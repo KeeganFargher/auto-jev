@@ -1,0 +1,85 @@
+- main [ref=f4e2]:
+  - generic [ref=f4e3]:
+    - generic [ref=f4e4]:
+      - paragraph [ref=f4e5]: A little world, unfolding
+      - heading "Jev Colony" [level=1] [ref=f4e6]
+    - strong [ref=f4e9]: Live
+  - region "Colony status" [ref=f4e10]:
+    - article [ref=f4e11]:
+      - generic [ref=f4e12]: Day
+      - strong [ref=f4e13]: "1"
+    - article [ref=f4e14]:
+      - generic [ref=f4e15]: Population
+      - strong [ref=f4e16]: "8"
+    - article [ref=f4e17]:
+      - generic [ref=f4e18]: Priority
+      - strong [ref=f4e19]: water
+    - article [ref=f4e20]:
+      - generic [ref=f4e21]: Decisions
+      - strong [ref=f4e22]: "0"
+    - article [ref=f4e23]:
+      - generic [ref=f4e24]: Jev calls
+      - strong [ref=f4e25]: —
+  - generic [ref=f4e26]:
+    - generic [ref=f4e27]:
+      - generic [ref=f4e28]:
+        - generic [ref=f4e29]:
+          - generic [ref=f4e30]: Food
+          - strong [ref=f4e31]: "36"
+        - generic [ref=f4e32]:
+          - generic [ref=f4e33]: Water
+          - strong [ref=f4e34]: "42"
+        - generic [ref=f4e35]:
+          - generic [ref=f4e36]: Wood
+          - strong [ref=f4e37]: "12"
+        - generic [ref=f4e38]:
+          - generic [ref=f4e39]: Stone
+          - strong [ref=f4e40]: "4"
+        - generic [ref=f4e41]:
+          - generic [ref=f4e42]: Housing
+          - strong [ref=f4e43]: 8/8
+      - generic [ref=f4e44]:
+        - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f4e45]
+        - generic:
+          - generic: The colony
+          - generic: A world of their own
+        - button "Reset view ↗" [ref=f4e46] [cursor=pointer]
+        - generic "Colonist activities":
+          - button [ref=f4e47] [cursor=pointer]
+          - button [ref=f4e48] [cursor=pointer]
+          - button [ref=f4e49] [cursor=pointer]
+          - button [ref=f4e50] [cursor=pointer]
+          - button [ref=f4e51] [cursor=pointer]
+          - button [ref=f4e52] [cursor=pointer]
+          - button [ref=f4e53] [cursor=pointer]
+          - button [ref=f4e54] [cursor=pointer]
+      - paragraph [ref=f4e55]: Drag to orbit · Scroll to zoom · Right-drag to pan · Select a colonist to inspect
+    - complementary [ref=f4e56]:
+      - generic [ref=f4e57]:
+        - generic [ref=f4e58]:
+          - heading "Ada" [level=2] [ref=f4e59]
+          - generic [ref=f4e60]: hard worker
+        - generic [ref=f4e61]:
+          - generic [ref=f4e62]: Current task
+          - strong [ref=f4e63]: chop tree
+        - generic [ref=f4e64]:
+          - generic [ref=f4e65]: Health
+          - strong [ref=f4e68]: "100"
+        - generic [ref=f4e69]:
+          - generic [ref=f4e70]: Hunger
+          - strong [ref=f4e73]: "35"
+        - generic [ref=f4e74]:
+          - generic [ref=f4e75]: Thirst
+          - strong [ref=f4e78]: "16"
+        - generic [ref=f4e79]:
+          - generic [ref=f4e80]: Energy
+          - strong [ref=f4e83]: "28"
+        - generic [ref=f4e84]:
+          - generic [ref=f4e85]: Latest decision
+          - generic [ref=f4e86]:
+            - generic [ref=f4e87]: —
+            - generic [ref=f4e88]: — ms
+          - paragraph [ref=f4e89]: No decision yet.
+      - generic [ref=f4e90]:
+        - heading "Recent events" [level=2] [ref=f4e91]
+        - list

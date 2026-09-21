@@ -1,0 +1,67 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada: Going to mine stone" [ref=e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e6]: ↗ ⛏
+      - 'button "Inspect Bo: Mining stone" [ref=e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e8]: ⛏
+      - 'button "Inspect Cleo: Going to mine stone" [ref=e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e10]: ↗ ⛏
+      - 'button "Inspect Dev: Going fishing" [ref=e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e12]: ↗ 🎣
+      - 'button "Inspect Eli: Going fishing" [ref=e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e14]: ↗ 🎣
+      - 'button "Inspect Fia: Mining stone" [ref=e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e16]: ⛏
+      - 'button "Inspect Gus: Going to mine stone" [ref=e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e18]: ↗ ⛏
+      - 'button "Inspect Hope: Going to mine stone" [ref=e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e20]: ↗ ⛏
+  - generic:
+    - generic:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [aria-hidden] [ref=e23]: ☀
+          - generic [ref=e24]:
+            - generic [ref=e25]: Colony day
+            - strong [ref=e26]: "1"
+        - strong [ref=e29]: Live
+      - generic "Colony resources" [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: Food
+          - strong [ref=e33]: "34"
+        - generic [ref=e34]:
+          - generic [ref=e35]: Water
+          - strong [ref=e36]: "36"
+        - generic [ref=e37]:
+          - generic [ref=e38]: Wood
+          - strong [ref=e39]: "12"
+        - generic [ref=e40]:
+          - generic [ref=e41]: Stone
+          - strong [ref=e42]: "4"
+        - generic [ref=e43]:
+          - generic [ref=e44]: Housing
+          - strong [ref=e45]: 8/8
+      - button "Hide HUD H" [ref=e46] [cursor=pointer]
+    - region "Current colony priority" [ref=e47]:
+      - generic [ref=e48]: Colony focus
+      - strong [ref=e49]: water
+      - generic [ref=e50]:
+        - text: 8 colonists
+        - generic [ref=e51]: camp
+      - generic [ref=e52]:
+        - generic [ref=e53]: Colony project
+        - strong [ref=e54]: Gathering farm materials
+        - progressbar "Colony project progress" [ref=e55]
+        - paragraph [ref=e56]: 12/24 wood · 4/8 stone
+        - paragraph [ref=e57]: 0 / 3 harvests to settlement
+    - generic:
+      - generic: Drag to orbit · Scroll to zoom · Select a colonist
+      - navigation "Game view controls" [ref=e58]:
+        - button "Journal" [ref=e59] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e60]: ≡
+          - text: Journal
+        - button "Reset view" [ref=e61] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e62]: ⌖
+          - text: Reset view

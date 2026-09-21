@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+data/world.json
+data/world.json.tmp
+*.log
+.DS_Store
+
+data/backups/

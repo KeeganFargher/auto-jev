@@ -1,0 +1,89 @@
+- main [ref=f2e2]:
+  - generic [ref=f2e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f2e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada: Deciding…" [active] [ref=f2e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e6]: …
+        - generic [ref=f2e71]: Deciding…
+      - 'button "Inspect Bo: Deciding…" [ref=f2e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e8]: …
+      - 'button "Inspect Cleo: Deciding…" [ref=f2e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e10]: …
+      - 'button "Inspect Dev: Deciding…" [ref=f2e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e12]: …
+      - 'button "Inspect Eli: Deciding…" [ref=f2e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e14]: …
+      - 'button "Inspect Fia: Deciding…" [ref=f2e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e16]: …
+      - 'button "Inspect Gus: Deciding…" [ref=f2e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e18]: …
+      - 'button "Inspect Hope: Deciding…" [ref=f2e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e20]: …
+  - generic:
+    - generic:
+      - generic [ref=f2e21]:
+        - generic [ref=f2e22]:
+          - generic [aria-hidden] [ref=f2e23]: ☀
+          - generic [ref=f2e24]:
+            - generic [ref=f2e25]: Colony day
+            - strong [ref=f2e26]: "1"
+        - strong [ref=f2e29]: Live
+      - generic "Colony resources" [ref=f2e30]:
+        - generic [ref=f2e72]:
+          - generic [ref=f2e73]: Food
+          - strong [ref=f2e74]: "36"
+        - generic [ref=f2e75]:
+          - generic [ref=f2e76]: Water
+          - strong [ref=f2e77]: "42"
+        - generic [ref=f2e78]:
+          - generic [ref=f2e79]: Wood
+          - strong [ref=f2e80]: "12"
+        - generic [ref=f2e81]:
+          - generic [ref=f2e82]: Stone
+          - strong [ref=f2e83]: "4"
+        - generic [ref=f2e84]:
+          - generic [ref=f2e85]: Housing
+          - strong [ref=f2e86]: 8/8
+      - button "Hide HUD H" [ref=f2e46] [cursor=pointer]
+    - region "Current colony priority" [ref=f2e47]:
+      - generic [ref=f2e48]: Colony focus
+      - strong [ref=f2e49]: water
+      - generic [ref=f2e50]: 8 colonists
+    - complementary "Selected colonist" [ref=f2e87]:
+      - generic [ref=f2e88]:
+        - generic [ref=f2e89]: Colonist
+        - button "Close colonist details" [ref=f2e90] [cursor=pointer]: ×
+      - generic [ref=f2e91]:
+        - generic [ref=f2e92]:
+          - heading "Ada" [level=2] [ref=f2e93]
+          - generic [ref=f2e94]: hard worker
+        - generic [ref=f2e95]:
+          - generic [ref=f2e96]: Current task
+          - strong [ref=f2e97]: Deciding…
+        - generic [ref=f2e98]:
+          - generic [ref=f2e99]: Health
+          - strong [ref=f2e102]: "100"
+        - generic [ref=f2e103]:
+          - generic [ref=f2e104]: Hunger
+          - strong [ref=f2e107]: "30"
+        - generic [ref=f2e108]:
+          - generic [ref=f2e109]: Thirst
+          - strong [ref=f2e112]: "15"
+        - generic [ref=f2e113]:
+          - generic [ref=f2e114]: Energy
+          - strong [ref=f2e117]: "29"
+        - generic [ref=f2e118]:
+          - generic [ref=f2e119]: Latest decision
+          - generic [ref=f2e120]:
+            - generic [ref=f2e121]: —
+            - generic [ref=f2e122]: — ms
+          - paragraph [ref=f2e123]: No decision yet.
+    - generic:
+      - generic: Drag to orbit · Scroll to zoom · Select a colonist
+      - navigation "Game view controls" [ref=f2e51]:
+        - button "Journal" [ref=f2e52] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f2e53]: ≡
+          - text: Journal
+        - button "Reset view" [ref=f2e54] [cursor=pointer]:
+          - generic [aria-hidden] [ref=f2e55]: ⌖
+          - text: Reset view

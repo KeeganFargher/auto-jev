@@ -1,0 +1,81 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada: Chopping wood" [ref=e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e6]: 🪓
+      - 'button "Inspect Bo: Chopping wood" [ref=e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e8]: 🪓
+      - 'button "Inspect Cleo: Chopping wood" [ref=e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e10]: 🪓
+      - 'button "Inspect Dev: Chopping wood" [ref=e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e12]: 🪓
+      - 'button "Inspect Eli: Chopping wood" [ref=e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e14]: 🪓
+      - 'button "Inspect Fia: Deciding…" [ref=e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e16]: …
+      - 'button "Inspect Gus: Deciding…" [ref=e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e18]: …
+      - 'button "Inspect Hope: Deciding…" [ref=e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e20]: …
+  - generic:
+    - generic:
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [aria-hidden] [ref=e23]: ☀
+          - generic [ref=e24]:
+            - generic [ref=e25]: Colony day
+            - strong [ref=e26]: "7"
+        - strong [ref=e29]: Live
+      - generic "Colony resources" [ref=e30]:
+        - button "Food 708 →" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: Food
+          - strong [ref=e33]: "708"
+          - generic [ref=e34]: →
+        - button "Water 483 →" [ref=e37] [cursor=pointer]:
+          - generic [ref=e38]: Water
+          - strong [ref=e39]: "483"
+          - generic [ref=e40]: →
+        - button "Wood 1228 ↑" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]: Wood
+          - strong [ref=e45]: "1228"
+          - generic [ref=e46]: ↑
+        - button "Stone 22 →" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]: Stone
+          - strong [ref=e52]: "22"
+          - generic [ref=e53]: →
+        - generic [ref=e56]:
+          - generic [ref=e57]: Housing
+          - strong [ref=e58]: 8/8
+      - button "Hide HUD H" [ref=e59] [cursor=pointer]
+    - region "Current colony priority" [ref=e60]:
+      - generic [ref=e61]: Colony focus
+      - strong [ref=e62]: materials
+      - generic [ref=e63]:
+        - text: 8 colonists
+        - generic [ref=e64]: settlement
+      - generic [ref=e65]:
+        - generic [ref=e66]: Colony project
+        - strong [ref=e67]: Fields ready to plant
+        - progressbar "Colony project progress" [ref=e68]
+        - paragraph [ref=e69]: Jev can assign a colonist to plant the next crop.
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]: farm 1
+            - strong [ref=e73]: Needs planting
+          - generic [ref=e74]:
+            - generic [ref=e75]: farm 2
+            - strong [ref=e76]: Needs planting
+          - generic [ref=e77]:
+            - generic [ref=e78]: farm 3
+            - strong [ref=e79]: Needs planting
+        - paragraph [ref=e80]: Settlement established · 6 harvests
+    - generic:
+      - generic: Drag to orbit · Scroll to zoom · Select a colonist
+      - navigation "Game view controls" [ref=e81]:
+        - button "Journal" [ref=e82] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e83]: ≡
+          - text: Journal
+        - button "Reset view" [ref=e84] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e85]: ⌖
+          - text: Reset view

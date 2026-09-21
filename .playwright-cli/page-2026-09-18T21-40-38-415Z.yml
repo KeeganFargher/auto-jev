@@ -1,0 +1,113 @@
+- main [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f1e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada · Ember: Going to drink" [ref=f1e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e6]: ↗ 💧
+      - 'button "Inspect Bo · Ember: Chopping wood" [ref=f1e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e8]: 🪓
+      - 'button "Inspect Cleo · Ember: Picking berries" [ref=f1e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e10]: 🫐
+      - 'button "Inspect Dev · Ember: Crafting planks" [ref=f1e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e12]: 🪚
+      - 'button "Inspect Eli · Ember: Picking berries" [ref=f1e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e14]: 🫐
+      - 'button "Inspect Fia · Ember: Going to chop wood" [ref=f1e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e16]: ↗ 🪓
+      - 'button "Inspect Gus · Ember: Chopping wood" [ref=f1e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e18]: 🪓
+      - 'button "Inspect Hope · Ember: Resting" [ref=f1e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e20]: ☾
+      - 'button "Inspect Settler 9 · Ember: Chopping wood" [ref=f1e21] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e22]: 🪓
+      - 'button "Inspect Settler 10 · Ember: Resting" [ref=f1e23] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e24]: ☾
+  - generic:
+    - generic:
+      - generic [ref=f1e25]:
+        - navigation "Follow colony" [ref=f1e26]:
+          - button "Ember · 10" [pressed] [ref=f1e27] [cursor=pointer]
+          - button "Tide · 12" [ref=f1e28] [cursor=pointer]
+        - generic "Colony day" [ref=f1e29]:
+          - text: ☀
+          - strong [ref=f1e30]: "42"
+        - generic [ref=f1e31]: Live
+      - generic "Colony resources" [ref=f1e32]:
+        - 'button "Food: 120 / 152. Collecting history. Click for chart." [ref=f1e33] [cursor=pointer]':
+          - strong [ref=f1e36]: "120"
+          - generic [aria-hidden] [ref=f1e37]: →
+        - 'button "Water: 147 / 152. Collecting history. Click for chart." [ref=f1e38] [cursor=pointer]':
+          - strong [ref=f1e41]: "147"
+          - generic [aria-hidden] [ref=f1e42]: ↑
+        - 'button "Wood: 198 / 220. Collecting history. Click for chart." [ref=f1e43] [cursor=pointer]':
+          - strong [ref=f1e46]: "198"
+          - generic [aria-hidden] [ref=f1e47]: ↑
+        - 'button "Stone: 2 / 140. Collecting history. Click for chart." [ref=f1e48] [cursor=pointer]':
+          - strong [ref=f1e51]: "2"
+          - generic [aria-hidden] [ref=f1e52]: ↓
+        - 'button "Planks: 93 / 150. Collecting history. Click for chart." [ref=f1e53] [cursor=pointer]':
+          - strong [ref=f1e56]: "93"
+          - generic [aria-hidden] [ref=f1e57]: ↑
+        - 'button "Ore: 0 / 100. Collecting history. Click for chart." [ref=f1e58] [cursor=pointer]':
+          - strong [ref=f1e61]: "0"
+          - generic [aria-hidden] [ref=f1e62]: →
+        - 'button "Coal: 10 / 100. Collecting history. Click for chart." [ref=f1e63] [cursor=pointer]':
+          - strong [ref=f1e67]: "10"
+          - generic [aria-hidden] [ref=f1e68]: →
+        - 'button "Metal: 0 / 100. Collecting history. Click for chart." [ref=f1e69] [cursor=pointer]':
+          - strong [ref=f1e72]: "0"
+          - generic [aria-hidden] [ref=f1e73]: →
+        - 'button "Tools: 0 / 16. Collecting history. Click for chart." [ref=f1e74] [cursor=pointer]':
+          - strong [ref=f1e77]: "0"
+          - generic [aria-hidden] [ref=f1e78]: →
+        - 'button "Weapons: 19 / 32. Collecting history. Click for chart." [ref=f1e79] [cursor=pointer]':
+          - strong [ref=f1e82]: "19"
+          - generic [aria-hidden] [ref=f1e83]: ↑
+      - button "Hide HUD H" [ref=f1e84] [cursor=pointer]
+    - region "Colony stories":
+      - navigation "Jev intentions":
+        - 'button "Ember: Secure water. 10 people · 120 food · 147 water" [ref=f1e85] [cursor=pointer]':
+          - generic [ref=f1e89]:
+            - generic [ref=f1e90]: Ember · Focus
+            - strong [ref=f1e91]: Secure water
+        - 'button "Tide: build defense. Work underway" [ref=f1e92] [cursor=pointer]':
+          - generic [ref=f1e96]:
+            - generic [ref=f1e97]: Tide · Investment
+            - strong [ref=f1e98]: build defense
+          - progressbar [ref=f1e99]
+      - generic:
+        - generic: Stories unfolding
+        - generic "Live observations"
+      - navigation "Developing stories":
+        - 'button "Tide: build defense. Work underway" [ref=f1e100] [cursor=pointer]':
+          - generic [ref=f1e104]:
+            - generic [ref=f1e105]: Tide · Developing
+            - strong [ref=f1e106]: build defense
+            - generic [ref=f1e107]: Work underway
+          - progressbar [ref=f1e108]
+        - 'button "Ember: Eli · Ember. Level 6 · gather berries" [ref=f1e109] [cursor=pointer]':
+          - generic [ref=f1e113]:
+            - generic [ref=f1e114]: Ember · Spotlight
+            - strong [ref=f1e115]: Eli · Ember
+            - generic [ref=f1e116]: Level 6 · gather berries
+        - 'button "Tide: Ada · Tide. Level 6 · guard" [ref=f1e117] [cursor=pointer]':
+          - generic [ref=f1e121]:
+            - generic [ref=f1e122]: Tide · Spotlight
+            - strong [ref=f1e123]: Ada · Tide
+            - generic [ref=f1e124]: Level 6 · guard
+    - generic:
+      - region "World minimap" [ref=f1e125]:
+        - generic [ref=f1e126]:
+          - generic [ref=f1e127]: Frontier
+          - generic "North" [ref=f1e128]: N ↑
+        - button "World minimap. Click to move the camera. Arrow keys pan; Enter returns to your colony." [ref=f1e129]
+        - generic [ref=f1e130]:
+          - generic [ref=f1e131]: Ember
+          - generic [ref=f1e132]: Tide
+      - navigation "Game view controls" [ref=f1e133]:
+        - button "Director camera" [ref=f1e134] [cursor=pointer]:
+          - generic [ref=f1e139]: Director
+        - button "Settlement" [ref=f1e140] [cursor=pointer]
+        - button "Journal" [ref=f1e145] [cursor=pointer]
+        - button "World" [ref=f1e150] [cursor=pointer]
+        - button "Home" [ref=f1e155] [cursor=pointer]

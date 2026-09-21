@@ -1,0 +1,60 @@
+- main [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f1e4]
+    - generic "Colonist activities"
+  - generic:
+    - generic:
+      - generic [ref=f1e5]:
+        - navigation "Follow colony" [ref=f1e6]:
+          - button "Ember · 8" [pressed] [ref=f1e7] [cursor=pointer]
+          - button "Tide · 8" [ref=f1e8] [cursor=pointer]
+        - generic "Colony day" [ref=f1e9]:
+          - text: ☀
+          - strong [ref=f1e10]: —
+      - generic "Colony resources" [ref=f1e11]:
+        - button "Food history" [ref=f1e12] [cursor=pointer]:
+          - strong [ref=f1e15]: —
+          - generic [aria-hidden] [ref=f1e16]: —
+        - button "Water history" [ref=f1e17] [cursor=pointer]:
+          - strong [ref=f1e20]: —
+          - generic [aria-hidden] [ref=f1e21]: —
+        - button "Wood history" [ref=f1e22] [cursor=pointer]:
+          - strong [ref=f1e25]: —
+          - generic [aria-hidden] [ref=f1e26]: —
+        - button "Stone history" [ref=f1e27] [cursor=pointer]:
+          - strong [ref=f1e30]: —
+          - generic [aria-hidden] [ref=f1e31]: —
+        - button "Planks history" [ref=f1e32] [cursor=pointer]:
+          - strong [ref=f1e35]: —
+          - generic [aria-hidden] [ref=f1e36]: —
+        - button "Ore history" [ref=f1e37] [cursor=pointer]:
+          - strong [ref=f1e40]: —
+          - generic [aria-hidden] [ref=f1e41]: —
+        - button "Coal history" [ref=f1e42] [cursor=pointer]:
+          - strong [ref=f1e46]: —
+          - generic [aria-hidden] [ref=f1e47]: —
+        - button "Metal history" [ref=f1e48] [cursor=pointer]:
+          - strong [ref=f1e51]: —
+          - generic [aria-hidden] [ref=f1e52]: —
+        - button "Tools history" [ref=f1e53] [cursor=pointer]:
+          - strong [ref=f1e56]: —
+          - generic [aria-hidden] [ref=f1e57]: —
+        - button "Weapons history" [ref=f1e58] [cursor=pointer]:
+          - strong [ref=f1e61]: —
+          - generic [aria-hidden] [ref=f1e62]: —
+      - button "Hide HUD" [ref=f1e63] [cursor=pointer]
+    - navigation "Important colony events"
+    - generic:
+      - region "World minimap" [ref=f1e64]:
+        - generic [ref=f1e65]:
+          - generic [ref=f1e66]: Frontier
+          - generic "North" [ref=f1e67]: N ↑
+        - button "World minimap. Click to move the camera. Arrow keys pan; Enter returns to your colony." [ref=f1e68]
+        - generic [ref=f1e69]:
+          - generic [ref=f1e70]: Ember
+          - generic [ref=f1e71]: Tide
+      - navigation "Game view controls" [ref=f1e72]:
+        - button "Settlement overview" [ref=f1e73] [cursor=pointer]
+        - button "Colony journal" [ref=f1e77] [cursor=pointer]
+        - button "Show both camps" [ref=f1e81] [cursor=pointer]
+        - button "Return to your colony · WASD to pan, scroll to zoom" [ref=f1e85] [cursor=pointer]

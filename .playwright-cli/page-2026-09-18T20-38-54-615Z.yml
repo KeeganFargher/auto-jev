@@ -1,0 +1,120 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=e4]
+      - generic "Colonist activities":
+        - 'button "Inspect Ada · Ember: Deciding…" [ref=e231] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e96]: …
+        - 'button "Inspect Bo · Ember: Going to drink" [ref=e232] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e98]: ↗ 💧
+        - 'button "Inspect Cleo · Ember: Deciding…" [ref=e233] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e100]: …
+        - 'button "Inspect Dev · Ember: Collecting water" [ref=e149] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e102]: 💧
+        - 'button "Inspect Eli · Ember: Deciding…" [ref=e234] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e104]: …
+        - 'button "Inspect Fia · Ember: Collecting water" [ref=e151] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e106]: 💧
+        - 'button "Inspect Gus · Ember: Going to pick berries" [ref=e235] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e108]: ↗ 🫐
+        - 'button "Inspect Hope · Ember: Collecting water" [ref=e153] [cursor=pointer]':
+          - generic [aria-hidden] [ref=e110]: 💧
+    - generic:
+      - generic:
+        - generic [ref=e5]:
+          - navigation "Follow colony" [ref=e6]:
+            - button "Ember · 8" [pressed] [ref=e7] [cursor=pointer]
+            - button "Tide · 10" [ref=e111] [cursor=pointer]
+          - generic "Colony day" [ref=e9]:
+            - text: ☀
+            - strong [ref=e10]: "17"
+          - generic [ref=e11]: Live
+        - generic "Colony resources" [ref=e12]:
+          - 'button "Food: 14 / 152. Food history · +4 over 1.0 colony days. Click for chart." [ref=e236] [cursor=pointer]':
+            - strong [ref=e16]: "14"
+            - generic [aria-hidden] [ref=e17]: ↑
+          - 'button "Water: 56 / 152. Water history · +8 over 1.0 colony days. Click for chart." [ref=e237] [cursor=pointer]':
+            - strong [ref=e21]: "56"
+            - generic [aria-hidden] [ref=e22]: ↑
+          - 'button "Wood: 13 / 220. Wood history · +4 over 1.0 colony days. Click for chart." [ref=e238] [cursor=pointer]':
+            - strong [ref=e26]: "13"
+            - generic [aria-hidden] [ref=e27]: ↑
+          - 'button "Stone: 5 / 140. Stone history · 0 over 1.0 colony days. Click for chart." [ref=e115] [cursor=pointer]':
+            - strong [ref=e31]: "5"
+            - generic [aria-hidden] [ref=e32]: →
+          - 'button "Planks: 44 / 150. Planks history · +21 over 1.0 colony days. Click for chart." [ref=e239] [cursor=pointer]':
+            - strong [ref=e36]: "44"
+            - generic [aria-hidden] [ref=e37]: ↑
+          - 'button "Ore: 0 / 100. Ore history · 0 over 1.0 colony days. Click for chart." [ref=e117] [cursor=pointer]':
+            - strong [ref=e41]: "0"
+            - generic [aria-hidden] [ref=e42]: →
+          - 'button "Coal: 0 / 100. Coal history · 0 over 1.0 colony days. Click for chart." [ref=e118] [cursor=pointer]':
+            - strong [ref=e47]: "0"
+            - generic [aria-hidden] [ref=e48]: →
+          - 'button "Metal: 0 / 100. Metal history · 0 over 1.0 colony days. Click for chart." [ref=e119] [cursor=pointer]':
+            - strong [ref=e52]: "0"
+            - generic [aria-hidden] [ref=e53]: →
+          - 'button "Tools: 0 / 16. Tools history · 0 over 1.0 colony days. Click for chart." [ref=e120] [cursor=pointer]':
+            - strong [ref=e57]: "0"
+            - generic [aria-hidden] [ref=e58]: →
+          - 'button "Weapons: 0 / 32. Weapons history · 0 over 1.0 colony days. Click for chart." [ref=e121] [cursor=pointer]':
+            - strong [ref=e62]: "0"
+            - generic [aria-hidden] [ref=e63]: →
+        - button "Hide HUD H" [ref=e64] [cursor=pointer]
+      - navigation "Important colony events":
+        - button "Ember · Low food" [ref=e240] [cursor=pointer]
+      - region "Settlement overview" [ref=e167]:
+        - generic [ref=e168]:
+          - heading "Ember" [level=2] [ref=e169]
+          - button "Close settlement overview" [ref=e170] [cursor=pointer]: ×
+        - generic [ref=e171]:
+          - generic [ref=e172]: village
+          - generic [ref=e173]: industry
+        - generic [ref=e174]:
+          - generic [ref=e179]: Focus
+          - strong [ref=e180]: food
+        - generic [ref=e181]:
+          - 'generic "Population: 8/12. Living colonists / settlement population limit. Research unlocks more capacity." [ref=e182]':
+            - strong [ref=e187]: 8/12
+            - generic [ref=e188]: Population
+          - 'generic "Housing: 12. 4 spare beds · 3 improved homes. Recruitment needs a spare bed." [ref=e189]':
+            - strong [ref=e193]: "12"
+            - generic [ref=e194]: Housing
+          - 'generic "Fields: 3. 0 ready to harvest · 0 growing" [ref=e243]':
+            - strong [ref=e199]: "3"
+            - generic [ref=e200]: Fields
+          - 'generic "Defenses: 0/3. 0 armed workers · palisades protect against raids" [ref=e201]':
+            - strong [ref=e205]: 0/3
+            - generic [ref=e206]: Defenses
+          - 'generic "Machines: 0. No machines built" [ref=e207]':
+            - strong [ref=e211]: "0"
+            - generic [ref=e212]: Machines
+          - 'generic "Technologies: 2. Open the settlement tree for unlocks, costs and prerequisites." [ref=e213]':
+            - strong [ref=e217]: "2"
+            - generic [ref=e218]: Technologies
+        - generic [ref=e219]:
+          - generic [ref=e220]: In progress
+          - strong [ref=e222]: No active construction
+          - paragraph [ref=e223]: Jev chooses the next investment
+        - button "Unlocks & settlement tree ↗" [ref=e224] [cursor=pointer]:
+          - text: Unlocks & settlement tree
+          - generic [ref=e228]: ↗
+        - group [ref=e229]:
+          - generic "More details" [ref=e230] [cursor=pointer]
+      - generic:
+        - region "World minimap" [ref=e65]:
+          - generic [ref=e66]:
+            - generic [ref=e67]: Frontier
+            - generic "North" [ref=e68]: N ↑
+          - button "World minimap. Click to move the camera. Arrow keys pan; Enter returns to your colony." [ref=e69]
+          - generic [ref=e70]:
+            - generic [ref=e71]: Ember
+            - generic [ref=e72]: Tide
+        - navigation "Game view controls" [ref=e73]:
+          - button "Settlement" [expanded] [active] [ref=e74] [cursor=pointer]
+          - button "Journal" [ref=e79] [cursor=pointer]
+          - button "World" [ref=e84] [cursor=pointer]
+          - button "Home" [ref=e89] [cursor=pointer]
+  - 'tooltip "Food Food: 14 / 152. Food history · +4 over 1.0 colony days. Click for chart."':
+    - strong: Food
+    - paragraph: "Food: 14 / 152. Food history · +4 over 1.0 colony days. Click for chart."

@@ -1,0 +1,107 @@
+- main [ref=e2]:
+  - strong [ref=e6]: Live
+  - region "Colony status" [ref=e7]:
+    - article [ref=e8]:
+      - generic [ref=e9]: Day
+      - strong [ref=e10]: "6"
+    - article [ref=e11]:
+      - generic [ref=e12]: Population
+      - strong [ref=e13]: "8"
+    - article [ref=e14]:
+      - generic [ref=e15]: Priority
+      - strong [ref=e16]: food
+    - article [ref=e17]:
+      - generic [ref=e18]: Decisions
+      - strong [ref=e19]: "971"
+    - article [ref=e20]:
+      - generic [ref=e21]: Jev calls
+      - strong [ref=e22]: 459 · 2.1/call
+  - generic [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: Food
+          - strong [ref=e28]: "105"
+        - generic [ref=e29]:
+          - generic [ref=e30]: Water
+          - strong [ref=e31]: 1,393
+        - generic [ref=e32]:
+          - generic [ref=e33]: Wood
+          - strong [ref=e34]: "980"
+        - generic [ref=e35]:
+          - generic [ref=e36]: Stone
+          - strong [ref=e37]: "112"
+        - generic [ref=e38]:
+          - generic [ref=e39]: Housing
+          - strong [ref=e40]: 8/8
+      - generic [ref=e41]:
+        - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=e42]
+        - generic:
+          - generic: The colony
+          - generic: A world of their own
+        - button "Reset view ↗" [ref=e43] [cursor=pointer]
+        - generic "Colonist activities":
+          - 'button "Inspect Ada: Chopping wood" [ref=e44] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e45]: 🪓
+            - generic [ref=e46]: Chopping wood
+          - 'button "Inspect Bo: Chopping wood" [ref=e47] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e48]: 🪓
+          - 'button "Inspect Cleo: Chopping wood" [ref=e49] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e50]: 🪓
+          - 'button "Inspect Dev: Chopping wood" [ref=e51] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e52]: 🪓
+          - 'button "Inspect Eli: Deciding…" [ref=e53] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e54]: …
+          - 'button "Inspect Fia: Resting" [ref=e55] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e56]: ☾
+          - 'button "Inspect Gus: Chopping wood" [ref=e57] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e58]: 🪓
+          - 'button "Inspect Hope: Chopping wood" [ref=e59] [cursor=pointer]':
+            - generic [aria-hidden] [ref=e60]: 🪓
+      - paragraph [ref=e61]: Drag to orbit · Scroll to zoom · Right-drag to pan · Select a colonist to inspect
+    - complementary [ref=e62]:
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - heading "Ada" [level=2] [ref=e65]
+          - generic [ref=e66]: hard worker
+        - generic [ref=e67]:
+          - generic [ref=e68]: Current task
+          - strong [ref=e69]: chop tree
+        - generic [ref=e70]:
+          - generic [ref=e71]: Health
+          - strong [ref=e74]: "100"
+        - generic [ref=e75]:
+          - generic [ref=e76]: Hunger
+          - strong [ref=e79]: "50"
+        - generic [ref=e80]:
+          - generic [ref=e81]: Thirst
+          - strong [ref=e84]: "5"
+        - generic [ref=e85]:
+          - generic [ref=e86]: Energy
+          - strong [ref=e89]: "24"
+        - generic [ref=e90]:
+          - generic [ref=e91]: Latest decision
+          - generic [ref=e92]:
+            - generic [ref=e93]: jev
+            - generic [ref=e94]: 484 ms
+          - generic [ref=e95]:
+            - generic [ref=e96]: mine stone
+            - strong [ref=e97]: 43%
+          - generic [ref=e100]:
+            - generic [ref=e101]: chop tree
+            - strong [ref=e102]: 43%
+          - generic [ref=e105]:
+            - generic [ref=e106]: eat
+            - strong [ref=e107]: 9%
+          - generic [ref=e110]:
+            - generic [ref=e111]: drink
+            - strong [ref=e112]: 2%
+          - generic [ref=e115]:
+            - generic [ref=e116]: fetch water
+            - strong [ref=e117]: 2%
+          - generic [ref=e120]:
+            - generic [ref=e121]: rest
+            - strong [ref=e122]: 1%
+      - generic [ref=e125]:
+        - heading "Recent events" [level=2] [ref=e126]
+        - list

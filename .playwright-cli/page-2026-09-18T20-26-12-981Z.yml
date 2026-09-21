@@ -1,0 +1,79 @@
+- main [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f1e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada · Ember: Collecting water" [ref=f1e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e6]: 💧
+      - 'button "Inspect Bo · Ember: Going to fetch water" [ref=f1e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e8]: ↗ 💧
+      - 'button "Inspect Cleo · Ember: Picking berries" [ref=f1e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e10]: 🫐
+      - 'button "Inspect Dev · Ember: Chopping wood" [ref=f1e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e12]: 🪓
+      - 'button "Inspect Eli · Ember: Picking berries" [ref=f1e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e14]: 🫐
+      - 'button "Inspect Fia · Ember: Picking berries" [ref=f1e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e16]: 🫐
+      - 'button "Inspect Gus · Ember: Collecting water" [ref=f1e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e18]: 💧
+      - 'button "Inspect Hope · Ember: Going fishing" [ref=f1e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e20]: ↗ 🎣
+  - generic:
+    - generic:
+      - generic [ref=f1e21]:
+        - navigation "Follow colony" [ref=f1e22]:
+          - button "Ember · 8" [pressed] [ref=f1e23] [cursor=pointer]
+          - button "Tide · 8" [ref=f1e24] [cursor=pointer]
+        - generic "Colony day" [ref=f1e25]:
+          - text: ☀
+          - strong [ref=f1e26]: "11"
+        - generic [ref=f1e27]: Live
+      - generic "Colony resources" [ref=f1e28]:
+        - 'button "Food: 4 / 152. Collecting history. Click for chart." [ref=f1e29] [cursor=pointer]':
+          - strong [ref=f1e32]: "4"
+          - generic [aria-hidden] [ref=f1e33]: ↓
+        - 'button "Water: 6 / 152. Collecting history. Click for chart." [ref=f1e34] [cursor=pointer]':
+          - strong [ref=f1e37]: "6"
+          - generic [aria-hidden] [ref=f1e38]: ↓
+        - 'button "Wood: 34 / 220. Collecting history. Click for chart." [ref=f1e39] [cursor=pointer]':
+          - strong [ref=f1e42]: "34"
+          - generic [aria-hidden] [ref=f1e43]: ↑
+        - 'button "Stone: 5 / 140. Collecting history. Click for chart." [ref=f1e44] [cursor=pointer]':
+          - strong [ref=f1e47]: "5"
+          - generic [aria-hidden] [ref=f1e48]: ↓
+        - 'button "Planks: 11 / 150. Collecting history. Click for chart." [ref=f1e49] [cursor=pointer]':
+          - strong [ref=f1e52]: "11"
+          - generic [aria-hidden] [ref=f1e53]: ↓
+        - 'button "Ore: 0 / 100. Collecting history. Click for chart." [ref=f1e54] [cursor=pointer]':
+          - strong [ref=f1e57]: "0"
+          - generic [aria-hidden] [ref=f1e58]: →
+        - 'button "Coal: 0 / 100. Collecting history. Click for chart." [ref=f1e59] [cursor=pointer]':
+          - strong [ref=f1e63]: "0"
+          - generic [aria-hidden] [ref=f1e64]: →
+        - 'button "Metal: 0 / 100. Collecting history. Click for chart." [ref=f1e65] [cursor=pointer]':
+          - strong [ref=f1e68]: "0"
+          - generic [aria-hidden] [ref=f1e69]: →
+        - 'button "Tools: 0 / 16. Collecting history. Click for chart." [ref=f1e70] [cursor=pointer]':
+          - strong [ref=f1e73]: "0"
+          - generic [aria-hidden] [ref=f1e74]: →
+        - 'button "Weapons: 0 / 32. Collecting history. Click for chart." [ref=f1e75] [cursor=pointer]':
+          - strong [ref=f1e78]: "0"
+          - generic [aria-hidden] [ref=f1e79]: →
+      - button "Hide HUD H" [ref=f1e80] [cursor=pointer]
+    - navigation "Important colony events":
+      - button "Ember · Low food" [ref=f1e81] [cursor=pointer]
+      - button "Ember · Low water" [ref=f1e84] [cursor=pointer]
+    - generic:
+      - region "World minimap" [ref=f1e87]:
+        - generic [ref=f1e88]:
+          - generic [ref=f1e89]: Frontier
+          - generic "North" [ref=f1e90]: N ↑
+        - button "World minimap. Click to move the camera. Arrow keys pan; Enter returns to your colony." [ref=f1e91]
+        - generic [ref=f1e92]:
+          - generic [ref=f1e93]: Ember
+          - generic [ref=f1e94]: Tide
+      - navigation "Game view controls" [ref=f1e95]:
+        - button "Settlement" [ref=f1e96] [cursor=pointer]
+        - button "Journal" [ref=f1e101] [cursor=pointer]
+        - button "World" [ref=f1e106] [cursor=pointer]
+        - button "Home" [ref=f1e111] [cursor=pointer]

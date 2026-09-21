@@ -1,0 +1,79 @@
+- main [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f1e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada: Resting" [ref=f1e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e6]: ☾
+      - 'button "Inspect Bo: Resting" [ref=f1e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e8]: ☾
+      - 'button "Inspect Cleo: Going to eat" [ref=f1e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e10]: ↗ 🍎
+      - 'button "Inspect Dev: Going to chop wood" [ref=f1e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e12]: ↗ 🪓
+      - 'button "Inspect Eli: Chopping wood" [ref=f1e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e14]: 🪓
+      - 'button "Inspect Fia: Going to pick berries" [ref=f1e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e16]: ↗ 🫐
+      - 'button "Inspect Gus: Picking berries" [ref=f1e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e18]: 🫐
+      - 'button "Inspect Hope: Picking berries" [ref=f1e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e20]: 🫐
+  - generic:
+    - generic:
+      - generic [ref=f1e21]:
+        - generic [ref=f1e22]:
+          - generic [aria-hidden] [ref=f1e23]: ☀
+          - generic [ref=f1e24]:
+            - generic [ref=f1e25]: Colony day
+            - strong [ref=f1e26]: "8"
+        - strong [ref=f1e29]: Live
+      - generic "Colony resources" [ref=f1e30]:
+        - button "Food 763 ↑" [ref=f1e31] [cursor=pointer]:
+          - generic [ref=f1e32]: Food
+          - strong [ref=f1e33]: "763"
+          - generic [ref=f1e34]: ↑
+        - button "Water 475 ↓" [ref=f1e38] [cursor=pointer]:
+          - generic [ref=f1e39]: Water
+          - strong [ref=f1e40]: "475"
+          - generic [ref=f1e41]: ↓
+        - button "Wood 1348 ↑" [ref=f1e45] [cursor=pointer]:
+          - generic [ref=f1e46]: Wood
+          - strong [ref=f1e47]: "1348"
+          - generic [ref=f1e48]: ↑
+        - button "Stone 22 →" [ref=f1e52] [cursor=pointer]:
+          - generic [ref=f1e53]: Stone
+          - strong [ref=f1e54]: "22"
+          - generic [ref=f1e55]: →
+        - generic [ref=f1e58]:
+          - generic [ref=f1e59]: Housing
+          - strong [ref=f1e60]: 8/8
+      - button "Hide HUD" [ref=f1e61] [cursor=pointer]
+    - region "Current colony priority" [ref=f1e62]:
+      - generic [ref=f1e63]: Colony focus
+      - strong [ref=f1e64]: water
+      - generic [ref=f1e65]:
+        - text: 8 colonists
+        - generic [ref=f1e66]: settlement
+      - generic [ref=f1e67]:
+        - generic [ref=f1e68]: Colony project
+        - strong [ref=f1e69]: Crops growing
+        - progressbar "Colony project progress" [ref=f1e70]
+        - paragraph [ref=f1e71]: Workers can fish and gather while crops mature.
+        - generic [ref=f1e72]:
+          - generic [ref=f1e73]:
+            - generic [ref=f1e74]: farm 1
+            - strong [ref=f1e75]: 34% grown
+          - generic [ref=f1e76]:
+            - generic [ref=f1e77]: farm 2
+            - strong [ref=f1e78]: Needs planting
+          - generic [ref=f1e79]:
+            - generic [ref=f1e80]: farm 3
+            - strong [ref=f1e81]: 29% grown
+        - paragraph [ref=f1e82]: Settlement established · 6 harvests
+    - navigation "Game view controls" [ref=f1e83]:
+      - button "Journal" [ref=f1e84] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f1e85]: ≡
+        - text: Journal
+      - button "Reset view" [ref=f1e86] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f1e87]: ⌖
+        - text: Reset view

@@ -1,0 +1,207 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada · Ember: Chopping wood" [ref=e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e6]: 🪓
+      - 'button "Inspect Bo · Ember: Chopping wood" [ref=e124] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e8]: 🪓
+      - 'button "Inspect Cleo · Ember: Chopping wood" [ref=e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e10]: 🪓
+      - 'button "Inspect Dev · Ember: Chopping wood" [ref=e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e12]: 🪓
+      - 'button "Inspect Eli · Ember: Mining stone" [ref=e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e14]: ⛏
+      - 'button "Inspect Fia · Ember: Chopping wood" [ref=e125] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e16]: 🪓
+      - 'button "Inspect Gus · Ember: Chopping wood" [ref=e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e18]: 🪓
+      - 'button "Inspect Hope · Ember: Chopping wood" [ref=e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e20]: 🪓
+  - generic:
+    - generic:
+      - generic [ref=e21]:
+        - strong [ref=e22]: Jev Ember
+        - generic [ref=e23]:
+          - generic [aria-hidden] [ref=e24]: ☀
+          - generic [ref=e25]:
+            - generic [ref=e26]: Colony day
+            - strong [ref=e27]: "1"
+        - strong [ref=e30]: Live
+      - generic "Colony resources" [ref=e31]:
+        - button "Food 47 / 128 ↓" [ref=e126] [cursor=pointer]:
+          - generic [ref=e33]: Food
+          - strong [ref=e34]: "47"
+          - text: / 128
+          - generic [ref=e35]: ↓
+        - button "Water 36 / 128 ↓" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: Water
+          - strong [ref=e41]: "36"
+          - text: / 128
+          - generic [ref=e42]: ↓
+        - button "Wood 50 / 220 ↑" [ref=e127] [cursor=pointer]:
+          - generic [ref=e47]: Wood
+          - strong [ref=e48]: "50"
+          - text: / 220
+          - generic [ref=e49]: ↑
+        - button "Stone 11 / 140 ↑" [ref=e129] [cursor=pointer]:
+          - generic [ref=e53]: Stone
+          - strong [ref=e54]: "11"
+          - text: / 140
+          - generic [ref=e55]: ↑
+        - button "Planks 0 / 150 →" [ref=e58] [cursor=pointer]:
+          - generic [ref=e59]: Planks
+          - strong [ref=e60]: "0"
+          - text: / 150
+          - generic [ref=e61]: →
+        - button "Ore 0 / 100 →" [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]: Ore
+          - strong [ref=e66]: "0"
+          - text: / 100
+          - generic [ref=e67]: →
+        - button "Coal 0 / 100 →" [ref=e70] [cursor=pointer]:
+          - generic [ref=e71]: Coal
+          - strong [ref=e72]: "0"
+          - text: / 100
+          - generic [ref=e73]: →
+        - button "Metal 0 / 100 →" [ref=e76] [cursor=pointer]:
+          - generic [ref=e77]: Metal
+          - strong [ref=e78]: "0"
+          - text: / 100
+          - generic [ref=e79]: →
+        - button "Tools 0 / 16 →" [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]: Tools
+          - strong [ref=e84]: "0"
+          - text: / 16
+          - generic [ref=e85]: →
+        - button "Weapons 0 / 32 →" [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]: Weapons
+          - strong [ref=e90]: "0"
+          - text: / 32
+          - generic [ref=e91]: →
+        - generic [ref=e94]:
+          - generic [ref=e95]: Housing
+          - strong [ref=e96]: 8/8
+      - button "Hide HUD H" [ref=e97] [cursor=pointer]
+    - navigation "Follow colony" [ref=e98]:
+      - button "Ember · 8" [pressed] [ref=e99] [cursor=pointer]
+      - button "Tide · 8" [ref=e100] [cursor=pointer]
+    - region "Current colony priority" [ref=e101]:
+      - generic [ref=e102]: Colony focus
+      - strong [ref=e103]: materials
+      - generic [ref=e104]:
+        - text: 8 colonists
+        - generic [ref=e105]: camp
+      - generic [ref=e106]:
+        - generic [ref=e107]: Development
+        - strong [ref=e108]: Colony development
+        - progressbar "Colony project progress" [ref=e109]
+        - paragraph [ref=e110]: Jev chooses the colony’s next investment.
+        - paragraph [ref=e111]: Path undecided · Workshop unbuilt · Palisades 0/3 · Homes 0/2
+        - paragraph [ref=e112]: Rival camp unscouted
+        - paragraph [ref=e113]: "People 8/8 · Beds 8 · Food 47/128 · Machines: none"
+        - button "Settlement tree ↗" [ref=e114] [cursor=pointer]
+        - paragraph [ref=e115]: "Raids: 0 food delivered · 0 lost"
+        - paragraph [ref=e116]: 0 / 14 technologies · identity undecided
+    - region "Progression tree" [ref=e131]:
+      - generic [ref=e132]:
+        - generic [ref=e133]:
+          - heading "Ember · settlement tree" [level=2] [ref=e134]
+          - paragraph [ref=e135]: Camp · 8 people / 8 unlocked · 8 beds · 0 monuments
+        - button "Close progression tree" [active] [ref=e136] [cursor=pointer]: ×
+      - paragraph [ref=e137]: No research project selected. Jev can plan from the available branches.
+      - paragraph [ref=e138]: ● Learned ◷ Researching ○ Available ◇ Locked
+      - generic [ref=e139]:
+        - generic [ref=e140]:
+          - heading "Civic" [level=3] [ref=e141]
+          - button "○ Available Village charter Colony level 2; recruit up to 12 people; unlock specialised research 12 planks · 12 stone · 12 food · Starting node" [ref=e142] [cursor=pointer]:
+            - generic [ref=e143]: ○ Available
+            - strong [ref=e144]: Village charter
+            - generic [ref=e145]: Colony level 2; recruit up to 12 people; unlock specialised research
+            - generic [ref=e146]: 12 planks · 12 stone · 12 food · Starting node
+          - button "◇ Locked Apprenticeships +20% worker XP from productive jobs 26 planks · 24 food · Requires Village charter" [ref=e147] [cursor=pointer]:
+            - generic [ref=e148]: ◇ Locked
+            - strong [ref=e149]: Apprenticeships
+            - generic [ref=e150]: +20% worker XP from productive jobs
+            - generic [ref=e151]: 26 planks · 24 food · Requires Village charter
+          - button "◇ Locked Town charter Colony level 3; recruit up to 24 people; unlock larger farms 60 planks · 30 metal · 40 stone · 40 food · Requires Village charter + Apprenticeships + Metalworking" [ref=e152] [cursor=pointer]:
+            - generic [ref=e153]: ◇ Locked
+            - strong [ref=e154]: Town charter
+            - generic [ref=e155]: Colony level 3; recruit up to 24 people; unlock larger farms
+            - generic [ref=e156]: 60 planks · 30 metal · 40 stone · 40 food · Requires Village charter + Apprenticeships + Metalworking
+          - button "◇ Locked Infirmary practice Rest restores 8 extra health; supports safer long expeditions 40 food · 40 water · 30 planks · Requires Apprenticeships" [ref=e157] [cursor=pointer]:
+            - generic [ref=e158]: ◇ Locked
+            - strong [ref=e159]: Infirmary practice
+            - generic [ref=e160]: Rest restores 8 extra health; supports safer long expeditions
+            - generic [ref=e161]: 40 food · 40 water · 30 planks · Requires Apprenticeships
+        - generic [ref=e162]:
+          - heading "Agriculture" [level=3] [ref=e163]
+          - button "◇ Locked Crop rotation +4 food per harvest; up to six fields 30 wood · 16 planks · 16 food · Requires Village charter" [ref=e164] [cursor=pointer]:
+            - generic [ref=e165]: ◇ Locked
+            - strong [ref=e166]: Crop rotation
+            - generic [ref=e167]: +4 food per harvest; up to six fields
+            - generic [ref=e168]: 30 wood · 16 planks · 16 food · Requires Village charter
+          - button "◇ Locked Granaries Double food/water storage; food spoilage falls from 12% to 3% per day 32 planks · 24 stone · Requires Crop rotation" [ref=e169] [cursor=pointer]:
+            - generic [ref=e170]: ◇ Locked
+            - strong [ref=e171]: Granaries
+            - generic [ref=e172]: Double food/water storage; food spoilage falls from 12% to 3% per day
+            - generic [ref=e173]: 32 planks · 24 stone · Requires Crop rotation
+          - button "◇ Locked Waterworks Build coal-powered pumps and automatic field irrigation 40 planks · 16 metal · 30 stone · Requires Crop rotation + Metalworking" [ref=e174] [cursor=pointer]:
+            - generic [ref=e175]: ◇ Locked
+            - strong [ref=e176]: Waterworks
+            - generic [ref=e177]: Build coal-powered pumps and automatic field irrigation
+            - generic [ref=e178]: 40 planks · 16 metal · 30 stone · Requires Crop rotation + Metalworking
+          - button "◇ Locked Terraced fields Expand fields from 3×3 to 5×5, doubling base harvest yield 45 planks · 18 metal · 45 stone · Requires Town charter + Crop rotation" [ref=e179] [cursor=pointer]:
+            - generic [ref=e180]: ◇ Locked
+            - strong [ref=e181]: Terraced fields
+            - generic [ref=e182]: Expand fields from 3×3 to 5×5, doubling base harvest yield
+            - generic [ref=e183]: 45 planks · 18 metal · 45 stone · Requires Town charter + Crop rotation
+        - generic [ref=e184]:
+          - heading "Industry" [level=3] [ref=e185]
+          - button "◇ Locked Managed forestry +1 wood per chop; regrowth is twice as fast 50 wood · 18 stone · Requires Village charter" [ref=e186] [cursor=pointer]:
+            - generic [ref=e187]: ◇ Locked
+            - strong [ref=e188]: Managed forestry
+            - generic [ref=e189]: +1 wood per chop; regrowth is twice as fast
+            - generic [ref=e190]: 50 wood · 18 stone · Requires Village charter
+          - button "◇ Locked Metalworking Mine remote iron and coal; smelt metal; craft tools 30 stone · 24 planks · 40 wood · Requires Village charter" [ref=e191] [cursor=pointer]:
+            - generic [ref=e192]: ◇ Locked
+            - strong [ref=e193]: Metalworking
+            - generic [ref=e194]: Mine remote iron and coal; smelt metal; craft tools
+            - generic [ref=e195]: 30 stone · 24 planks · 40 wood · Requires Village charter
+          - button "◇ Locked Supply depots +100% material storage; +10% walking speed 30 planks · 30 stone · Requires Managed forestry" [ref=e196] [cursor=pointer]:
+            - generic [ref=e197]: ◇ Locked
+            - strong [ref=e198]: Supply depots
+            - generic [ref=e199]: +100% material storage; +10% walking speed
+            - generic [ref=e200]: 30 planks · 30 stone · Requires Managed forestry
+          - 'button "◇ Locked Powered sawmills Build an automatic sawmill: wood + coal → planks 40 planks · 24 metal · 30 stone · Requires Managed forestry + Metalworking" [ref=e201] [cursor=pointer]':
+            - generic [ref=e202]: ◇ Locked
+            - strong [ref=e203]: Powered sawmills
+            - generic [ref=e204]: "Build an automatic sawmill: wood + coal → planks"
+            - generic [ref=e205]: 40 planks · 24 metal · 30 stone · Requires Managed forestry + Metalworking
+        - generic [ref=e206]:
+          - heading "Frontier" [level=3] [ref=e207]
+          - button "◇ Locked Militia Craft and equip spears; guards and raiders gain weapon strength 20 planks · 24 stone · 20 food · Requires Village charter" [ref=e208] [cursor=pointer]:
+            - generic [ref=e209]: ◇ Locked
+            - strong [ref=e210]: Militia
+            - generic [ref=e211]: Craft and equip spears; guards and raiders gain weapon strength
+            - generic [ref=e212]: 20 planks · 24 stone · 20 food · Requires Village charter
+          - button "◇ Locked Regional capital Colony level 4; up to 32 people; commission escalating civic monuments 120 planks · 80 metal · 60 stone · 60 food · Requires Town charter + Powered sawmills + Militia" [ref=e213] [cursor=pointer]:
+            - generic [ref=e214]: ◇ Locked
+            - strong [ref=e215]: Regional capital
+            - generic [ref=e216]: Colony level 4; up to 32 people; commission escalating civic monuments
+            - generic [ref=e217]: 120 planks · 80 metal · 60 stone · 60 food · Requires Town charter + Powered sawmills + Militia
+      - paragraph [ref=e218]: Select a node to inspect its requirements. These choices belong to Jev.
+      - group [ref=e219]:
+        - generic "Milestone history" [ref=e220]
+    - generic:
+      - generic: WASD to pan · Drag to orbit · Scroll to zoom · Select a colonist
+      - navigation "Game view controls" [ref=e117]:
+        - button "Journal" [ref=e118] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e119]: ≡
+          - text: Journal
+        - button "Both camps" [ref=e120] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e121]: ◈
+          - text: Both camps
+        - button "Reset view" [ref=e122] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e123]: ⌖
+          - text: Reset view

@@ -1,0 +1,117 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada · Ember: Chopping wood" [ref=e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e6]: 🪓
+      - 'button "Inspect Bo · Ember: Going to chop wood" [ref=e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e8]: ↗ 🪓
+      - 'button "Inspect Cleo · Ember: Chopping wood" [ref=e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e10]: 🪓
+      - 'button "Inspect Dev · Ember: Chopping wood" [ref=e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e12]: 🪓
+      - 'button "Inspect Eli · Ember: Mining stone" [ref=e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e14]: ⛏
+      - 'button "Inspect Fia · Ember: Going to chop wood" [ref=e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e16]: ↗ 🪓
+      - 'button "Inspect Gus · Ember: Chopping wood" [ref=e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e18]: 🪓
+      - 'button "Inspect Hope · Ember: Chopping wood" [ref=e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e20]: 🪓
+  - generic:
+    - generic:
+      - generic [ref=e21]:
+        - strong [ref=e22]: Jev Ember
+        - generic [ref=e23]:
+          - generic [aria-hidden] [ref=e24]: ☀
+          - generic [ref=e25]:
+            - generic [ref=e26]: Colony day
+            - strong [ref=e27]: "1"
+        - strong [ref=e30]: Live
+      - generic "Colony resources" [ref=e31]:
+        - button "Food 48 / 128 ↓" [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]: Food
+          - strong [ref=e34]: "48"
+          - text: / 128
+          - generic [ref=e35]: ↓
+        - button "Water 36 / 128 ↓" [ref=e39] [cursor=pointer]:
+          - generic [ref=e40]: Water
+          - strong [ref=e41]: "36"
+          - text: / 128
+          - generic [ref=e42]: ↓
+        - button "Wood 20 / 220 →" [ref=e46] [cursor=pointer]:
+          - generic [ref=e47]: Wood
+          - strong [ref=e48]: "20"
+          - text: / 220
+          - generic [ref=e49]: →
+        - button "Stone 8 / 140 →" [ref=e52] [cursor=pointer]:
+          - generic [ref=e53]: Stone
+          - strong [ref=e54]: "8"
+          - text: / 140
+          - generic [ref=e55]: →
+        - button "Planks 0 / 150 →" [ref=e58] [cursor=pointer]:
+          - generic [ref=e59]: Planks
+          - strong [ref=e60]: "0"
+          - text: / 150
+          - generic [ref=e61]: →
+        - button "Ore 0 / 100 →" [ref=e64] [cursor=pointer]:
+          - generic [ref=e65]: Ore
+          - strong [ref=e66]: "0"
+          - text: / 100
+          - generic [ref=e67]: →
+        - button "Coal 0 / 100 →" [ref=e70] [cursor=pointer]:
+          - generic [ref=e71]: Coal
+          - strong [ref=e72]: "0"
+          - text: / 100
+          - generic [ref=e73]: →
+        - button "Metal 0 / 100 →" [ref=e76] [cursor=pointer]:
+          - generic [ref=e77]: Metal
+          - strong [ref=e78]: "0"
+          - text: / 100
+          - generic [ref=e79]: →
+        - button "Tools 0 / 16 →" [ref=e82] [cursor=pointer]:
+          - generic [ref=e83]: Tools
+          - strong [ref=e84]: "0"
+          - text: / 16
+          - generic [ref=e85]: →
+        - button "Weapons 0 / 32 →" [ref=e88] [cursor=pointer]:
+          - generic [ref=e89]: Weapons
+          - strong [ref=e90]: "0"
+          - text: / 32
+          - generic [ref=e91]: →
+        - generic [ref=e94]:
+          - generic [ref=e95]: Housing
+          - strong [ref=e96]: 8/8
+      - button "Hide HUD H" [ref=e97] [cursor=pointer]
+    - navigation "Follow colony" [ref=e98]:
+      - button "Ember · 8" [pressed] [ref=e99] [cursor=pointer]
+      - button "Tide · 8" [ref=e100] [cursor=pointer]
+    - region "Current colony priority" [ref=e101]:
+      - generic [ref=e102]: Colony focus
+      - strong [ref=e103]: materials
+      - generic [ref=e104]:
+        - text: 8 colonists
+        - generic [ref=e105]: camp
+      - generic [ref=e106]:
+        - generic [ref=e107]: Development
+        - strong [ref=e108]: Colony development
+        - progressbar "Colony project progress" [ref=e109]
+        - paragraph [ref=e110]: Jev chooses the colony’s next investment.
+        - paragraph [ref=e111]: Path undecided · Workshop unbuilt · Palisades 0/3 · Homes 0/2
+        - paragraph [ref=e112]: Rival camp unscouted
+        - paragraph [ref=e113]: "People 8/8 · Beds 8 · Food 48/128 · Machines: none"
+        - button "Settlement tree ↗" [ref=e114] [cursor=pointer]
+        - paragraph [ref=e115]: "Raids: 0 food delivered · 0 lost"
+        - paragraph [ref=e116]: 0 / 14 technologies · identity undecided
+    - generic:
+      - generic: WASD to pan · Drag to orbit · Scroll to zoom · Select a colonist
+      - navigation "Game view controls" [ref=e117]:
+        - button "Journal" [ref=e118] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e119]: ≡
+          - text: Journal
+        - button "Both camps" [ref=e120] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e121]: ◈
+          - text: Both camps
+        - button "Reset view" [ref=e122] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e123]: ⌖
+          - text: Reset view

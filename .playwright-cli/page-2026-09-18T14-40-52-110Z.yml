@@ -1,0 +1,43 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=e4]
+    - generic "Colonist activities"
+  - generic:
+    - generic:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - generic [aria-hidden] [ref=e7]: ☀
+          - generic [ref=e8]:
+            - generic [ref=e9]: Colony day
+            - strong [ref=e10]: "10"
+        - strong [ref=e13]: Live
+      - generic "Colony resources" [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]: Food
+          - strong [ref=e17]: "-1"
+        - generic [ref=e18]:
+          - generic [ref=e19]: Water
+          - strong [ref=e20]: 1,254
+        - generic [ref=e21]:
+          - generic [ref=e22]: Wood
+          - strong [ref=e23]: 1,356
+        - generic [ref=e24]:
+          - generic [ref=e25]: Stone
+          - strong [ref=e26]: "382"
+        - generic [ref=e27]:
+          - generic [ref=e28]: Housing
+          - strong [ref=e29]: 8/0
+      - button "Hide HUD H" [ref=e30] [cursor=pointer]
+    - region "Current colony priority" [ref=e31]:
+      - generic [ref=e32]: Colony focus
+      - strong [ref=e33]: food
+      - generic [ref=e34]: 0 colonists
+    - generic:
+      - generic: Drag to orbit · Scroll to zoom · Select a colonist
+      - navigation "Game view controls" [ref=e35]:
+        - button "Journal" [ref=e36] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e37]: ≡
+          - text: Journal
+        - button "Reset view" [ref=e38] [cursor=pointer]:
+          - generic [aria-hidden] [ref=e39]: ⌖
+          - text: Reset view

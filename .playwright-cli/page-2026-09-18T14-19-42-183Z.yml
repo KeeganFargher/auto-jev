@@ -1,0 +1,76 @@
+- main [ref=f2e2]:
+  - generic [ref=f2e3]:
+    - generic [ref=f2e4]:
+      - paragraph [ref=f2e5]: A little world, unfolding
+      - heading "Jev Colony" [level=1] [ref=f2e6]
+    - strong [ref=f2e9]: Live
+  - region "Colony status" [ref=f2e10]:
+    - article [ref=f2e11]:
+      - generic [ref=f2e12]: Day
+      - strong [ref=f2e13]: "1"
+    - article [ref=f2e14]:
+      - generic [ref=f2e15]: Population
+      - strong [ref=f2e16]: "8"
+    - article [ref=f2e17]:
+      - generic [ref=f2e18]: Priority
+      - strong [ref=f2e19]: water
+    - article [ref=f2e20]:
+      - generic [ref=f2e21]: Decisions
+      - strong [ref=f2e22]: "0"
+    - article [ref=f2e23]:
+      - generic [ref=f2e24]: Jev calls
+      - strong [ref=f2e25]: —
+  - generic [ref=f2e26]:
+    - generic [ref=f2e27]:
+      - generic [ref=f2e28]:
+        - generic [ref=f2e29]:
+          - generic [ref=f2e30]: Food
+          - strong [ref=f2e31]: "36"
+        - generic [ref=f2e32]:
+          - generic [ref=f2e33]: Water
+          - strong [ref=f2e34]: "42"
+        - generic [ref=f2e35]:
+          - generic [ref=f2e36]: Wood
+          - strong [ref=f2e37]: "12"
+        - generic [ref=f2e38]:
+          - generic [ref=f2e39]: Stone
+          - strong [ref=f2e40]: "4"
+        - generic [ref=f2e41]:
+          - generic [ref=f2e42]: Housing
+          - strong [ref=f2e43]: 8/8
+      - generic [ref=f2e44]:
+        - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f2e45]
+        - generic:
+          - generic: The colony
+          - generic: A world of their own
+        - button "Reset view ↗" [ref=f2e46] [cursor=pointer]
+      - paragraph [ref=f2e47]: Drag to orbit · Scroll to zoom · Right-drag to pan · Select a colonist to inspect
+    - complementary [ref=f2e48]:
+      - generic [ref=f2e49]:
+        - generic [ref=f2e50]:
+          - heading "Ada" [level=2] [ref=f2e51]
+          - generic [ref=f2e52]: hard worker
+        - generic [ref=f2e53]:
+          - generic [ref=f2e54]: Current task
+          - strong [ref=f2e55]: Deciding…
+        - generic [ref=f2e56]:
+          - generic [ref=f2e57]: Health
+          - strong [ref=f2e60]: "100"
+        - generic [ref=f2e61]:
+          - generic [ref=f2e62]: Hunger
+          - strong [ref=f2e65]: "28"
+        - generic [ref=f2e66]:
+          - generic [ref=f2e67]: Thirst
+          - strong [ref=f2e70]: "19"
+        - generic [ref=f2e71]:
+          - generic [ref=f2e72]: Energy
+          - strong [ref=f2e75]: "12"
+        - generic [ref=f2e76]:
+          - generic [ref=f2e77]: Latest decision
+          - generic [ref=f2e78]:
+            - generic [ref=f2e79]: —
+            - generic [ref=f2e80]: — ms
+          - paragraph [ref=f2e81]: No decision yet.
+      - generic [ref=f2e82]:
+        - heading "Recent events" [level=2] [ref=f2e83]
+        - list

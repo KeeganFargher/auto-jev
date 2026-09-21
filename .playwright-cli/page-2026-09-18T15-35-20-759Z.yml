@@ -1,0 +1,95 @@
+- main [ref=f2e2]:
+  - generic [ref=f2e3]:
+    - generic "Interactive 3D colony. Drag to orbit, scroll to zoom, click a colonist to inspect." [ref=f2e4]
+    - generic "Colonist activities":
+      - 'button "Inspect Ada · Ember: Crafting planks" [ref=f2e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e6]: 🪚
+      - 'button "Inspect Bo · Ember: Building palisades" [ref=f2e7] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e8]: 🛡
+      - 'button "Inspect Cleo · Ember: Picking berries" [ref=f2e9] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e10]: 🫐
+      - 'button "Inspect Dev · Ember: Chopping wood" [ref=f2e11] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e12]: 🪓
+      - 'button "Inspect Eli · Ember: Chopping wood" [ref=f2e13] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e14]: 🪓
+      - 'button "Inspect Fia · Ember: Chopping wood" [ref=f2e15] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e16]: 🪓
+      - 'button "Inspect Gus · Ember: Chopping wood" [ref=f2e17] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e18]: 🪓
+      - 'button "Inspect Hope · Ember: Chopping wood" [ref=f2e19] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e20]: 🪓
+      - 'button "Inspect Bo · Tide: Fishing" [ref=f2e21] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f2e22]: 🎣
+  - generic:
+    - generic:
+      - generic [ref=f2e23]:
+        - strong [ref=f2e24]: Jev Ember
+        - generic [ref=f2e25]:
+          - generic [aria-hidden] [ref=f2e26]: ☀
+          - generic [ref=f2e27]:
+            - generic [ref=f2e28]: Colony day
+            - strong [ref=f2e29]: "2"
+        - strong [ref=f2e32]: Live
+      - generic "Colony resources" [ref=f2e33]:
+        - button "Food 232 ↑" [ref=f2e34] [cursor=pointer]:
+          - generic [ref=f2e35]: Food
+          - strong [ref=f2e36]: "232"
+          - generic [ref=f2e37]: ↑
+        - button "Water 96 ↓" [ref=f2e41] [cursor=pointer]:
+          - generic [ref=f2e42]: Water
+          - strong [ref=f2e43]: "96"
+          - generic [ref=f2e44]: ↓
+        - button "Wood 116 ↓" [ref=f2e48] [cursor=pointer]:
+          - generic [ref=f2e49]: Wood
+          - strong [ref=f2e50]: "116"
+          - generic [ref=f2e51]: ↓
+        - button "Stone 26 ↑" [ref=f2e55] [cursor=pointer]:
+          - generic [ref=f2e56]: Stone
+          - strong [ref=f2e57]: "26"
+          - generic [ref=f2e58]: ↑
+        - button "Planks 3 ↑" [ref=f2e62] [cursor=pointer]:
+          - generic [ref=f2e63]: Planks
+          - strong [ref=f2e64]: "3"
+          - generic [ref=f2e65]: ↑
+        - generic [ref=f2e69]:
+          - generic [ref=f2e70]: Housing
+          - strong [ref=f2e71]: 8/8
+      - button "Hide HUD" [ref=f2e72] [cursor=pointer]
+    - navigation "Follow colony" [ref=f2e73]:
+      - button "Ember · 8" [pressed] [ref=f2e74] [cursor=pointer]
+      - button "Tide · 8" [ref=f2e75] [cursor=pointer]
+    - region "Current colony priority" [ref=f2e76]:
+      - generic [ref=f2e77]: Colony focus
+      - strong [ref=f2e78]: shelter
+      - generic [ref=f2e79]:
+        - text: 8 colonists
+        - generic [ref=f2e80]: settlement
+      - generic [ref=f2e81]:
+        - generic [ref=f2e82]: Development
+        - strong [ref=f2e83]: craft planks
+        - progressbar "Colony project progress" [ref=f2e84]
+        - paragraph [ref=f2e85]: Ada · Ember · 79% complete
+        - generic [ref=f2e86]:
+          - generic [ref=f2e87]:
+            - generic [ref=f2e88]: ember farm 1
+            - strong [ref=f2e89]: Needs planting
+          - generic [ref=f2e90]:
+            - generic [ref=f2e91]: ember farm 2
+            - strong [ref=f2e92]: Needs planting
+          - generic [ref=f2e93]:
+            - generic [ref=f2e94]: ember farm 3
+            - strong [ref=f2e95]: Needs planting
+        - paragraph [ref=f2e96]: industry · Workshop ready · Palisades 2/3 · Homes 0/2
+        - paragraph [ref=f2e97]: Rival camp unscouted
+        - paragraph [ref=f2e98]: "Raids: 0 food delivered · 0 lost"
+        - paragraph [ref=f2e99]: industry path chosen · 0 harvests
+    - navigation "Game view controls" [ref=f2e100]:
+      - button "Journal" [ref=f2e101] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f2e102]: ≡
+        - text: Journal
+      - button "Both camps" [ref=f2e103] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f2e104]: ◈
+        - text: Both camps
+      - button "Reset view" [ref=f2e105] [cursor=pointer]:
+        - generic [aria-hidden] [ref=f2e106]: ⌖
+        - text: Reset view
