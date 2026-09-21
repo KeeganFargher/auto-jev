@@ -1,0 +1,21 @@
+{
+  "name": "@jev-game/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@colyseus/sdk": "^0.18.1",
+    "@jev-game/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@jev-game/colyseus-contract": "workspace:*",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}

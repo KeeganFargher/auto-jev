@@ -1,0 +1,12 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+pmOnFail: ignore
+# colyseus's optional uWebSockets.js transport is git-hosted; allow that one exception.
+blockExoticSubdeps: false
+# Native postinstall builds pnpm blocks by default: esbuild, @colyseus/schema's msgpackr-extract.
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
+# @colyseus/core <-> @colyseus/auth circular peer dep splits the matchMaker under the isolated linker.
+nodeLinker: hoisted

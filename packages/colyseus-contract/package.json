@@ -1,0 +1,22 @@
+{
+  "name": "@jev-game/colyseus-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@colyseus/schema": "^5.0.14",
+    "@jev-game/shared": "workspace:*",
+    "colyseus": "^0.18.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}

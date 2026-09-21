@@ -1,0 +1,33 @@
+{
+  "name": "jev-game",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev:client": "pnpm --filter ./apps/client dev",
+    "dev:server": "pnpm --filter ./apps/server start",
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm --filter \"./apps/*\" build",
+    "lint": "oxlint",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.83.0",
+    "oxfmt": "^0.68.0",
+    "oxlint": "^1.83.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.5.1",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.5.1"
+}
