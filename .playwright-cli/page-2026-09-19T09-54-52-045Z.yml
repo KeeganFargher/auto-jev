@@ -1,0 +1,98 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic "Interactive 3D battlefield. Drag to orbit, scroll to zoom, click a person or building to inspect." [ref=e4]
+    - generic "Activities and battles":
+      - 'button "Inspect Thorn the Ancient: Guarding the town" [ref=e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=e6]: 🛡
+        - generic [ref=e7]: Guarding the town
+  - generic:
+    - generic:
+      - generic [ref=e8]:
+        - navigation "Follow faction" [ref=e9]:
+          - button "Thornwatch 23" [pressed] [ref=e10] [cursor=pointer]:
+            - generic [ref=e11]: Thornwatch
+            - generic [ref=e12]: "23"
+          - button "Greyhaven 17" [ref=e13] [cursor=pointer]:
+            - generic [ref=e14]: Greyhaven
+            - generic [ref=e15]: "17"
+          - button "Goldmere 18" [ref=e16] [cursor=pointer]:
+            - generic [ref=e17]: Goldmere
+            - generic [ref=e18]: "18"
+        - generic [ref=e19]:
+          - text: War
+          - strong [ref=e20]: 12:13
+        - generic [ref=e21]: Live
+      - generic "Faction resources" [ref=e22]:
+        - 'button "Supplies: 86 in store, +60 per day. +66 over the last 2 minutes. Click for chart." [ref=e23] [cursor=pointer]':
+          - strong [ref=e26]: "86"
+          - generic [aria-hidden] [ref=e27]: ↑
+        - 'button "Food: 317 in store, +89 per day. +31 over the last 2 minutes. Click for chart." [ref=e28] [cursor=pointer]':
+          - strong [ref=e31]: "317"
+          - generic [aria-hidden] [ref=e32]: ↑
+        - 'button "Iron: 0 in store, +0 per day. 0 over the last 2 minutes. Click for chart." [ref=e33] [cursor=pointer]':
+          - strong [ref=e36]: "0"
+          - generic [aria-hidden] [ref=e37]: →
+        - 'button "Essence: 7 in store, +12 per day. +7 over the last 2 minutes. Click for chart." [ref=e38] [cursor=pointer]':
+          - strong [ref=e41]: "7"
+          - generic [aria-hidden] [ref=e42]: ↑
+        - strong [ref=e47]: "23"
+        - strong [ref=e51]: "7"
+      - button "Hide HUD H" [ref=e52] [cursor=pointer]
+    - region "Faction stories":
+      - button "Collapse stories" [expanded] [ref=e53] [cursor=pointer]:
+        - generic [ref=e57]: Stories
+        - generic [aria-hidden] [ref=e58]: ‹
+      - navigation "Faction intentions":
+        - 'button "Thornwatch: Ordered to retreat. retreating" [ref=e59] [cursor=pointer]':
+          - generic [ref=e63]:
+            - generic [ref=e64]: Thornwatch · Army
+            - strong [ref=e65]: Ordered to retreat
+        - 'button "Greyhaven: Claiming Three Crossings. moving" [ref=e66] [cursor=pointer]':
+          - generic [ref=e70]:
+            - generic [ref=e71]: Greyhaven · Army
+            - strong [ref=e72]: Claiming Three Crossings
+        - 'button "Goldmere: Ordered to retreat. retreating" [ref=e73] [cursor=pointer]':
+          - generic [ref=e77]:
+            - generic [ref=e78]: Goldmere · Army
+            - strong [ref=e79]: Ordered to retreat
+      - generic:
+        - generic: Stories unfolding
+        - generic "Live observations"
+      - navigation "Developing stories":
+        - 'button "Goldmere: Kael the Bloodhound is in danger. Jev at risk" [ref=e80] [cursor=pointer]':
+          - generic [ref=e84]:
+            - generic [ref=e85]: Goldmere · Live observation
+            - strong [ref=e86]: Kael the Bloodhound is in danger
+            - generic [ref=e87]: Jev at risk
+        - 'button "Thornwatch: Battle of Three Crossings. Since 09:19" [ref=e88] [cursor=pointer]':
+          - generic [ref=e92]:
+            - generic [ref=e93]: Thornwatch · Battle
+            - strong [ref=e94]: Battle of Three Crossings
+            - generic [ref=e95]: Since 09:19
+        - 'button "Thornwatch: Thornwatch''s Vanguard: Ordered to retreat. retreating" [ref=e96] [cursor=pointer]':
+          - generic [ref=e100]:
+            - generic [ref=e101]: Thornwatch · Live observation
+            - strong [ref=e102]: "Thornwatch's Vanguard: Ordered to retreat"
+            - generic [ref=e103]: retreating
+        - 'button "Goldmere: Goldmere''s Vanguard: Ordered to retreat. retreating" [ref=e104] [cursor=pointer]':
+          - generic [ref=e108]:
+            - generic [ref=e109]: Goldmere · Live observation
+            - strong [ref=e110]: "Goldmere's Vanguard: Ordered to retreat"
+            - generic [ref=e111]: retreating
+    - generic:
+      - region "World minimap" [ref=e112]:
+        - generic [ref=e113]:
+          - generic [ref=e114]: Frontier
+          - generic "North" [ref=e115]: N ↑
+        - button "World minimap. Click to move the camera. Arrow keys pan; Enter returns to the selected faction." [ref=e116]
+        - generic [ref=e117]:
+          - generic [ref=e118]: Thornwatch
+          - generic [ref=e119]: Greyhaven
+          - generic [ref=e120]: Goldmere
+      - navigation "Game view controls" [ref=e121]:
+        - button "Director camera" [ref=e122] [cursor=pointer]:
+          - generic [ref=e127]: Director
+        - button "Faction" [ref=e128] [cursor=pointer]
+        - button "Journal" [ref=e133] [cursor=pointer]
+        - button "World" [ref=e138] [cursor=pointer]
+        - button "Home" [ref=e143] [cursor=pointer]

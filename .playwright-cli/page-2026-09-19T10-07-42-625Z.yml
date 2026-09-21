@@ -1,0 +1,51 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic "Interactive 3D battlefield. Drag to orbit, scroll to zoom, click a person or building to inspect." [ref=e4]
+    - generic "Activities and battles"
+  - generic:
+    - generic:
+      - generic [ref=e5]:
+        - navigation "Follow faction"
+        - generic [ref=e6]:
+          - text: Foundation
+          - strong [ref=e7]: 00:00
+        - generic [ref=e8]: Reconnecting
+      - generic "Faction resources" [ref=e9]:
+        - button "Supplies history" [ref=e10] [cursor=pointer]:
+          - strong [ref=e13]: —
+          - generic [aria-hidden] [ref=e14]: —
+        - button "Food history" [ref=e15] [cursor=pointer]:
+          - strong [ref=e18]: —
+          - generic [aria-hidden] [ref=e19]: —
+        - button "Iron history" [ref=e20] [cursor=pointer]:
+          - strong [ref=e23]: —
+          - generic [aria-hidden] [ref=e24]: —
+        - button "Essence history" [ref=e25] [cursor=pointer]:
+          - strong [ref=e28]: —
+          - generic [aria-hidden] [ref=e29]: —
+        - strong [ref=e34]: —
+        - strong [ref=e38]: —
+      - button "Hide HUD H" [ref=e39] [cursor=pointer]
+    - region "Faction stories":
+      - button "Collapse stories" [expanded] [ref=e40] [cursor=pointer]:
+        - generic [ref=e44]: Stories
+        - generic [aria-hidden] [ref=e45]: ‹
+      - navigation "Faction intentions"
+      - generic:
+        - generic: Stories unfolding
+        - generic "Live observations"
+      - navigation "Developing stories"
+      - paragraph: A quiet spell. The factions are building.
+    - generic:
+      - region "World minimap" [ref=e46]:
+        - generic [ref=e47]:
+          - generic [ref=e48]: Frontier
+          - generic "North" [ref=e49]: N ↑
+        - button "World minimap. Click to move the camera. Arrow keys pan; Enter returns to the selected faction." [ref=e50]
+      - navigation "Game view controls" [ref=e51]:
+        - button "Director camera" [ref=e52] [cursor=pointer]:
+          - generic [ref=e57]: Director
+        - button "Faction" [ref=e58] [cursor=pointer]
+        - button "Journal" [ref=e63] [cursor=pointer]
+        - button "World" [ref=e68] [cursor=pointer]
+        - button "Home" [ref=e73] [cursor=pointer]

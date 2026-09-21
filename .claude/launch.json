@@ -1,0 +1,50 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "offline",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:offline"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "jev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "fast",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:fast"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "quick",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:quick"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "battle-check",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "JEV_ENGINE=offline PORT=3400 TURN_MS=500 PACE=0.3 WORLD_PATH=/tmp/jev-battlecheck.json npx tsx src/server.ts"
+      ],
+      "port": 3400
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+- main [ref=f1e2]:
+  - generic [ref=f1e3]:
+    - generic "Interactive 3D battlefield. Drag to orbit, scroll to zoom, click a person or building to inspect." [ref=f1e4]
+    - generic "Activities and battles":
+      - 'button "Inspect Thorn the Ancient: Thorn the Ancient · Guarding the town" [ref=f1e5] [cursor=pointer]':
+        - generic [aria-hidden] [ref=f1e6]: 🛡
+        - generic [ref=f1e7]: Thorn the Ancient · Guarding the town
+  - generic:
+    - generic:
+      - generic [ref=f1e8]:
+        - navigation "Follow faction" [ref=f1e9]:
+          - button "Thornwatch 23" [pressed] [ref=f1e10] [cursor=pointer]:
+            - generic [ref=f1e11]: Thornwatch
+            - generic [ref=f1e12]: "23"
+          - button "Greyhaven 22" [ref=f1e13] [cursor=pointer]:
+            - generic [ref=f1e14]: Greyhaven
+            - generic [ref=f1e15]: "22"
+          - button "Goldmere 19" [ref=f1e16] [cursor=pointer]:
+            - generic [ref=f1e17]: Goldmere
+            - generic [ref=f1e18]: "19"
+        - generic [ref=f1e19]:
+          - text: War
+          - strong [ref=f1e20]: 15:24
+        - generic [ref=f1e21]: Live
+      - generic "Faction resources" [ref=f1e22]:
+        - 'button "Supplies: 140 in store, +152 per day. +75 over the last 2 minutes. Click for chart." [ref=f1e23] [cursor=pointer]':
+          - strong [ref=f1e26]: "140"
+          - generic [aria-hidden] [ref=f1e27]: ↑
+        - 'button "Food: 471 in store, +119 per day. +72 over the last 2 minutes. Click for chart." [ref=f1e28] [cursor=pointer]':
+          - strong [ref=f1e31]: "471"
+          - generic [aria-hidden] [ref=f1e32]: ↑
+        - 'button "Iron: 12 in store, +12 per day. +6 over the last 2 minutes. Click for chart." [ref=f1e33] [cursor=pointer]':
+          - strong [ref=f1e36]: "12"
+          - generic [aria-hidden] [ref=f1e37]: ↑
+        - 'button "Essence: 25 in store, +0 per day. +2 over the last 2 minutes. Click for chart." [ref=f1e38] [cursor=pointer]':
+          - strong [ref=f1e41]: "25"
+          - generic [aria-hidden] [ref=f1e42]: ↑
+        - strong [ref=f1e47]: "23"
+        - strong [ref=f1e51]: "6"
+      - button "Hide HUD H" [ref=f1e52] [cursor=pointer]
+    - region "Faction stories":
+      - button "Collapse stories" [expanded] [ref=f1e53] [cursor=pointer]:
+        - generic [ref=f1e57]: Stories
+        - generic [aria-hidden] [ref=f1e58]: ‹
+      - navigation "Faction intentions":
+        - 'button "Thornwatch: Ordered to retreat. retreating" [ref=f1e59] [cursor=pointer]':
+          - generic [ref=f1e63]:
+            - generic [ref=f1e64]: Thornwatch · Army
+            - strong [ref=f1e65]: Ordered to retreat
+        - 'button "Greyhaven: Taking Saltmarsh from Goldmere. fighting" [ref=f1e66] [cursor=pointer]':
+          - generic [ref=f1e70]:
+            - generic [ref=f1e71]: Greyhaven · Army
+            - strong [ref=f1e72]: Taking Saltmarsh from Goldmere
+        - 'button "Goldmere: Ordered to retreat. retreating" [ref=f1e73] [cursor=pointer]':
+          - generic [ref=f1e77]:
+            - generic [ref=f1e78]: Goldmere · Army
+            - strong [ref=f1e79]: Ordered to retreat
+      - generic:
+        - generic: Stories unfolding
+        - generic "Live observations"
+      - navigation "Developing stories":
+        - 'button "Greyhaven: Battle of Saltmarsh. Since 14:32" [ref=f1e80] [cursor=pointer]':
+          - generic [ref=f1e84]:
+            - generic [ref=f1e85]: Greyhaven · Battle
+            - strong [ref=f1e86]: Battle of Saltmarsh
+            - generic [ref=f1e87]: Since 14:32
+        - 'button "Thornwatch: Thornwatch''s Spears: Ordered to retreat. retreating" [ref=f1e88] [cursor=pointer]':
+          - generic [ref=f1e92]:
+            - generic [ref=f1e93]: Thornwatch · Live observation
+            - strong [ref=f1e94]: "Thornwatch's Spears: Ordered to retreat"
+            - generic [ref=f1e95]: retreating
+        - 'button "Goldmere: Goldmere''s Spears: Ordered to retreat. retreating" [ref=f1e96] [cursor=pointer]':
+          - generic [ref=f1e100]:
+            - generic [ref=f1e101]: Goldmere · Live observation
+            - strong [ref=f1e102]: "Goldmere's Spears: Ordered to retreat"
+            - generic [ref=f1e103]: retreating
+        - 'button "Greyhaven: Greyhaven''s Wardens: Taking Saltmarsh from Goldmere. fighting" [ref=f1e104] [cursor=pointer]':
+          - generic [ref=f1e108]:
+            - generic [ref=f1e109]: Greyhaven · Live observation
+            - strong [ref=f1e110]: "Greyhaven's Wardens: Taking Saltmarsh from Goldmere"
+            - generic [ref=f1e111]: fighting
+    - generic:
+      - region "World minimap" [ref=f1e112]:
+        - generic [ref=f1e113]:
+          - generic [ref=f1e114]: Frontier
+          - generic "North" [ref=f1e115]: N ↑
+        - button "World minimap. Click to move the camera. Arrow keys pan; Enter returns to the selected faction." [ref=f1e116]
+        - generic [ref=f1e117]:
+          - generic [ref=f1e118]: Thornwatch
+          - generic [ref=f1e119]: Greyhaven
+          - generic [ref=f1e120]: Goldmere
+      - navigation "Game view controls" [ref=f1e121]:
+        - button "Director camera" [ref=f1e122] [cursor=pointer]:
+          - generic [ref=f1e127]: Director
+        - button "Faction" [ref=f1e128] [cursor=pointer]
+        - button "Journal" [ref=f1e133] [cursor=pointer]
+        - button "World" [ref=f1e138] [cursor=pointer]
+        - button "Home" [ref=f1e143] [cursor=pointer]

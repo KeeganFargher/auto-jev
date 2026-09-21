@@ -1,13 +1,20 @@
 {
-  "name": "jev-colony",
+  "name": "jev-rivals",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx src/server.ts",
+    "dev:offline": "JEV_ENGINE=offline tsx src/server.ts",
+    "dev:fast": "JEV_ENGINE=offline TURN_MS=500 BATTLE_SPEED=3 PACE=0.35 tsx src/server.ts",
+    "dev:quick": "JEV_ENGINE=offline TURN_MS=500 PACE=0.35 tsx src/server.ts",
+    "campaign": "JEV_ENGINE=offline tsx src/headless.ts",
+    "balance": "JEV_ENGINE=offline tsx src/balance.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "tron": "tsx src/tron/headless.ts",
+    "tron:offline": "JEV_ENGINE=offline tsx src/tron/headless.ts"
   },
   "dependencies": {
     "express": "^5.1.0",

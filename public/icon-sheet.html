@@ -1,0 +1,18 @@
+<!doctype html><meta charset="utf-8">
+<body style="margin:0;background:#0d1a16;color:#e5cf93;font:11px Inter,sans-serif">
+<div id="grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:18px;padding:18px"></div>
+<script type="module">
+import { hudIcon, iconNames, useIconSprites, hasSprite } from "/hud-icons.js";
+// The sheet is standalone, so it has to ask for the manifest the way the game does.
+const catalog = await fetch("/api/world").then((r) => r.json()).then((r) => r.catalog).catch(() => ({ icons: [] }));
+useIconSprites(catalog.icons);
+document.getElementById("grid").innerHTML = iconNames.map((n) => `
+  <div style="display:flex;align-items:center;gap:10px;background:#16241f;border:1px solid #ffffff14;border-radius:6px;padding:8px">
+    <span style="display:grid;place-items:center;width:16px;height:16px;flex:none">${hudIcon(n)}</span>
+    <span style="display:grid;place-items:center;width:26px;height:26px;flex:none">${hudIcon(n)}</span>
+    <span style="display:grid;place-items:center;width:44px;height:44px;flex:none">${hudIcon(n)}</span>
+    <b style="color:${hasSprite(n) ? "#8fbfa4" : "#e0704f"}">${n}${hasSprite(n) ? "" : " · drawn"}</b>
+  </div>`).join("");
+for (const s of document.querySelectorAll("svg")) { s.style.width = "100%"; s.style.height = "100%"; }
+</script>
+<style>svg path, svg circle, svg rect { vector-effect: non-scaling-stroke; }</style>
