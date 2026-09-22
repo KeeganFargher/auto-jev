@@ -3,7 +3,7 @@ import { createLocalBattleLabSession } from "./session/local-session.js";
 import { createPlaybackSession } from "./session/playback-session.js";
 import { createBattleLabScene, type BattleLabScene } from "./game/scenes/battle-lab-scene.js";
 import { parseScenario, serializeScenario, type LabScenario } from "./dev/scenario-editor.js";
-import type { BattleLabSession, LabScenarioKind } from "./session/types.js";
+import type { BattleLabSession, LabScenarioKind, TeamAUpgradeIdsByHero } from "./session/types.js";
 
 const canvasRoot = document.getElementById("lab-canvas-root")!;
 
@@ -56,14 +56,25 @@ function handleReplay(): void {
   mount(createPlaybackSession(recording, scenario), true);
 }
 
-function handleReset(seed: number, scenario?: LabScenarioKind): void {
+function handleReset(
+  seed: number,
+  scenario?: LabScenarioKind,
+  teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero,
+): void {
   if (activeIsReplay) {
-    mount(createLocalBattleLabSession(seed, scenario ?? activeSession.peekSnapshot().scenario), false);
+    mount(
+      createLocalBattleLabSession(
+        seed,
+        scenario ?? activeSession.peekSnapshot().scenario,
+        teamAUpgradeIdsByHero,
+      ),
+      false,
+    );
 
     return;
   }
 
-  activeSession.reset(seed, scenario);
+  activeSession.reset(seed, scenario, teamAUpgradeIdsByHero);
 }
 
 mount(activeSession, false);

@@ -7,7 +7,9 @@ import { resolveTarget } from "./targeting.js";
 import { proposeMovement } from "./movement.js";
 import { getEngageRange, proposeAction, type ActionProposal } from "./abilities.js";
 import { applyEffect } from "./effects.js";
-import { expireShield } from "./statuses.js";
+import { resolveChainDamage } from "./chain.js";
+import { expireShield, expireSlow } from "./statuses.js";
+import { processReactionQueue, type ReactionJob } from "./reactions.js";
 
 export interface BattleStep {
   tick: number;
@@ -125,6 +127,16 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
         status: "shield",
       });
     }
+
+    if (expireSlow(unit, state.tick)) {
+      events.push({
+        kind: "status-expired",
+        tick: state.tick,
+        sequence: nextSequence(state),
+        unitId: unit.unitId,
+        status: "slow",
+      });
+    }
   }
 
   for (const unit of eligible) {
@@ -164,13 +176,12 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
       continue;
     }
 
-    const ability = catalogue.abilities[proposal.abilityId];
+    const cooldownDuration =
+      unit.abilityCooldownDurations[proposal.abilityId] ??
+      catalogue.abilities[proposal.abilityId]?.cooldownTicks ??
+      0;
 
-    if (ability === undefined) {
-      continue;
-    }
-
-    unit.abilityCooldowns[proposal.abilityId] = state.tick + ability.cooldownTicks;
+    unit.abilityCooldowns[proposal.abilityId] = state.tick + cooldownDuration;
     actionProposals.push(proposal);
   }
 
@@ -183,12 +194,14 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
     return rankA - rankB;
   });
 
+  const reactionQueue: ReactionJob[] = [];
+
   for (const proposal of actionProposals) {
     const source = state.units.find((candidate) => candidate.unitId === proposal.sourceUnitId);
     const target = state.units.find((candidate) => candidate.unitId === proposal.targetUnitId);
     const ability = catalogue.abilities[proposal.abilityId];
 
-    if (ability === undefined) {
+    if (ability === undefined || source === undefined) {
       continue;
     }
 
@@ -217,13 +230,51 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
     });
 
     for (const effect of ability.effects) {
-      const outcome = applyEffect(effect, target, state.tick);
+      if (!target.alive) {
+        break;
+      }
+
+      if (effect.kind === "chain-damage") {
+        const bonusBounces = source.chainBounceBonus[proposal.abilityId] ?? 0;
+        const hits = resolveChainDamage(effect, source, target, state.units, bonusBounces);
+
+        for (const hit of hits) {
+          source.damageDealt += hit.hpLost;
+
+          events.push({
+            kind: "damage-dealt",
+            tick: state.tick,
+            sequence: nextSequence(state),
+            causeSequence: castSequence,
+            sourceUnitId: proposal.sourceUnitId,
+            targetUnitId: hit.targetUnitId,
+            abilityId: proposal.abilityId,
+            amount: hit.hpLost,
+            shieldAbsorbed: hit.shieldAbsorbed,
+          });
+
+          if (hit.targetUnitId !== target.unitId) {
+            const hitUnit = state.units.find((candidate) => candidate.unitId === hit.targetUnitId);
+
+            if (hitUnit !== undefined && !hitUnit.alive) {
+              events.push({
+                kind: "death",
+                tick: state.tick,
+                sequence: nextSequence(state),
+                unitId: hitUnit.unitId,
+              });
+            }
+          }
+        }
+
+        continue;
+      }
+
+      const outcome = applyEffect(effect, source, target, state.tick, proposal.isBasicAttack);
 
       switch (outcome.kind) {
         case "damage": {
-          if (source !== undefined) {
-            source.damageDealt += outcome.hpLost;
-          }
+          source.damageDealt += outcome.hpLost;
 
           events.push({
             kind: "damage-dealt",
@@ -252,6 +303,18 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
             amount: outcome.amountHealed,
           });
 
+          for (const reaction of source.reactions) {
+            if (reaction.trigger === "after-heal-effect") {
+              reactionQueue.push({
+                rootActionSequence: castSequence,
+                depth: 1,
+                reaction,
+                sourceUnitId: source.unitId,
+                targetUnitId: target.unitId,
+              });
+            }
+          }
+
           break;
         }
 
@@ -265,6 +328,22 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
             targetUnitId: proposal.targetUnitId,
             abilityId: proposal.abilityId,
             amount: outcome.amount,
+            expiresAtTick: outcome.expiresAtTick,
+          });
+
+          break;
+        }
+
+        case "slow": {
+          events.push({
+            kind: "slow-applied",
+            tick: state.tick,
+            sequence: nextSequence(state),
+            causeSequence: castSequence,
+            sourceUnitId: proposal.sourceUnitId,
+            targetUnitId: proposal.targetUnitId,
+            abilityId: proposal.abilityId,
+            speedMultiplier: outcome.speedMultiplier,
             expiresAtTick: outcome.expiresAtTick,
           });
 
@@ -289,7 +368,29 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
     }
   }
 
-  const result = evaluateResult(state);
+  const reactionOutcome = processReactionQueue(reactionQueue, state, () => nextSequence(state));
+  events.push(...reactionOutcome.events);
+
+  let result: BattleResult | null;
+
+  if (reactionOutcome.budgetExceeded !== null) {
+    events.push({
+      kind: "reaction-budget-exceeded",
+      tick: state.tick,
+      sequence: nextSequence(state),
+      rootActionSequence: reactionOutcome.budgetExceeded.rootActionSequence,
+      depthReached: reactionOutcome.budgetExceeded.depthReached,
+    });
+
+    result = {
+      kind: "failure",
+      reason: "reaction budget exceeded",
+      endedAtTick: state.tick,
+      damageDealt: collectDamageDealt(state.units),
+    };
+  } else {
+    result = evaluateResult(state);
+  }
 
   if (result !== null) {
     state.result = result;

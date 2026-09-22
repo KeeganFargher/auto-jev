@@ -24,7 +24,8 @@ export function proposeMovement(
     return { unitId: unit.unitId, position: unit.position };
   }
 
-  const maxStep = unit.moveSpeedUnitsPerSecond * TICK_SECONDS;
+  const slowMultiplier = unit.slow === null ? 1 : unit.slow.speedMultiplier;
+  const maxStep = unit.moveSpeedUnitsPerSecond * slowMultiplier * TICK_SECONDS;
   const remaining = distanceToTarget - engageRangeUnits;
   const step = Math.min(maxStep, remaining);
   const direction = directionTo(unit.position, target.position);

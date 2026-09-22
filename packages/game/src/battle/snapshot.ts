@@ -23,6 +23,7 @@ export function getBattleSnapshot(state: BattleState): BattleSnapshot {
       position: { ...unit.position },
       abilityCooldowns: { ...unit.abilityCooldowns },
       shield: unit.shield === null ? null : { ...unit.shield },
+      slow: unit.slow === null ? null : { ...unit.slow },
     })),
     result: state.result,
     rng: cloneRng(state.rng),

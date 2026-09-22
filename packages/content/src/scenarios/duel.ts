@@ -1,8 +1,12 @@
-import type { BattleSetup } from "@jev-game/game";
+import { createHeroBuild, type BattleSetup, type HeroDefinitionId, type UpgradeDefinitionId } from "@jev-game/game";
 import { bruiser } from "../heroes/bruiser.js";
 import { flatArena } from "../arenas/flat-arena.js";
+import { catalogue } from "../catalogue.js";
 
-export function createDuelSetup(seed: number): BattleSetup {
+export function createDuelSetup(
+  seed: number,
+  teamAUpgradeIdsByHero: ReadonlyMap<HeroDefinitionId, readonly UpgradeDefinitionId[]> = new Map(),
+): BattleSetup {
   return {
     rulesetId: "duel-prototype",
     rulesetVersion: 1,
@@ -12,13 +16,13 @@ export function createDuelSetup(seed: number): BattleSetup {
       {
         unitId: "A-1",
         teamId: "A",
-        heroId: bruiser.id,
+        build: createHeroBuild("A-1", bruiser.id, teamAUpgradeIdsByHero.get(bruiser.id) ?? [], catalogue),
         spawn: { x: 10, y: flatArena.height / 2 },
       },
       {
         unitId: "B-1",
         teamId: "B",
-        heroId: bruiser.id,
+        build: createHeroBuild("B-1", bruiser.id, [], catalogue),
         spawn: { x: flatArena.width - 10, y: flatArena.height / 2 },
       },
     ],

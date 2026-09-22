@@ -6,8 +6,5 @@ export const mend: AbilityDefinition = {
   cooldownTicks: 90,
   targetPolicy: "lowest-hp-fraction-ally",
   range: 8,
-  effects: [
-    { kind: "heal", amount: 20 },
-    { kind: "shield", amount: 15, durationTicks: 60 },
-  ],
+  effects: [{ kind: "heal", amount: 20 }],
 };

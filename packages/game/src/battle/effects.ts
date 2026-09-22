@@ -1,20 +1,27 @@
-import type { EffectDefinition } from "../definitions.js";
+import type { SingleTargetEffectDefinition } from "../definitions.js";
 import type { UnitState } from "./state.js";
 import { applyDamage } from "./damage.js";
 
 export type EffectOutcome =
   | { kind: "damage"; hpLost: number; shieldAbsorbed: number }
   | { kind: "heal"; amountHealed: number }
-  | { kind: "shield"; amount: number; expiresAtTick: number };
+  | { kind: "shield"; amount: number; expiresAtTick: number }
+  | { kind: "slow"; speedMultiplier: number; expiresAtTick: number };
 
 export function applyEffect(
-  effect: EffectDefinition,
+  effect: SingleTargetEffectDefinition,
+  source: UnitState,
   target: UnitState,
   tick: number,
+  isBasicAttack: boolean,
 ): EffectOutcome {
   switch (effect.kind) {
     case "damage": {
-      const requested = Math.round(effect.amount);
+      let requested = Math.round(effect.amount);
+
+      if (isBasicAttack && target.slow !== null && source.slowedTargetBasicAttackDamageBonusFraction > 0) {
+        requested = Math.round(requested * (1 + source.slowedTargetBasicAttackDamageBonusFraction));
+      }
 
       const shieldAbsorbed =
         target.shield === null ? 0 : Math.min(target.shield.amount, requested);
@@ -44,6 +51,14 @@ export function applyEffect(
       target.shield = { amount: Math.round(effect.amount), expiresAtTick };
 
       return { kind: "shield", amount: target.shield.amount, expiresAtTick };
+    }
+
+    case "slow": {
+      const expiresAtTick = tick + effect.durationTicks;
+      const speedMultiplier = Math.max(0, 1 - effect.slowFraction);
+      target.slow = { speedMultiplier, expiresAtTick };
+
+      return { kind: "slow", speedMultiplier, expiresAtTick };
     }
 
     default: {

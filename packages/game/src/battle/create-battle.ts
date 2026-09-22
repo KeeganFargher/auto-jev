@@ -1,14 +1,16 @@
-import type { ArenaDefinitionId, HeroDefinitionId, TeamId, UnitId } from "../ids.js";
-import type { Catalogue, HeroDefinition } from "../definitions.js";
+import type { ArenaDefinitionId, TeamId, UnitId } from "../ids.js";
+import type { Catalogue } from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
 import type { BattleState, UnitState } from "./state.js";
+import type { HeroBuild } from "../builds/state.js";
+import { compileBuild } from "../builds/compile-build.js";
 import { createRng, nextInt, type RngState } from "../random/rng.js";
 import { DEFAULT_TICK_LIMIT } from "../constants.js";
 
 export interface UnitSetup {
   unitId: UnitId;
   teamId: TeamId;
-  heroId: HeroDefinitionId;
+  build: HeroBuild;
   spawn: Vector2;
 }
 
@@ -31,10 +33,10 @@ function isWithinArena(vector: Vector2, arenaWidth: number, arenaHeight: number)
   );
 }
 
-function initialAbilityCooldowns(hero: HeroDefinition) {
+function initialAbilityCooldowns(abilityIds: readonly string[]) {
   const cooldowns: Record<string, number> = {};
 
-  for (const abilityId of [...hero.abilityIds, hero.basicAttackId]) {
+  for (const abilityId of abilityIds) {
     cooldowns[abilityId] = 0;
   }
 
@@ -82,10 +84,10 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
   }
 
   const units: UnitState[] = setup.units.map((unitSetup) => {
-    const hero = catalogue.heroes[unitSetup.heroId];
+    const hero = catalogue.heroes[unitSetup.build.heroId];
 
     if (hero === undefined) {
-      throw new Error(`unknown hero id "${unitSetup.heroId}"`);
+      throw new Error(`unknown hero id "${unitSetup.build.heroId}"`);
     }
 
     if (!isFiniteVector(unitSetup.spawn)) {
@@ -106,17 +108,25 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
       }
     }
 
+    const compiled = compileBuild(unitSetup.build, catalogue);
+
     return {
       unitId: unitSetup.unitId,
-      heroId: unitSetup.heroId,
+      heroId: unitSetup.build.heroId,
+      build: unitSetup.build,
       teamId: unitSetup.teamId,
       position: { x: unitSetup.spawn.x, y: unitSetup.spawn.y },
-      hp: hero.maxHp,
-      maxHp: hero.maxHp,
-      moveSpeedUnitsPerSecond: hero.moveSpeedUnitsPerSecond,
+      hp: compiled.maxHp,
+      maxHp: compiled.maxHp,
+      moveSpeedUnitsPerSecond: compiled.moveSpeedUnitsPerSecond,
       targetUnitId: null,
-      abilityCooldowns: initialAbilityCooldowns(hero),
+      abilityCooldowns: initialAbilityCooldowns([...hero.abilityIds, hero.basicAttackId]),
+      abilityCooldownDurations: compiled.abilityCooldownDurations,
+      chainBounceBonus: compiled.chainBounceBonus,
+      slowedTargetBasicAttackDamageBonusFraction: compiled.slowedTargetBasicAttackDamageBonusFraction,
+      reactions: compiled.reactions,
       shield: null,
+      slow: null,
       alive: true,
       damageDealt: 0,
     };

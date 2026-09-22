@@ -222,7 +222,10 @@ pnpm --filter @jev-game/client dev        # + / in two browser sessions,
   `AbilityDefinition`) — the plan names shield as a separate implementation
   step but the starter content list is fixed at three named abilities
   (`strike`/`bolt`/`mend`); bundling shield onto mend exercises the status
-  mechanism without inventing a fourth ability file.
+  mechanism without inventing a fourth ability file. **Superseded in Phase
+  4:** `mend` is heal-only now: the plan's own Phase 4 upgrade list assumes
+  a heal-only base with an upgrade that grants the shield back, so this
+  Phase 3 shortcut was undone. See the Phase 4 section below.
 - `apps/client`'s lab defaults to a `three-vs-three` scenario (2 bruisers +
   2 rangers + 2 support, mirrored formations) with `duel` still selectable;
   a scenario `<select>` replaced the old hero-stat-override inputs (cut —
@@ -416,8 +419,230 @@ build-driven stat changes. Note this run's damage is now itself an exact
 mirror (`A-1` = `B-1`, etc.) since it's a symmetric matchup with no
 surviving order-dependence — a useful sanity check in its own right.
 
+**Superseded in Phase 4:** this 379/829-tick and 50/190/120 breakdown was
+measured against Phase 3's `mend` (heal+shield in one ability). Phase 4
+moved the shield out of `mend`'s base kit and into an upgrade, which
+changes these numbers materially — see the Phase 4 section below for the
+current baseline. This section is left as an accurate record of what
+Phase 3 actually shipped, not updated in place.
+
+This discovery session was still not run by a human before Phase 4
+started; Phase 4 began on explicit instruction rather than after that
+review. The scope-narrowing observation above (no scenario has mixed
+roles actually fight three identical bruisers) is still true and still
+open.
+
+## Phase 4 — Make upgrades change the way builds play — done
+
+### What works now
+
+- `packages/game/src/builds/`: `HeroBuild` (persistent: hero ID + ordered
+  upgrade selections with stack counts) is now the only thing that
+  survives between battles. `compileBuild(build, catalogue)` is the single
+  function that turns a build into concrete per-unit numbers — max HP,
+  basic-attack cooldown, chain-lightning bounce bonus, a slowed-target
+  damage-bonus fraction, and any granted reactions (with their own
+  compiled amounts) — using one documented formula,
+  `(base + flat) * (1 + percent)`, everywhere. `create-battle.ts` calls it
+  once per unit and never reads hero/ability stats out of the catalogue
+  directly again.
+- `apply-upgrade.ts`: `isUpgradeEligible` (hero restriction, prerequisite
+  upgrades, stack limit), `generateUpgradeOffers` (filters the whole
+  catalogue through that same function — offers and validation can't
+  drift apart), and `applyUpgrade` (throws a named error for an illegal
+  choice rather than silently no-opping).
+- A real reaction system: `battle/reactions.ts`'s `processReactionQueue`
+  drains a queue (not recursion), each job carrying a root action sequence
+  and a depth, bounded by `MAX_REACTION_DEPTH` (4) and
+  `MAX_REACTIONS_PER_TICK` (16). Exceeding either aborts the battle as a
+  `failure` result with a `reaction-budget-exceeded` diagnostic event
+  naming the offending chain, rather than looping or throwing.
+- A real chain-lightning effect: `chain-damage` (`battle/chain.ts`) hits a
+  primary target then bounces to the nearest *other* living enemy within
+  range, tracking visited targets so no unit is hit twice by the same
+  cast, with quantized-distance target selection so two geometrically
+  mirrored casts can never pick different bounce targets over
+  floating-point noise (see `docs/decisions.md` — this reuses the exact
+  bug class the Phase 3 range-boundary fix addressed, guarded against up
+  front this time instead of discovered after shipping).
+- A `slow` status, structurally identical to `shield` (one expiry
+  comparison, run in the same per-tick pass) — reduces
+  `moveSpeedUnitsPerSecond` by a multiplier for a fixed duration.
+- Six upgrades in `packages/content/src/upgrades/`: `more-max-hp` (any
+  hero, stacks 3), `faster-attacks` (any hero, stacks 2),
+  `extra-lightning-bounce` (ranger only, stacks 2),
+  `healing-that-also-shields` (support only, grants the `mend-shield`
+  reaction), `stronger-shield` (support only, requires
+  `healing-that-also-shields`, stacks 2), `bonus-damage-vs-slowed`
+  (bruiser only — deliberately, see `docs/decisions.md`).
+- `mend` (`packages/content/src/abilities/mend.ts`) is heal-only now;
+  `bolt` deals `chain-damage` and applies `slow` to its primary target.
+- `apps/client/src/hud/upgrade-picker.ts`: a checkbox picker in the
+  existing tuning drawer, one section per hero on **team A** for the
+  current scenario (`duel` → bruiser only, `three-vs-three` → all three).
+  Team B always stays at its stock build, so every Reset is a direct
+  upgraded-vs-baseline comparison. Eligibility re-evaluates on every
+  toggle (a prerequisite-gated upgrade greys in/out live, not just at
+  Reset time).
+- `unit-inspector.ts` shows an active `slow` status (percent + ticks
+  remaining) alongside `shield`, and lists a selected unit's upgrades
+  (`upgradeId x stacks`) when it has any.
+
+### Verified, not assumed
+
+- **The build-compile refactor alone changes nothing when a build has no
+  upgrades.** Before any upgrade or reaction code was written,
+  `pnpm simulate duel 1`, `three-vs-three 1`, and `three-bruisers 1` were
+  re-run against the `HeroBuild`/`compileBuild` plumbing and reproduced
+  their already-committed Phase 3 numbers exactly (297 / 829 / 392 ticks,
+  identical event digests). This is what makes the numbers below
+  attributable to the upgrades, not to the refactor underneath them.
+- **A percent modifier onto a zero-base stat is silently inert — found by
+  diffing, not by inspection.** `bonus-damage-vs-slowed` originally used a
+  `percent` modifier; a probe comparing a bruiser's total `strike` damage
+  with and without the upgrade selected showed *no difference at all*
+  (50 vs. 50 across identical hit counts). `compileBuild`'s own output
+  confirmed the compiled bonus was exactly `0`. Root cause and fix in
+  `docs/decisions.md`.
+- **Chain-lightning bounce selection is mirror-stable.** A probe ran
+  `three-vs-three` across 5 seeds and compared `A-2`'s sequence of bounce
+  targets against `B-2`'s (with team labels swapped) — identical every
+  seed. Also confirmed `bolt` actually chains (12 of 18 casts in one run
+  hit more than one target) and never hits the same target twice in one
+  cast.
+- **The reaction-budget safety path actually aborts, checked directly, not
+  just by reading `processReactionQueue`.** A synthetic queue of 20 jobs
+  (16 legal, 4 at an excessive depth) fed straight into
+  `processReactionQueue` outside of any battle processed exactly 16 and
+  then correctly reported the depth-exceeded diagnostic instead of
+  continuing or throwing.
+- **The shield-on-heal reaction fires in the live browser client, not just
+  headless.** Checking `healing-that-also-shields` + `stronger-shield` on
+  the support and running `three-vs-three` in the browser produced
+  `A-3 healed A-1 for 20` immediately followed by
+  `A-3 shielded A-1 for 23` in the event feed — matching the headless
+  probe's math (`15` base `* 1.5` from one `stronger-shield` stack) — and
+  the un-upgraded team B support only ever logged a bare heal.
+- **One upgrade pair turned a guaranteed mirror draw into an outright
+  win.** With no upgrades, `three-vs-three` seed 1 is a symmetric draw by
+  construction. With `healing-that-also-shields` + `stronger-shield` on
+  team A's support only, the same matchup ended `team A wins` at tick 295
+  — a result-*kind* change, not just a bigger damage number, which is the
+  bar the plan's Phase 4 deliverable actually sets.
+- **A synergy upgrade with no partner present does nothing and breaks
+  nothing.** Selecting `bonus-damage-vs-slowed` in a `duel` (bruiser vs.
+  bruiser, neither kit has a slow source) produced an identical 10-for-10
+  damage exchange to the unupgraded case and no console errors — correct
+  behaviour for a cross-unit synergy upgrade with nothing to synergize
+  with in that matchup, not a bug.
+- **Eligibility re-evaluates live in the browser, not just in the
+  function.** `stronger-shield`'s checkbox starts disabled in the picker
+  and becomes checkable the instant `healing-that-also-shields` is
+  checked — confirmed by screenshot before and after, not just by reading
+  `isUpgradeEligible`.
+
+### Deliberately deferred (see `docs/decisions.md` for why)
+
+- `bonus-damage-vs-slowed` is restricted to `bruiser` in eligibility,
+  rather than offered to every hero. It only ever reads the single-target
+  `damage` effect path; `bolt`'s damage goes through the separate
+  `chain-damage` path and never consults it, so offering it to a ranger
+  would be a checked, always-inert choice.
+- The picker exposes each upgrade as a single on/off toggle even where
+  `maxStacks` is 2 or 3 — stacking beyond one pick is fully supported by
+  the engine (verified directly through `compileBuild`: `more-max-hp` at
+  3 stacks, `stronger-shield` at 2) but has no stepper control in this
+  lab UI. A stack-count control belongs to Phase 5's real lobby picker.
+- Upgrade selections are not part of the scenario export/import JSON —
+  they live only in the picker's in-memory state for the page session.
+- The reaction-budget safety path has no shipped content that can
+  actually trigger it (the only reaction's generated effect, `shield`, is
+  not itself a heal, so it can't retrigger `after-heal-effect`). Verified
+  synthetically instead of by a real battle outcome — see above.
+- The plan's "aborts an online battle without changing run health" half
+  of the reaction-budget requirement isn't built: there is no online
+  battle or run-health concept until Phase 5/6.
+
+### Known gaps / minor rough edges
+
+- `mend`'s rebalance to heal-only changes the Phase 3 discovery-session
+  baseline materially: `three-vs-three` seed 1 now ends at tick 379 (was
+  829) with a `50 / 170 / 90` damage split (was `50 / 190 / 120`) — a
+  15-point shield reapplied roughly every 90 ticks across every
+  unmodified support was absorbing a meaningful share of chip damage.
+  `duel` (297 ticks) and `three-bruisers` (392 ticks) are unaffected
+  (neither scenario uses a support).
+- `healing-that-also-shields`'s value is entangled with the still-open
+  Phase 3 support-positioning gap: the upgrade only pays off when `mend`
+  lands on an ally, and the support's last-measured self-heal rate was 8
+  of 12 casts. Whether the upgrade reads as strong or weak in practice
+  can't be judged in isolation from that positioning question.
+- Control glyphs are still unicode placeholders (unchanged from Phase 3;
+  logged in `missing_assets.md`).
+
+### Phase 4 review pass
+
+An independent Opus review of this phase's diff found one real bug and
+several worth a decision. Full rationale in `docs/decisions.md`. Summary:
+
+- `createHeroBuild` accepted any upgrade IDs with no eligibility check at
+  all — `heroId`, `maxStacks` and prerequisites were only enforced by
+  `applyUpgrade`, which nothing called. Fixed: it now folds each ID
+  through `applyUpgrade` in order, so an illegal build can no longer be
+  constructed through this function. Every call site
+  (`duel.ts`/`three-versus-three.ts`/`upgrade-picker.ts`) now passes a
+  `Catalogue`.
+- `validateCatalogue` gained a prerequisite-graph check (self-reference,
+  cycles, cross-hero prerequisites) and now caps `slowFraction` below
+  `1.0` (a full root was reachable content, not just a floating-point
+  accident). The self-reference case doubled as a real client bug: the
+  picker's deselect cascade had no recursion guard and would stack
+  overflow on a cyclic prerequisite — fixed with a visited set.
+- `compileBuild`'s basic-attack-cooldown division was unguarded against a
+  compiled rate of `0` or below (→ `Infinity` cooldown, a permanently
+  disabled ability). Now clamped to `[1, DEFAULT_TICK_LIMIT]`.
+- Effects no longer apply to a target that already died earlier in the
+  same cast (`bolt`'s `slow` no longer fires on a target its own
+  `chain-damage` just killed), and `applyDamage` now clears a unit's
+  `shield`/`slow` the instant it dies, so a corpse can't keep reporting a
+  live status for the rest of the battle. This trimmed `three-vs-three`
+  seed 1's event count from 153 to 149 (spurious post-mortem events
+  removed); ticks/result/damage totals are unchanged.
+- Two items were confirmed as intentional and documented rather than
+  changed: a reaction-granted shield overwrites rather than stacks (same
+  rule as every other shield reapplication), and a source that dies later
+  in the same tick after its heal already resolved still lands the
+  reaction shield it queued.
+
+### Commands used to verify this phase
+
+```
+pnpm -r typecheck
+pnpm lint
+pnpm build
+pnpm simulate duel 1                      # re-confirms 297 ticks, unaffected
+pnpm simulate three-vs-three 1            # 379 ticks now, was 829
+pnpm simulate three-bruisers 1            # re-confirms 392 ticks, unaffected
+pnpm --filter @jev-game/client dev        # + / in the browser: tuning drawer,
+                                           #   per-hero upgrade checkboxes,
+                                           #   prerequisite greying, reset,
+                                           #   play, event feed, unit inspector
+```
+
+### Discovery session (per the plan, before Phase 5)
+
+Not yet run by a human. Two upgrade combinations were deliberately tried
+and both produced an explicable, non-numeric behaviour change rather than
+just bigger numbers: the shield-on-heal pair turned a guaranteed draw into
+a win (see above), and chain lightning plus its bounce upgrade visibly
+spreads `bolt`'s damage across multiple enemies instead of stacking it on
+one target. Whether the *current six* upgrades are "a small set worth
+choosing between" (the plan's decision-before-Phase-5 bar) — as opposed to
+some being an obvious always-take — has not been evaluated by a human yet.
+
 ### Next concrete task
 
-Phase 4: make upgrades change the way builds play. Not started. Per the
-plan, wait for the discovery session above (and its review) before
-starting it.
+Phase 5: a complete local lobby run (pick a team and upgrades, eight-seat
+lobby against seven baseline bots). Per the plan, wait for the discovery
+session above (and its review) before starting it, the same gate that was
+explicitly waived for both Phase 3 and Phase 4 so far.

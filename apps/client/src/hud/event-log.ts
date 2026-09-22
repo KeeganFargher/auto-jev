@@ -9,37 +9,46 @@ export interface EventLogView {
 }
 
 function describe(event: BattleEvent): string {
-  if (event.kind === "cast") {
-    return `${event.sourceUnitId} casts ${event.abilityId} on ${event.targetUnitId}`;
+  switch (event.kind) {
+    case "cast":
+      return `${event.sourceUnitId} casts ${event.abilityId} on ${event.targetUnitId}`;
+
+    case "damage-dealt": {
+      const absorbed = event.shieldAbsorbed > 0 ? ` (${event.shieldAbsorbed} shielded)` : "";
+
+      return `${event.sourceUnitId} hit ${event.targetUnitId} for ${event.amount}${absorbed}`;
+    }
+
+    case "healing-done":
+      return `${event.sourceUnitId} healed ${event.targetUnitId} for ${event.amount}`;
+
+    case "shield-applied":
+      return `${event.sourceUnitId} shielded ${event.targetUnitId} for ${event.amount}`;
+
+    case "slow-applied":
+      return `${event.sourceUnitId} slowed ${event.targetUnitId} to ${Math.round(event.speedMultiplier * 100)}% speed`;
+
+    case "cast-fizzled":
+      return `${event.sourceUnitId}'s ${event.abilityId} fizzled, ${event.targetUnitId} was no longer a legal target`;
+
+    case "reaction-budget-exceeded":
+      return `reaction chain from action #${event.rootActionSequence} exceeded its safety budget at depth ${event.depthReached}`;
+
+    case "status-expired":
+      return `${event.unitId}'s ${event.status} expired`;
+
+    case "death":
+      return `${event.unitId} died`;
+
+    case "battle-ended":
+      return `battle ended (${JSON.stringify(event.result)})`;
+
+    default: {
+      const exhaustive: never = event;
+
+      return exhaustive;
+    }
   }
-
-  if (event.kind === "damage-dealt") {
-    const absorbed = event.shieldAbsorbed > 0 ? ` (${event.shieldAbsorbed} shielded)` : "";
-
-    return `${event.sourceUnitId} hit ${event.targetUnitId} for ${event.amount}${absorbed}`;
-  }
-
-  if (event.kind === "healing-done") {
-    return `${event.sourceUnitId} healed ${event.targetUnitId} for ${event.amount}`;
-  }
-
-  if (event.kind === "shield-applied") {
-    return `${event.sourceUnitId} shielded ${event.targetUnitId} for ${event.amount}`;
-  }
-
-  if (event.kind === "cast-fizzled") {
-    return `${event.sourceUnitId}'s ${event.abilityId} fizzled, ${event.targetUnitId} was no longer a legal target`;
-  }
-
-  if (event.kind === "status-expired") {
-    return `${event.unitId}'s ${event.status} expired`;
-  }
-
-  if (event.kind === "death") {
-    return `${event.unitId} died`;
-  }
-
-  return `battle ended (${JSON.stringify(event.result)})`;
 }
 
 export function createEventLogView(container: HTMLElement): EventLogView {

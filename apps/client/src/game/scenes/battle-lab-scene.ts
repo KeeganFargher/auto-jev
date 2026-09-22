@@ -3,7 +3,7 @@ import { createBattleView } from "../views/battle-view.js";
 import { createEventLogView } from "../../hud/event-log.js";
 import { createUnitInspectorView } from "../../hud/unit-inspector.js";
 import { createBattleControlsView } from "../../hud/battle-controls.js";
-import type { BattleLabSession, LabScenarioKind } from "../../session/types.js";
+import type { BattleLabSession, LabScenarioKind, TeamAUpgradeIdsByHero } from "../../session/types.js";
 
 export interface BattleLabScene {
   dispose(): void;
@@ -31,13 +31,14 @@ export function createBattleLabScene(
   statusEl: HTMLElement,
   session: BattleLabSession,
   onReplay: () => void,
-  onReset: (seed: number, scenario?: LabScenarioKind) => void,
+  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero) => void,
   isReplay: boolean,
 ): BattleLabScene {
   const barRoot = hudRoot.querySelector<HTMLElement>("#lab-bar")!;
   const unitRoot = hudRoot.querySelector<HTMLElement>("#lab-unit")!;
   const feedRoot = hudRoot.querySelector<HTMLElement>("#lab-feed")!;
   const tuningRoot = hudRoot.querySelector<HTMLElement>("#lab-tuning-fields")!;
+  const upgradesRoot = hudRoot.querySelector<HTMLElement>("#lab-upgrades")!;
 
   let selectedUnitId: string | null = null;
 
@@ -57,7 +58,7 @@ export function createBattleLabScene(
 
   const inspector = createUnitInspectorView(unitRoot);
   const eventLog = createEventLogView(feedRoot);
-  const controls = createBattleControlsView(barRoot, tuningRoot, session, onReplay, onReset);
+  const controls = createBattleControlsView(barRoot, tuningRoot, upgradesRoot, session, onReplay, onReset);
 
   function render(): void {
     const view = session.getView();

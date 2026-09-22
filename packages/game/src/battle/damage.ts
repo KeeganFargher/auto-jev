@@ -7,6 +7,8 @@ export function applyDamage(unit: UnitState, amount: number): number {
   if (unit.hp <= 0) {
     unit.hp = 0;
     unit.alive = false;
+    unit.shield = null;
+    unit.slow = null;
   }
 
   return actual;

@@ -1,6 +1,8 @@
-import type { BattleEvent, BattleRecording, BattleSnapshot } from "@jev-game/game";
+import type { BattleEvent, BattleRecording, BattleSnapshot, HeroDefinitionId, UpgradeDefinitionId } from "@jev-game/game";
 
 export type LabScenarioKind = "duel" | "three-vs-three";
+
+export type TeamAUpgradeIdsByHero = ReadonlyMap<HeroDefinitionId, readonly UpgradeDefinitionId[]>;
 
 export interface BattleLabView {
   snapshot: BattleSnapshot;
@@ -21,7 +23,7 @@ export interface BattleLabSession {
   pause(): void;
   stepOnce(): void;
   setSpeed(multiplier: number): void;
-  reset(seed: number, scenario?: LabScenarioKind): void;
+  reset(seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero): void;
   advanceRealTime(deltaSeconds: number): void;
   dispose(): void;
 }

@@ -320,3 +320,37 @@ body {
 .hud-error:empty {
   min-height: 0;
 }
+
+.hud-upgrades {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--hairline);
+}
+
+.hud-upgrade-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hud-upgrade-hero-title {
+  color: var(--text-strong);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.hud-upgrade-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hud-upgrade-option.is-disabled {
+  color: rgba(154, 160, 184, 0.4);
+  cursor: not-allowed;
+}

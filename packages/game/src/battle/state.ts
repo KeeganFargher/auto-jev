@@ -2,11 +2,14 @@ import type { AbilityDefinitionId, ArenaDefinitionId, HeroDefinitionId, TeamId, 
 import type { RngState } from "../random/rng.js";
 import type { Vector2 } from "../math/vector.js";
 import type { BattleResult } from "./result.js";
-import type { ShieldStatus } from "./statuses.js";
+import type { ShieldStatus, SlowStatus } from "./statuses.js";
+import type { CompiledReactionInstance } from "../builds/compile-build.js";
+import type { HeroBuild } from "../builds/state.js";
 
 export interface UnitState {
   unitId: UnitId;
   heroId: HeroDefinitionId;
+  build: HeroBuild;
   teamId: TeamId;
   position: Vector2;
   hp: number;
@@ -14,7 +17,12 @@ export interface UnitState {
   moveSpeedUnitsPerSecond: number;
   targetUnitId: UnitId | null;
   abilityCooldowns: Record<AbilityDefinitionId, number>;
+  abilityCooldownDurations: Record<AbilityDefinitionId, number>;
+  chainBounceBonus: Record<AbilityDefinitionId, number>;
+  slowedTargetBasicAttackDamageBonusFraction: number;
+  reactions: CompiledReactionInstance[];
   shield: ShieldStatus | null;
+  slow: SlowStatus | null;
   alive: boolean;
   damageDealt: number;
 }

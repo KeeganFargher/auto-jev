@@ -44,6 +44,17 @@ export type BattleEvent =
       expiresAtTick: number;
     }
   | {
+      kind: "slow-applied";
+      tick: number;
+      sequence: number;
+      causeSequence: number;
+      sourceUnitId: UnitId;
+      targetUnitId: UnitId;
+      abilityId: AbilityDefinitionId;
+      speedMultiplier: number;
+      expiresAtTick: number;
+    }
+  | {
       kind: "cast-fizzled";
       tick: number;
       sequence: number;
@@ -51,6 +62,13 @@ export type BattleEvent =
       abilityId: AbilityDefinitionId;
       targetUnitId: UnitId;
     }
-  | { kind: "status-expired"; tick: number; sequence: number; unitId: UnitId; status: "shield" }
+  | {
+      kind: "reaction-budget-exceeded";
+      tick: number;
+      sequence: number;
+      rootActionSequence: number;
+      depthReached: number;
+    }
+  | { kind: "status-expired"; tick: number; sequence: number; unitId: UnitId; status: "shield" | "slow" }
   | { kind: "death"; tick: number; sequence: number; unitId: UnitId }
   | { kind: "battle-ended"; tick: number; sequence: number; result: BattleResult };

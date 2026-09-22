@@ -33,3 +33,13 @@ export * from "./battle/effects.js";
 export * from "./battle/damage.js";
 
 export * from "./battle/recording.js";
+
+export * from "./battle/chain.js";
+
+export * from "./battle/reactions.js";
+
+export * from "./builds/state.js";
+
+export * from "./builds/compile-build.js";
+
+export * from "./builds/apply-upgrade.js";

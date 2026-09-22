@@ -57,6 +57,11 @@ export function createUnitInspectorView(container: HTMLElement): UnitInspectorVi
         statChip(stats, "shield", `${unit.shield.amount} (${ticksLeft}t)`);
       }
 
+      if (unit.slow !== null) {
+        const ticksLeft = Math.max(0, unit.slow.expiresAtTick - tick);
+        statChip(stats, "slowed", `${Math.round(unit.slow.speedMultiplier * 100)}% (${ticksLeft}t)`);
+      }
+
       container.appendChild(stats);
 
       const abilities = document.createElement("div");
@@ -68,6 +73,17 @@ export function createUnitInspectorView(container: HTMLElement): UnitInspectorVi
       }
 
       container.appendChild(abilities);
+
+      if (unit.build.upgrades.length > 0) {
+        const upgrades = document.createElement("div");
+        upgrades.className = "hud-stats";
+
+        for (const selection of unit.build.upgrades) {
+          statChip(upgrades, selection.upgradeId, `x${selection.stacks}`);
+        }
+
+        container.appendChild(upgrades);
+      }
     },
 
     dispose() {

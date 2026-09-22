@@ -585,3 +585,313 @@ should actually behave — stop advancing on the enemy to peel back to a
 wounded ally? only when badly hurt? never break formation? — which is a
 gameplay call, not a bug fix, and is left open pending that decision rather
 than picked unilaterally.
+
+## Phase 4: upgrades that change how builds play
+
+**`HeroBuild` is persistent, `UnitState` is disposable, `compileBuild` is
+the only bridge between them.** `packages/game/src/builds/state.ts` holds
+`HeroBuild { buildId, heroId, upgrades: {upgradeId, stacks}[] }` — no HP,
+position or cooldowns. `create-battle.ts` calls `compileBuild(build,
+catalogue)` once per unit at battle start and never touches
+`catalogue.heroes`/`catalogue.abilities` directly for stats again;
+`UnitSetup.heroId` was replaced outright with `UnitSetup.build` rather than
+kept alongside it, so there is exactly one path into a unit's starting
+stats, not two that could drift.
+
+Before writing a single upgrade, this refactor alone was checkpointed
+against the Phase 3 baseline: a zero-upgrade build must compile to the
+hero definition's numbers bit-for-bit, or the compile path itself has a
+bug independent of any upgrade content. `pnpm simulate duel 1`,
+`three-vs-three 1`, and `three-bruisers 1` all reproduced their
+already-committed tick counts, results and event digests exactly
+(297/829/392 ticks) before any upgrade or reaction code was written. Only
+after that passed did upgrade content get added — the checkpoint is what
+makes the numbers below trustworthy as "the upgrades did this," not "the
+refactor did this and the upgrades are incidental."
+
+**Stat formula:** `(base + flat) * (1 + percent)`, one function
+(`compileStat` in `compile-build.ts`), reused for every stat. One real
+bug came out of this while wiring `bonus-damage-vs-slowed`: a percent
+modifier multiplying onto a stat whose natural base is `0` (a pure bonus
+fraction with nothing to scale) compiles to `0 * anything = 0` — the
+upgrade was silently inert. Caught by a probe script that diffed a
+bruiser's strike damage with and without the upgrade selected and found
+no difference at all, then confirmed by printing `compileBuild`'s output
+directly (`slowedTargetBasicAttackDamageBonusFraction: 0`). Fixed by
+changing that one modifier from `percent` to `flat` — for a zero-base
+stat, "flat" is the only modifier kind that can ever produce a nonzero
+result, so any future zero-base stat (a stat with no hero-intrinsic
+value to scale) must use `flat`, never `percent`. This is exactly the
+"don't let '10% faster' have two meanings" trap the plan warned about,
+just one level removed: same formula, but two structurally different
+*uses* of "percent" that looked interchangeable and weren't.
+
+**Chain lightning (`bolt` → `chain-damage`) reused the exact ULP-boundary
+bug class from the Phase 3 range fix, deliberately guarded against up
+front.** Bounce-target selection compares candidate distances the same
+way `findNearestEnemy` does, and two mirrored candidates at
+geometrically identical distance can differ in the last bits of a
+`Math.hypot` result — the same trap that stranded a unit at its engage
+boundary last phase. `resolveChainDamage`'s target search
+(`packages/game/src/battle/chain.ts`) quantizes distance to
+`RANGE_EPSILON` (`Math.round(distance / RANGE_EPSILON)`) before comparing,
+then falls back to `unitId` for an exact tie, so two mirrored bounces
+can never diverge over sub-micrometer noise. Verified, not assumed: a
+probe ran `three-vs-three` across 5 seeds and diffed `A-2`'s bounce
+target sequence against `B-2`'s (with team labels swapped) — identical
+every time. Also verified `bolt` actually chains at all (12 of 18 casts
+in one run hit more than one target) and that at most one hit lands per
+target per cast (enforced by the `visited` set in `resolveChainDamage`,
+not just claimed).
+
+**`slow` reuses `shield`'s exact expiry convention on purpose.** One
+comparison site (`expiresAtTick > tick` = not yet expired), run in the
+same per-tick pass as shield's, and the bonus-damage check at
+damage-resolution time is a plain `target.slow !== null` — it does not
+re-derive "is this still active" with its own `>=`/`>` comparison. Two
+comparison sites for one boundary is what produced the Phase 3
+movement/ability disagreement; this phase's slow status was written to
+never have that seam.
+
+**Reactions run through a drained queue, not recursion.** Every job
+carries a `rootActionSequence` and a `depth`; `processReactionQueue`
+(`packages/game/src/battle/reactions.ts`) dequeues with `Array.shift`
+inside a `while`, checking `depth > MAX_REACTION_DEPTH` (4) and a total
+`MAX_REACTIONS_PER_TICK` budget (16) before doing any work, so a runaway
+chain aborts instead of blowing the stack or looping forever. None of
+the six shipped upgrades can actually trigger a cycle — the only
+reaction fires on `after-heal-effect` and produces a `shield` effect,
+which is not itself a heal, so it structurally cannot retrigger its own
+trigger. That means the safety mechanism has no real content that
+exercises it under normal play. It was verified anyway, directly: a
+synthetic queue of 20 jobs (16 at depth 1, 4 at depth 10) was fed straight
+into `processReactionQueue` outside of any battle, and it correctly
+processed exactly 16 jobs, emitted a `reaction-budget-exceeded` diagnostic
+naming the offending root action and the depth reached, then stopped —
+proving the abort path works even though shipped content can't reach it.
+`step-battle.ts` turns that into a `failure` result with
+`reason: "reaction budget exceeded"` and a `reaction-budget-exceeded`
+event before `battle-ended`, matching the plan's "ends the lab scenario
+with a diagnostic" requirement. The plan's parallel requirement — "aborts
+an online battle without changing run health" — doesn't apply yet; there
+is no online battle or run-health concept until Phase 5/6, so that half is
+deliberately not built.
+
+**`mend` gave up its baked-in shield; the shield is now what "healing
+that also grants a shield" buys you.** Phase 3 shipped `mend` as
+heal-and-shield in one ability because a fourth ability file wasn't
+justified yet. The plan's own upgrade list assumes a heal-only base with
+an upgrade that adds the shield, so Phase 3's shortcut had to be undone:
+`mend`'s effects are now `[{kind: "heal", amount: 20}]` only. The shield
+comes back through a real reaction (`mend-shield`, trigger
+`after-heal-effect`), granted by the `healing-that-also-shields` upgrade,
+whose own flat stat-modifier (`value: 15`) supplies the reaction's base
+shield amount — there is no bare "15" living in the reaction definition
+itself, so the granting upgrade's flat contribution *is* the base, and
+`stronger-shield`'s percent modifier (gated behind
+`healing-that-also-shields` as a prerequisite) multiplies onto exactly
+that, giving `15 * 1.5 = 22.5 → 23` at one stack. This is a genuine
+Phase 4 content rebalance, not a silent edit: it changes `three-vs-three`
+seed 1's baseline from 829 ticks / `50, 190, 120` damage to **379 ticks /
+`50, 170, 90`** (removing the periodic shield from every unmodified
+support materially shortens the mirror fight — explicable, not a bug: a
+15-point shield reapplied roughly every 90 ticks was absorbing a
+meaningful share of chip damage across the whole match). `duel` and
+`three-bruisers` are untouched (neither scenario uses a support), and
+were reconfirmed identical to their already-committed numbers
+(297 / 392 ticks) as part of the same re-verification pass.
+
+**The six upgrades, and one deliberate exclusion:**
+`more-max-hp` (any hero, +15 flat HP, stacks 3) and `faster-attacks` (any
+hero, +15% attack rate, stacks 2) are pure stat modifiers with no new
+mechanics. `extra-lightning-bounce` (ranger only, +1 `bolt` bounce,
+stacks 2) and `bonus-damage-vs-slowed` (bruiser only, +50% `strike`
+damage vs. a currently-slowed target) are restricted to one hero each —
+deliberately, not by omission. `bonus-damage-vs-slowed` reads
+`isBasicAttack` plus the *single-target* `damage` effect path in
+`applyEffect`; `bolt`'s damage goes through the separate `chain-damage`
+path in `chain.ts`, which never consults the bonus. Offering this upgrade
+to a ranger would be a "never-useful choice" — checked, never do
+anything — so it is not offered to one. Restricting it to bruiser turns
+it into the intended cross-unit synergy instead: a ranger's `bolt` slows
+a target, and a bruiser with this upgrade capitalizes on it with `strike`
+— verified live in the browser (see below), not just in the headless
+probe.
+
+**Client: an upgrade picker in the existing tuning drawer, not a new
+overlay.** `apps/client/src/hud/upgrade-picker.ts` renders one checkbox
+section per hero present on **team A only** for the current scenario;
+team B always stays at its stock, zero-upgrade build. This is a
+deliberate asymmetry, not a limitation: the plan's Phase 4 deliverable is
+"compare a build with its previous version" against a *fixed* opponent,
+which a mirrored symmetric toggle can't give you as directly. Eligibility
+(`isUpgradeEligible`) re-runs on every checkbox change, so
+`stronger-shield` starts disabled and greys back in the instant
+`healing-that-also-shields` is checked — verified in the browser, not
+just by reading the eligibility function. Live-tested end to end:
+checking `healing-that-also-shields` + `stronger-shield` on the support
+and resetting `three-vs-three` produced `A-3 healed A-1 for 20` followed
+immediately by `A-3 shielded A-1 for 23` in the event feed (matching the
+headless-probe math exactly), team B's support only ever logged a bare
+heal with no shield line, and the battle ended in a team A **win** at
+tick 295 — a draw-mirror turned into an outright win by one upgrade pair,
+which is the "clearly different behaviour, not merely larger numbers" bar
+the plan sets, demonstrated live rather than asserted. Selecting
+`bonus-damage-vs-slowed` in a `duel` (bruiser vs. bruiser, no slow source
+in either kit) correctly did nothing and crashed nothing — the expected
+behaviour for a synergy upgrade with no partner present, not a bug.
+
+**Known, deliberate gaps, left for a human to weigh in on rather than
+guessed at:**
+- The picker only offers each upgrade as a single toggle (0 or 1 stack),
+  even though the engine and `compileBuild` fully support higher stacks
+  (`more-max-hp` at 3 stacks and `stronger-shield` at 2 were both verified
+  directly through `compileBuild`, just not through the picker's UI). A
+  stack-count control is a Phase 5 lobby concern, not a Phase 4 lab one.
+- Upgrade selections are not part of the scenario export/import JSON —
+  they live only in the picker's in-memory state for the current page
+  session. Extending `LabScenario` to carry them was judged out of scope
+  for this pass rather than silently skipped.
+- The reaction-budget safety path (`MAX_REACTION_DEPTH` / total budget)
+  has no shipped content that can actually reach it; it is verified by a
+  synthetic test, not by any real battle outcome. The first genuinely
+  self-retriggering reaction (a future upgrade) should re-verify this
+  path against real content, not just trust the synthetic test still
+  applies.
+- Support-unit positioning (documented above, still open from Phase 3)
+  now has a second consequence: `healing-that-also-shields` only pays off
+  when `mend` lands on an *ally*, and the support's own self-heal rate
+  was last measured at 8 of 12 casts. Whether that upgrade reads as
+  strong or weak in practice is entangled with the unresolved positioning
+  question, not a separate finding — worth re-measuring together in the
+  discovery session rather than judging the upgrade in isolation.
+
+## Phase 4 review pass (Opus)
+
+An independent Opus review of the Phase 4 diff found one real blocking bug
+and several worth a decision. All fixed and re-verified; the zero-upgrade
+baselines (`duel` 297, `three-vs-three` 379/`50,170,90`, `three-bruisers`
+392) were re-run after every fix in this pass and are unchanged except
+where a fix specifically changes an event count (noted below).
+
+**Blocking: `createHeroBuild` enforced nothing, and it was the only build
+constructor scenarios/the lab/`scripts/simulate.ts` actually use.**
+`applyUpgrade` already enforced `heroId` restriction, `maxStacks`, and
+prerequisites correctly — nothing called it. Confirmed concretely:
+`createHeroBuild("x", "bruiser", ["more-max-hp"×4], catalogue)` compiled to
+160 max HP against a stated cap of 145 before the fix. `createHeroBuild`
+now folds each upgrade ID through `applyUpgrade` in order instead of
+building the selection list by hand, so it's impossible to construct an
+over-stacked, cross-hero, or prerequisite-missing build through this
+function anymore — confirmed by re-running the reviewer's exact
+reproduction (now throws `"... is not a legal choice for build ..."`) and
+by three more targeted cases (cross-hero, missing-prerequisite). This does
+mean `createHeroBuild` now requires a `Catalogue` argument and can throw;
+every call site (`duel.ts`, `three-versus-three.ts`,
+`apps/client/src/hud/upgrade-picker.ts`) was updated to pass one. The
+picker wraps its own call in a fallback (`buildOrEmpty`) that treats a
+hero's selection as empty rather than crashing the whole panel if it ever
+becomes inconsistent — defence in depth, since the picker's own
+eligibility-gated checkboxes shouldn't be able to produce an illegal
+selection in the first place, but a UI shouldn't hard-crash on bad state
+regardless of how confident the code around it is.
+
+**Validator hardening, three new checks in `validateCatalogue`:**
+- `slowFraction` must now be in `(0, 1)`, not `(0, 1]` — a full root
+  (`1.0`) is rejected. No shipped content used it, but it's a direct route
+  to the same "a unit can structurally never act again" failure class the
+  Phase 3 range-epsilon bug produced by accident; there's no reason to
+  leave that door open when nothing needs it.
+- A new `validatePrerequisiteGraph` pass rejects a self-referencing
+  `prerequisiteUpgradeIds` entry, any prerequisite cycle (walked, not just
+  checked one hop deep), and a prerequisite whose `heroId` conflicts with
+  its dependent's (which would make the dependent permanently
+  unreachable — eligible for no build that could ever satisfy it).
+  Verified against four synthetic broken catalogues (clone +
+  mutate, never touching shipped content): self-reference, a 2-cycle,
+  and a cross-hero prerequisite each correctly throw before this pass;
+  a fourth was the confirmation that the *legal* prerequisite order
+  (`healing-that-also-shields` → `stronger-shield`) still compiles fine.
+- The self-referencing case doubled as a real client-side bug: before
+  this pass, `upgrade-picker.ts`'s deselect cascade recursed over
+  `catalogue.upgrades` with no visited-set guard, so a cyclic
+  `prerequisiteUpgradeIds` would stack-overflow the picker (reproduced:
+  `RangeError` around recursion depth 4995). `deselectCascade` now takes
+  an explicit `visited: Set<UpgradeDefinitionId>` and returns immediately
+  on a repeat — the validator should always catch this in content before
+  it ships, but the UI no longer trusts that as its only line of defence.
+
+**`compileBuild`'s basic-attack-cooldown rate had an unguarded division.**
+A large enough negative `percent` sum on `basic-attack-cooldown` drives
+the compiled rate to `0` or below; `1 / 0` is `Infinity`, and
+`Math.max(1, Math.round(Infinity))` is still `Infinity` — an ability with
+an infinite cooldown, permanently disabled, not a crash but a silent
+content footgun. No shipped upgrade has a large enough negative percent to
+trigger this, but nothing stopped one from being authored that way.
+`abilityCooldownDurations` is now clamped to
+`[1, DEFAULT_TICK_LIMIT]` (`DEFAULT_TICK_LIMIT` from `constants.ts`) — a
+pathological rate now compiles to "effectively never castable within one
+battle," a finite number, instead of `Infinity` propagating into whatever
+reads that field next. Verified with a synthetic `-500%` modifier:
+compiles to `1350` (the tick limit), finite.
+
+**Effects no longer apply to a target that already died earlier in the
+same cast, and a unit's `shield`/`slow` are cleared the instant it dies.**
+`bolt`'s effects are `[chain-damage, slow]`; before this fix, a
+`chain-damage` hit that killed the primary target was immediately followed
+by a `slow` effect applied to that same, now-dead unit — a real event
+observed live (`damage-dealt` → `slow-applied` → `death`, same tick,
+consecutive sequence numbers). `step-battle.ts`'s per-effect loop now
+checks `target.alive` at the top of each iteration and stops processing
+further effects once it's false. Separately, `applyDamage` (the single
+choke point both the plain-damage and chain-damage paths call through) now
+nulls `unit.shield`/`unit.slow` in the same branch that sets
+`unit.alive = false`, so a corpse can never keep reporting a live status
+for the rest of the battle regardless of which effect killed it. Verified
+by instrumenting a full `three-vs-three` battle and asserting no dead unit
+ever has a non-null `shield` or `slow` on any tick: zero violations across
+all 379 ticks. This also trimmed `three-vs-three` seed 1's event count
+from 153 to 149 (four fewer now-nonsensical `slow-applied` events on
+already-dead targets) — ticks, result and damage totals are unchanged;
+only the spurious post-mortem events are gone.
+
+**Confirmed as intentional, documented rather than changed (the plan's
+own "document and inspect this ordering rather than hiding it" guidance,
+item 10):**
+- A reaction-granted shield *overwrites* rather than stacks with an
+  existing shield (matches `applyEffect`'s plain shield case — reapplying
+  always replaces amount and refreshes duration, documented back in the
+  Phase 3 review pass). Consistent behaviour, not a special case for
+  reactions.
+- A source unit that dies later in the *same tick* after its heal already
+  resolved still lands its reaction-granted shield — the heal (and the
+  reaction it queues) is already complete by the time a later action in
+  the same tick's resolution order kills the source; the reaction doesn't
+  re-check the source's aliveness at drain time, only the target's. Not
+  observed to matter in any shipped scenario (`three-vs-three` seed 1's
+  reaction shields land at ticks 27/117/207 with no source death in the
+  same tick), and changing it would need a real design answer (does a
+  dead unit's queued-but-unresolved reaction still fire at all?) rather
+  than a one-line guard.
+- The reaction-budget safety path (`MAX_REACTION_DEPTH` /
+  `MAX_REACTIONS_PER_TICK`) still has no shipped content that can reach it
+  — the only reaction's generated effect is a shield, which can't
+  retrigger `after-heal-effect`. Re-confirmed by re-deriving the same
+  synthetic test from the first review (20-job queue, 16 legal + 4
+  over-depth: processes 16, reports the depth-exceeded diagnostic). The
+  first genuinely self-retriggering reaction should re-verify this path
+  against real content, not just trust the synthetic test still applies.
+- `bonus-damage-vs-slowed` stays restricted to `heroId: "bruiser"` —
+  re-confirmed the restriction is load-bearing, not just a preference:
+  `bolt`'s damage never routes through the single-target `damage` case
+  the bonus reads, so offering it to a ranger would be a checked,
+  always-inert choice.
+
+**Not changed: `shield-applied`'s `abilityId` field carries a
+`ReactionDefinitionId` for a reaction-granted shield** (e.g.
+`"mend-shield"`, not a real ability). Both are plain `string` aliases so
+this type-checks; it's inert today because `event-log.ts`'s
+`shield-applied` case doesn't look the field up in
+`catalogue.abilities`. Left as-is — flagged here so a future change that
+*does* do a catalogue lookup on a `shield-applied` event's `abilityId`
+knows to check for this case first.

@@ -1,4 +1,6 @@
-import type { BattleLabSession, LabScenarioKind } from "../session/types.js";
+import type { HeroDefinitionId } from "@jev-game/game";
+import type { BattleLabSession, LabScenarioKind, TeamAUpgradeIdsByHero } from "../session/types.js";
+import { createUpgradePickerView } from "./upgrade-picker.js";
 
 export interface BattleControlsView {
   dispose(): void;
@@ -10,6 +12,11 @@ const SCENARIO_OPTIONS: readonly { value: LabScenarioKind; label: string }[] = [
   { value: "three-vs-three", label: "three vs three" },
   { value: "duel", label: "duel" },
 ];
+
+const SCENARIO_TEAM_A_HEROES: Record<LabScenarioKind, readonly HeroDefinitionId[]> = {
+  "three-vs-three": ["bruiser", "ranger", "support"],
+  duel: ["bruiser"],
+};
 
 function isScenarioKind(value: string): value is LabScenarioKind {
   return SCENARIO_OPTIONS.some((option) => option.value === value);
@@ -79,9 +86,10 @@ function scenarioField(
 export function createBattleControlsView(
   barContainer: HTMLElement,
   tuningContainer: HTMLElement,
+  upgradesContainer: HTMLElement,
   session: BattleLabSession,
   onReplay: () => void,
-  onReset: (seed: number, scenario?: LabScenarioKind) => void,
+  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero) => void,
 ): BattleControlsView {
   const playButton = iconButton(barContainer, "▶", "Play");
   const pauseButton = iconButton(barContainer, "‖", "Pause");
@@ -126,6 +134,17 @@ export function createBattleControlsView(
   const seedInput = numberField(fields, "seed", initial.seed);
   const scenarioSelect = scenarioField(fields, initial.scenario);
 
+  const upgradePicker = createUpgradePickerView(upgradesContainer, () => {});
+  upgradePicker.render(SCENARIO_TEAM_A_HEROES[initial.scenario]);
+
+  scenarioSelect.addEventListener("change", () => {
+    const selected = scenarioSelect.value;
+
+    if (isScenarioKind(selected)) {
+      upgradePicker.render(SCENARIO_TEAM_A_HEROES[selected]);
+    }
+  });
+
   playButton.addEventListener("click", () => {
     session.play();
   });
@@ -140,7 +159,11 @@ export function createBattleControlsView(
 
   resetButton.addEventListener("click", () => {
     const selected = scenarioSelect.value;
-    onReset(Number(seedInput.value), isScenarioKind(selected) ? selected : undefined);
+    onReset(
+      Number(seedInput.value),
+      isScenarioKind(selected) ? selected : undefined,
+      upgradePicker.getSelection(),
+    );
   });
 
   replayButton.addEventListener("click", onReplay);
@@ -154,6 +177,7 @@ export function createBattleControlsView(
       replayButton.remove();
       speedGroup.remove();
       fields.remove();
+      upgradePicker.dispose();
     },
   };
 }
