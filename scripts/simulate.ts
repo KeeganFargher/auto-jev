@@ -1,5 +1,11 @@
-import { createBattle, stepBattle, type BattleSetup } from "@jev-game/game";
-import { catalogue, createDuelSetup, validateCatalogue } from "@jev-game/content";
+import { recordBattle, type BattleSetup } from "@jev-game/game";
+import {
+  catalogue,
+  createDuelSetup,
+  createThreeBruisersSetup,
+  createThreeVersusThreeSetup,
+  validateCatalogue,
+} from "@jev-game/content";
 
 function parseArgs(argv: string[]) {
   const scenario = argv[0] ?? "duel";
@@ -16,6 +22,14 @@ function parseArgs(argv: string[]) {
 function buildSetup(scenario: string, seed: number): BattleSetup {
   if (scenario === "duel") {
     return createDuelSetup(seed);
+  }
+
+  if (scenario === "three-vs-three") {
+    return createThreeVersusThreeSetup(seed);
+  }
+
+  if (scenario === "three-bruisers") {
+    return createThreeBruisersSetup(seed);
   }
 
   throw new Error(`unknown scenario "${scenario}"`);
@@ -39,31 +53,24 @@ function main(): void {
 
   const { scenario, seed } = parseArgs(process.argv.slice(2));
   const setup = buildSetup(scenario, seed);
-  const state = createBattle(setup, catalogue);
+  const recording = recordBattle(setup, catalogue);
+  const lastFrame = recording.frames[recording.frames.length - 1];
 
-  const eventLog: string[] = [];
-
-  for (let iterations = 0; iterations <= state.tickLimit && state.result === null; iterations++) {
-    const step = stepBattle(state, catalogue);
-
-    for (const event of step.events) {
-      eventLog.push(JSON.stringify(event));
-    }
-  }
-
-  if (state.result === null) {
+  if (lastFrame === undefined || lastFrame.snapshot.result === null) {
     throw new Error("battle did not terminate within its own tick limit");
   }
 
+  const eventLog = recording.events.map((event) => JSON.stringify(event));
+
   console.log(`scenario: ${scenario}`);
   console.log(`seed: ${seed}`);
-  console.log(`ticks: ${state.tick}`);
-  console.log(`result: ${JSON.stringify(state.result)}`);
+  console.log(`ticks: ${lastFrame.tick}`);
+  console.log(`result: ${JSON.stringify(lastFrame.snapshot.result)}`);
   console.log(`events: ${eventLog.length}`);
   console.log(`event digest: ${fnv1aHex(eventLog)}`);
   console.log("damage dealt:");
 
-  for (const [unitId, amount] of Object.entries(state.result.damageDealt)) {
+  for (const [unitId, amount] of Object.entries(lastFrame.snapshot.result.damageDealt)) {
     console.log(`  ${unitId}: ${amount}`);
   }
 }

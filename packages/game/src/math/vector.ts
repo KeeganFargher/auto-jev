@@ -1,3 +1,5 @@
+import { RANGE_EPSILON } from "../constants.js";
+
 export interface Vector2 {
   x: number;
   y: number;
@@ -5,6 +7,10 @@ export interface Vector2 {
 
 export function distance(a: Vector2, b: Vector2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+export function isWithinRange(actualDistance: number, range: number): boolean {
+  return actualDistance <= range + RANGE_EPSILON;
 }
 
 export function directionTo(from: Vector2, to: Vector2): Vector2 {

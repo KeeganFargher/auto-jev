@@ -1,12 +1,43 @@
-import { distance, type BattleSnapshot, type UnitState } from "@jev-game/game";
+import { distance, type BattleEvent, type BattleSnapshot, type UnitState } from "@jev-game/game";
 import { createArenaView } from "./arena-view.js";
-import { drawTargetLine, drawUnit } from "./unit-view.js";
+import {
+  DAMAGE_CUE_COLOR,
+  HEAL_CUE_COLOR,
+  SHIELD_CUE_COLOR,
+  drawCastCue,
+  drawTargetLine,
+  drawUnit,
+} from "./unit-view.js";
 
 const CLICK_TOLERANCE_PIXELS = 14;
 
+const CAST_CUE_TICKS = 10;
+
 export interface BattleView {
-  update(snapshot: BattleSnapshot, selectedUnitId: string | null): void;
+  update(snapshot: BattleSnapshot, selectedUnitId: string | null, latestEvents: readonly BattleEvent[]): void;
   dispose(): void;
+}
+
+interface RecentCastCue {
+  targetUnitId: string;
+  tick: number;
+  color: string;
+}
+
+function colorForEffectEvent(event: BattleEvent): string | null {
+  if (event.kind === "damage-dealt") {
+    return DAMAGE_CUE_COLOR;
+  }
+
+  if (event.kind === "healing-done") {
+    return HEAL_CUE_COLOR;
+  }
+
+  if (event.kind === "shield-applied") {
+    return SHIELD_CUE_COLOR;
+  }
+
+  return null;
 }
 
 export function createBattleView(
@@ -17,6 +48,7 @@ export function createBattleView(
 ): BattleView {
   let latestSnapshot: BattleSnapshot | null = null;
   let latestSelectedUnitId: string | null = null;
+  let recentCastCues: RecentCastCue[] = [];
 
   function render(): void {
     if (latestSnapshot === null) {
@@ -44,6 +76,17 @@ export function createBattleView(
 
     for (const unit of latestSnapshot.units) {
       drawUnit(arena.ctx, unit, unit.unitId === latestSelectedUnitId, transform);
+    }
+
+    for (const cue of recentCastCues) {
+      const target = latestSnapshot.units.find((candidate) => candidate.unitId === cue.targetUnitId);
+
+      if (target === undefined) {
+        continue;
+      }
+
+      const age = latestSnapshot.tick - cue.tick;
+      drawCastCue(arena.ctx, target.position, cue.color, 1 - age / CAST_CUE_TICKS, transform);
     }
   }
 
@@ -84,9 +127,19 @@ export function createBattleView(
   arena.canvas.addEventListener("click", handleClick);
 
   return {
-    update(snapshot, selectedUnitId) {
+    update(snapshot, selectedUnitId, latestEvents) {
       latestSnapshot = snapshot;
       latestSelectedUnitId = selectedUnitId;
+
+      for (const event of latestEvents) {
+        const color = colorForEffectEvent(event);
+
+        if (color !== null && "targetUnitId" in event) {
+          recentCastCues.push({ targetUnitId: event.targetUnitId, tick: event.tick, color });
+        }
+      }
+
+      recentCastCues = recentCastCues.filter((cue) => snapshot.tick - cue.tick < CAST_CUE_TICKS);
       render();
     },
 

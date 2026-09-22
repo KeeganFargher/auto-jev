@@ -4,37 +4,48 @@ import {
   stepBattle,
   TICK_SECONDS,
   type BattleEvent,
+  type BattleRecording,
+  type BattleSetup,
   type BattleState,
-  type Catalogue,
 } from "@jev-game/game";
-import { bruiser, catalogue, createDuelSetup, validateCatalogue } from "@jev-game/content";
-import type { BattleLabSession, HeroOverrides } from "./types.js";
+import {
+  catalogue,
+  createDuelSetup,
+  createThreeVersusThreeSetup,
+  validateCatalogue,
+} from "@jev-game/content";
+import type { BattleLabSession, LabScenarioKind } from "./types.js";
 
 const MAX_STEPS_PER_FRAME = 10;
 
-function catalogueWithOverrides(overrides: Partial<HeroOverrides> | undefined): Catalogue {
-  if (overrides === undefined) {
-    return catalogue;
+function buildSetup(scenario: LabScenarioKind, seed: number): BattleSetup {
+  if (scenario === "duel") {
+    return createDuelSetup(seed);
   }
 
-  const overridden = { ...catalogue, heroes: { ...catalogue.heroes } };
-  overridden.heroes[bruiser.id] = { ...bruiser, ...overrides };
-  validateCatalogue(overridden);
-
-  return overridden;
+  return createThreeVersusThreeSetup(seed);
 }
 
-export function createLocalBattleLabSession(initialSeed: number): BattleLabSession {
+export function createLocalBattleLabSession(
+  initialSeed: number,
+  initialScenario: LabScenarioKind = "three-vs-three",
+): BattleLabSession {
   validateCatalogue(catalogue);
 
   let seed = initialSeed;
-  let activeCatalogue: Catalogue = catalogue;
-  let state: BattleState = createBattle(createDuelSetup(seed), activeCatalogue);
+  let scenario = initialScenario;
+  let state: BattleState = createBattle(buildSetup(scenario, seed), catalogue);
   let isRunning = false;
   let speedMultiplier = 1;
   let accumulatedSeconds = 0;
   let behindBySteps = 0;
   let pendingEvents: BattleEvent[] = [];
+  let recordedEvents: BattleEvent[] = [];
+
+  let recordedFrames: BattleRecording["frames"] = [
+    { tick: state.tick, snapshot: getBattleSnapshot(state) },
+  ];
+
   const listeners = new Set<() => void>();
 
   function notify(): void {
@@ -44,8 +55,14 @@ export function createLocalBattleLabSession(initialSeed: number): BattleLabSessi
   }
 
   function stepOnceInternal(): void {
-    const step = stepBattle(state, activeCatalogue);
+    if (state.result !== null) {
+      return;
+    }
+
+    const step = stepBattle(state, catalogue);
     pendingEvents.push(...step.events);
+    recordedEvents.push(...step.events);
+    recordedFrames.push({ tick: state.tick, snapshot: getBattleSnapshot(state) });
 
     if (state.result !== null) {
       isRunning = false;
@@ -60,6 +77,7 @@ export function createLocalBattleLabSession(initialSeed: number): BattleLabSessi
       return {
         snapshot: getBattleSnapshot(state),
         seed,
+        scenario,
         isRunning,
         speedMultiplier,
         behindBySteps,
@@ -68,7 +86,21 @@ export function createLocalBattleLabSession(initialSeed: number): BattleLabSessi
     },
 
     peekSnapshot() {
-      return { seed, snapshot: getBattleSnapshot(state) };
+      return { seed, scenario, snapshot: getBattleSnapshot(state) };
+    },
+
+    getRecording() {
+      if (state.result === null) {
+        return null;
+      }
+
+      return {
+        rulesetId: state.rulesetId,
+        rulesetVersion: state.rulesetVersion,
+        seed,
+        events: recordedEvents,
+        frames: recordedFrames,
+      };
     },
 
     subscribe(listener) {
@@ -99,14 +131,16 @@ export function createLocalBattleLabSession(initialSeed: number): BattleLabSessi
       notify();
     },
 
-    reset(newSeed, overrides) {
+    reset(newSeed, newScenario) {
       seed = newSeed;
-      activeCatalogue = catalogueWithOverrides(overrides);
-      state = createBattle(createDuelSetup(seed), activeCatalogue);
+      scenario = newScenario ?? scenario;
+      state = createBattle(buildSetup(scenario, seed), catalogue);
       isRunning = false;
       accumulatedSeconds = 0;
       behindBySteps = 0;
       pendingEvents = [];
+      recordedEvents = [];
+      recordedFrames = [{ tick: state.tick, snapshot: getBattleSnapshot(state) }];
       notify();
     },
 

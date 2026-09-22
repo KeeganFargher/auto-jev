@@ -1,7 +1,9 @@
 import "./style.css";
 import { createLocalBattleLabSession } from "./session/local-session.js";
-import { createBattleLabScene } from "./game/scenes/battle-lab-scene.js";
+import { createPlaybackSession } from "./session/playback-session.js";
+import { createBattleLabScene, type BattleLabScene } from "./game/scenes/battle-lab-scene.js";
 import { parseScenario, serializeScenario, type LabScenario } from "./dev/scenario-editor.js";
+import type { BattleLabSession, LabScenarioKind } from "./session/types.js";
 
 const canvasRoot = document.getElementById("lab-canvas-root")!;
 
@@ -17,25 +19,59 @@ const importButton = document.getElementById("lab-scenario-import")!;
 
 const errorEl = document.getElementById("lab-scenario-error")!;
 
-const session = createLocalBattleLabSession(1);
+let activeSession: BattleLabSession = createLocalBattleLabSession(1);
 
-createBattleLabScene(canvasRoot, hudRoot, statusEl, session);
+let activeScene: BattleLabScene | null = null;
+
+let activeIsReplay = false;
+
+function mount(session: BattleLabSession, isReplay: boolean): void {
+  activeScene?.dispose();
+
+  if (session !== activeSession) {
+    activeSession.dispose();
+  }
+
+  activeSession = session;
+  activeIsReplay = isReplay;
+  activeScene = createBattleLabScene(
+    canvasRoot,
+    hudRoot,
+    statusEl,
+    activeSession,
+    handleReplay,
+    handleReset,
+    isReplay,
+  );
+}
+
+function handleReplay(): void {
+  const recording = activeSession.getRecording();
+
+  if (recording === null) {
+    return;
+  }
+
+  const { scenario } = activeSession.peekSnapshot();
+  mount(createPlaybackSession(recording, scenario), true);
+}
+
+function handleReset(seed: number, scenario?: LabScenarioKind): void {
+  if (activeIsReplay) {
+    mount(createLocalBattleLabSession(seed, scenario ?? activeSession.peekSnapshot().scenario), false);
+
+    return;
+  }
+
+  activeSession.reset(seed, scenario);
+}
+
+mount(activeSession, false);
 
 function currentScenario(): LabScenario {
-  const { seed, snapshot } = session.peekSnapshot();
-  const unit = snapshot.units[0];
+  const { seed, scenario } = activeSession.peekSnapshot();
 
-  return {
-    version: 1,
-    seed,
-    heroOverrides: {
-      maxHp: unit?.maxHp ?? 0,
-      attackDamage: unit?.attackDamage ?? 0,
-      attackRangeUnits: unit?.attackRangeUnits ?? 0,
-      attackIntervalTicks: unit?.attackIntervalTicks ?? 0,
-      moveSpeedUnitsPerSecond: unit?.moveSpeedUnitsPerSecond ?? 0,
-    },
-  };
+  return { version: 2, seed, scenario };
 }
 
 exportButton.addEventListener("click", () => {
@@ -47,7 +83,7 @@ importButton.addEventListener("click", () => {
   try {
     const scenario = parseScenario(scenarioText.value);
     errorEl.textContent = "";
-    session.reset(scenario.seed, scenario.heroOverrides);
+    mount(createLocalBattleLabSession(scenario.seed, scenario.scenario), false);
   } catch (error) {
     errorEl.textContent = error instanceof Error ? error.message : "invalid scenario";
   }

@@ -3,7 +3,7 @@ import { createBattleView } from "../views/battle-view.js";
 import { createEventLogView } from "../../hud/event-log.js";
 import { createUnitInspectorView } from "../../hud/unit-inspector.js";
 import { createBattleControlsView } from "../../hud/battle-controls.js";
-import type { BattleLabSession } from "../../session/types.js";
+import type { BattleLabSession, LabScenarioKind } from "../../session/types.js";
 
 export interface BattleLabScene {
   dispose(): void;
@@ -30,6 +30,9 @@ export function createBattleLabScene(
   hudRoot: HTMLElement,
   statusEl: HTMLElement,
   session: BattleLabSession,
+  onReplay: () => void,
+  onReset: (seed: number, scenario?: LabScenarioKind) => void,
+  isReplay: boolean,
 ): BattleLabScene {
   const barRoot = hudRoot.querySelector<HTMLElement>("#lab-bar")!;
   const unitRoot = hudRoot.querySelector<HTMLElement>("#lab-unit")!;
@@ -54,12 +57,12 @@ export function createBattleLabScene(
 
   const inspector = createUnitInspectorView(unitRoot);
   const eventLog = createEventLogView(feedRoot);
-  const controls = createBattleControlsView(barRoot, tuningRoot, session);
+  const controls = createBattleControlsView(barRoot, tuningRoot, session, onReplay, onReset);
 
   function render(): void {
     const view = session.getView();
 
-    battleView.update(view.snapshot, selectedUnitId);
+    battleView.update(view.snapshot, selectedUnitId, view.latestEvents);
     eventLog.push(view.latestEvents);
 
     const selectedUnit =
@@ -67,11 +70,12 @@ export function createBattleLabScene(
         ? null
         : (view.snapshot.units.find((unit) => unit.unitId === selectedUnitId) ?? null);
 
-    inspector.update(selectedUnit);
+    inspector.update(selectedUnit, view.snapshot.tick);
 
     const behindText = view.behindBySteps > 0 ? ` · behind ${view.behindBySteps}` : "";
+    const prefix = isReplay ? "REPLAY · " : "";
 
-    statusEl.textContent = `tick ${view.snapshot.tick}/${view.snapshot.tickLimit} · ${describeResult(view.snapshot.result)}${behindText}`;
+    statusEl.textContent = `${prefix}${view.scenario} · tick ${view.snapshot.tick}/${view.snapshot.tickLimit} · ${describeResult(view.snapshot.result)}${behindText}`;
   }
 
   const unsubscribe = session.subscribe(render);

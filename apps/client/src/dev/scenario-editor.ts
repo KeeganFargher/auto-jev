@@ -1,9 +1,25 @@
-import type { HeroOverrides } from "../session/types.js";
+import type { LabScenarioKind } from "../session/types.js";
 
 export interface LabScenario {
-  version: 1;
+  version: 2;
   seed: number;
-  heroOverrides: HeroOverrides;
+  scenario: LabScenarioKind;
+}
+
+const SCENARIO_KINDS: readonly LabScenarioKind[] = ["duel", "three-vs-three"];
+
+function isScenarioLike(
+  value: unknown,
+): value is { version: unknown; seed: unknown; scenario: unknown } {
+  return value instanceof Object && "version" in value && "seed" in value && "scenario" in value;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return Number.isFinite(value);
+}
+
+function isScenarioKind(value: unknown): value is LabScenarioKind {
+  return SCENARIO_KINDS.some((kind) => kind === value);
 }
 
 export function serializeScenario(scenario: LabScenario): string {
@@ -11,23 +27,27 @@ export function serializeScenario(scenario: LabScenario): string {
 }
 
 export function parseScenario(json: string): LabScenario {
-  const parsed = JSON.parse(json);
+  const parsed: unknown = JSON.parse(json);
 
-  if (parsed.version !== 1) {
+  if (!isScenarioLike(parsed)) {
+    throw new Error("scenario is missing version, seed, or scenario fields");
+  }
+
+  if (parsed.version !== 2) {
     throw new Error(`unsupported scenario version "${String(parsed.version)}"`);
   }
 
-  const overrides = parsed.heroOverrides;
+  if (!isScenarioKind(parsed.scenario)) {
+    throw new Error(`unknown scenario "${String(parsed.scenario)}"`);
+  }
+
+  if (!isFiniteNumber(parsed.seed)) {
+    throw new Error(`scenario seed must be a finite number, got "${String(parsed.seed)}"`);
+  }
 
   return {
-    version: 1,
-    seed: Number(parsed.seed),
-    heroOverrides: {
-      maxHp: Number(overrides.maxHp),
-      attackDamage: Number(overrides.attackDamage),
-      attackRangeUnits: Number(overrides.attackRangeUnits),
-      attackIntervalTicks: Number(overrides.attackIntervalTicks),
-      moveSpeedUnitsPerSecond: Number(overrides.moveSpeedUnitsPerSecond),
-    },
+    version: 2,
+    seed: parsed.seed,
+    scenario: parsed.scenario,
   };
 }

@@ -1,5 +1,5 @@
 import type { ArenaDefinitionId, HeroDefinitionId, TeamId, UnitId } from "../ids.js";
-import type { Catalogue } from "../definitions.js";
+import type { Catalogue, HeroDefinition } from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
 import type { BattleState, UnitState } from "./state.js";
 import { createRng, nextInt, type RngState } from "../random/rng.js";
@@ -29,6 +29,16 @@ function isWithinArena(vector: Vector2, arenaWidth: number, arenaHeight: number)
   return (
     vector.x >= 0 && vector.x <= arenaWidth && vector.y >= 0 && vector.y <= arenaHeight
   );
+}
+
+function initialAbilityCooldowns(hero: HeroDefinition) {
+  const cooldowns: Record<string, number> = {};
+
+  for (const abilityId of [...hero.abilityIds, hero.basicAttackId]) {
+    cooldowns[abilityId] = 0;
+  }
+
+  return cooldowns;
 }
 
 function shufflePriority(unitIds: readonly UnitId[], rng: RngState): UnitId[] {
@@ -86,6 +96,16 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
       throw new Error(`unit "${unitSetup.unitId}" has a spawn position outside the arena`);
     }
 
+    if (catalogue.abilities[hero.basicAttackId] === undefined) {
+      throw new Error(`hero "${hero.id}" has an unknown basic attack id "${hero.basicAttackId}"`);
+    }
+
+    for (const abilityId of hero.abilityIds) {
+      if (catalogue.abilities[abilityId] === undefined) {
+        throw new Error(`hero "${hero.id}" has an unknown ability id "${abilityId}"`);
+      }
+    }
+
     return {
       unitId: unitSetup.unitId,
       heroId: unitSetup.heroId,
@@ -93,12 +113,10 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
       position: { x: unitSetup.spawn.x, y: unitSetup.spawn.y },
       hp: hero.maxHp,
       maxHp: hero.maxHp,
-      attackDamage: hero.attackDamage,
-      attackRangeUnits: hero.attackRangeUnits,
-      attackIntervalTicks: hero.attackIntervalTicks,
       moveSpeedUnitsPerSecond: hero.moveSpeedUnitsPerSecond,
       targetUnitId: null,
-      nextAttackTick: 0,
+      abilityCooldowns: initialAbilityCooldowns(hero),
+      shield: null,
       alive: true,
       damageDealt: 0,
     };

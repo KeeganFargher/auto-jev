@@ -18,7 +18,12 @@ export function getBattleSnapshot(state: BattleState): BattleSnapshot {
     tickLimit: state.tickLimit,
     arenaWidth: state.arenaWidth,
     arenaHeight: state.arenaHeight,
-    units: state.units.map((unit) => ({ ...unit, position: { ...unit.position } })),
+    units: state.units.map((unit) => ({
+      ...unit,
+      position: { ...unit.position },
+      abilityCooldowns: { ...unit.abilityCooldowns },
+      shield: unit.shield === null ? null : { ...unit.shield },
+    })),
     result: state.result,
     rng: cloneRng(state.rng),
   };

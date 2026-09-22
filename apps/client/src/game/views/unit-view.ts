@@ -1,4 +1,5 @@
-import type { UnitState } from "@jev-game/game";
+import type { UnitState, Vector2 } from "@jev-game/game";
+import { bruiser, catalogue, ranger, support } from "@jev-game/content";
 import type { CanvasTransform } from "./arena-view.js";
 
 const RADIUS_PIXELS = 9;
@@ -14,6 +15,14 @@ const TEAM_B_COLOR = "#ff6b6b";
 const OTHER_TEAM_COLOR = "#c084fc";
 
 const DEAD_COLOR = "#6b7280";
+
+const SHIELD_RING_COLOR = "#60a5fa";
+
+export const DAMAGE_CUE_COLOR = "#ffb454";
+
+export const HEAL_CUE_COLOR = "#4ade80";
+
+export const SHIELD_CUE_COLOR = "#60a5fa";
 
 function colorForUnit(unit: UnitState): string {
   if (!unit.alive) {
@@ -31,6 +40,39 @@ function colorForUnit(unit: UnitState): string {
   return OTHER_TEAM_COLOR;
 }
 
+function traceBody(ctx: CanvasRenderingContext2D, unit: UnitState, center: Vector2): void {
+  if (unit.heroId === ranger.id) {
+    ctx.beginPath();
+    ctx.moveTo(center.x, center.y - RADIUS_PIXELS);
+    ctx.lineTo(center.x + RADIUS_PIXELS, center.y + RADIUS_PIXELS);
+    ctx.lineTo(center.x - RADIUS_PIXELS, center.y + RADIUS_PIXELS);
+    ctx.closePath();
+
+    return;
+  }
+
+  if (unit.heroId === support.id) {
+    ctx.beginPath();
+    ctx.moveTo(center.x, center.y - RADIUS_PIXELS);
+    ctx.lineTo(center.x + RADIUS_PIXELS, center.y);
+    ctx.lineTo(center.x, center.y + RADIUS_PIXELS);
+    ctx.lineTo(center.x - RADIUS_PIXELS, center.y);
+    ctx.closePath();
+
+    return;
+  }
+
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, RADIUS_PIXELS, 0, Math.PI * 2);
+}
+
+function engageRangeUnits(unit: UnitState): number {
+  const hero = catalogue.heroes[unit.heroId] ?? bruiser;
+  const basicAttack = catalogue.abilities[hero.basicAttackId];
+
+  return basicAttack === undefined ? 0 : basicAttack.range;
+}
+
 export function drawUnit(
   ctx: CanvasRenderingContext2D,
   unit: UnitState,
@@ -42,7 +84,7 @@ export function drawUnit(
 
   if (isSelected) {
     ctx.beginPath();
-    ctx.arc(center.x, center.y, unit.attackRangeUnits * transform.scale, 0, Math.PI * 2);
+    ctx.arc(center.x, center.y, engageRangeUnits(unit) * transform.scale, 0, Math.PI * 2);
     ctx.setLineDash([5, 4]);
     ctx.strokeStyle = "rgba(78, 161, 255, 0.4)";
     ctx.lineWidth = 1;
@@ -50,8 +92,14 @@ export function drawUnit(
     ctx.setLineDash([]);
   }
 
-  ctx.beginPath();
-  ctx.arc(center.x, center.y, RADIUS_PIXELS, 0, Math.PI * 2);
+  if (unit.shield !== null) {
+    traceBody(ctx, unit, center);
+    ctx.strokeStyle = SHIELD_RING_COLOR;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  traceBody(ctx, unit, center);
   ctx.fillStyle = color;
   ctx.fill();
 
@@ -93,4 +141,22 @@ export function drawTargetLine(
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.setLineDash([]);
+}
+
+export function drawCastCue(
+  ctx: CanvasRenderingContext2D,
+  position: Vector2,
+  color: string,
+  alpha: number,
+  transform: CanvasTransform,
+): void {
+  const center = transform.worldToCanvas(position);
+
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, RADIUS_PIXELS + 5, 0, Math.PI * 2);
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }

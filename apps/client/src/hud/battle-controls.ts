@@ -1,11 +1,19 @@
-import { bruiser } from "@jev-game/content";
-import type { BattleLabSession, HeroOverrides } from "../session/types.js";
+import type { BattleLabSession, LabScenarioKind } from "../session/types.js";
 
 export interface BattleControlsView {
   dispose(): void;
 }
 
 const SPEED_OPTIONS = [0.5, 1, 2, 4] as const;
+
+const SCENARIO_OPTIONS: readonly { value: LabScenarioKind; label: string }[] = [
+  { value: "three-vs-three", label: "three vs three" },
+  { value: "duel", label: "duel" },
+];
+
+function isScenarioKind(value: string): value is LabScenarioKind {
+  return SCENARIO_OPTIONS.some((option) => option.value === value);
+}
 
 function iconButton(parent: HTMLElement, glyph: string, label: string): HTMLButtonElement {
   const button = document.createElement("button");
@@ -18,11 +26,7 @@ function iconButton(parent: HTMLElement, glyph: string, label: string): HTMLButt
   return button;
 }
 
-function numberField(
-  parent: HTMLElement,
-  label: string,
-  initialValue: number,
-): HTMLInputElement {
+function numberField(parent: HTMLElement, label: string, initialValue: number): HTMLInputElement {
   const wrapper = document.createElement("label");
   wrapper.className = "hud-field";
 
@@ -41,15 +45,49 @@ function numberField(
   return input;
 }
 
+function scenarioField(
+  parent: HTMLElement,
+  initialValue: LabScenarioKind,
+): HTMLSelectElement {
+  const wrapper = document.createElement("label");
+  wrapper.className = "hud-field";
+
+  const caption = document.createElement("span");
+  caption.textContent = "scenario";
+  wrapper.appendChild(caption);
+
+  const select = document.createElement("select");
+
+  for (const option of SCENARIO_OPTIONS) {
+    const element = document.createElement("option");
+    element.value = option.value;
+    element.textContent = option.label;
+
+    if (option.value === initialValue) {
+      element.selected = true;
+    }
+
+    select.appendChild(element);
+  }
+
+  wrapper.appendChild(select);
+  parent.appendChild(wrapper);
+
+  return select;
+}
+
 export function createBattleControlsView(
   barContainer: HTMLElement,
   tuningContainer: HTMLElement,
   session: BattleLabSession,
+  onReplay: () => void,
+  onReset: (seed: number, scenario?: LabScenarioKind) => void,
 ): BattleControlsView {
   const playButton = iconButton(barContainer, "▶", "Play");
   const pauseButton = iconButton(barContainer, "‖", "Pause");
   const stepButton = iconButton(barContainer, "▶‖", "Step one tick");
   const resetButton = iconButton(barContainer, "↻", "Reset");
+  const replayButton = iconButton(barContainer, "⏮", "Replay last recording");
 
   const speedGroup = document.createElement("div");
   speedGroup.className = "hud-speed";
@@ -84,28 +122,9 @@ export function createBattleControlsView(
   fields.className = "hud-fields";
   tuningContainer.appendChild(fields);
 
-  const seedInput = numberField(fields, "seed", 1);
-  const maxHpInput = numberField(fields, "max hp", bruiser.maxHp);
-  const attackDamageInput = numberField(fields, "attack damage", bruiser.attackDamage);
-  const attackRangeInput = numberField(fields, "attack range", bruiser.attackRangeUnits);
-
-  const attackIntervalInput = numberField(
-    fields,
-    "attack interval",
-    bruiser.attackIntervalTicks,
-  );
-
-  const moveSpeedInput = numberField(fields, "move speed", bruiser.moveSpeedUnitsPerSecond);
-
-  function readOverrides(): HeroOverrides {
-    return {
-      maxHp: Math.round(Number(maxHpInput.value)),
-      attackDamage: Math.round(Number(attackDamageInput.value)),
-      attackRangeUnits: Number(attackRangeInput.value),
-      attackIntervalTicks: Math.round(Number(attackIntervalInput.value)),
-      moveSpeedUnitsPerSecond: Number(moveSpeedInput.value),
-    };
-  }
+  const initial = session.peekSnapshot();
+  const seedInput = numberField(fields, "seed", initial.seed);
+  const scenarioSelect = scenarioField(fields, initial.scenario);
 
   playButton.addEventListener("click", () => {
     session.play();
@@ -120,8 +139,11 @@ export function createBattleControlsView(
   });
 
   resetButton.addEventListener("click", () => {
-    session.reset(Number(seedInput.value), readOverrides());
+    const selected = scenarioSelect.value;
+    onReset(Number(seedInput.value), isScenarioKind(selected) ? selected : undefined);
   });
+
+  replayButton.addEventListener("click", onReplay);
 
   return {
     dispose() {
@@ -129,6 +151,7 @@ export function createBattleControlsView(
       pauseButton.remove();
       stepButton.remove();
       resetButton.remove();
+      replayButton.remove();
       speedGroup.remove();
       fields.remove();
     },

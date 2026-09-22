@@ -345,3 +345,243 @@ banner comment and `packages/server-runtime/src/rooms/arena.ts`'s design-
 rationale JSDoc were left as they were — the former says "do not manually
 edit this file," and both predate this pass; stripping them is a separate,
 explicit ask, not something to fold into a bug-fix pass.
+
+## Phase 3
+
+**Every hero has exactly one `basicAttackId` plus an ordered `abilityIds`
+list; abilities are tried first, the basic attack is the fallback.** The
+plan's own phrase — "abilities resolve before its basic attack; by default
+it does one of these per tick" — is the spec for this. `bruiser` has no
+extra abilities (`abilityIds: []`), so it behaves exactly as it did in
+Phase 2. `ranger`'s *basic attack itself* is `bolt` — there's no separate
+"ranged ability," the ranged behaviour just *is* what the hero's basic
+attack does. `support` has `abilityIds: ["mend"]` with `basicAttackId:
+"strike"` as a fallback, so a support with nothing to heal still fights
+instead of standing idle — and, just as importantly, still has a
+well-defined *engagement range* for movement purposes (see next entry).
+
+**Movement's stop-distance is the unit's basic attack's range, not a flat
+per-unit field.** Phase 2's `UnitState.attackRangeUnits` is gone — abilities
+can have different ranges from each other (`strike` 10, `bolt` 30, `mend`
+8), so "how close does this unit walk before it starts doing anything" had
+to become a lookup (`abilities/getEngageRange`) instead of a stored number.
+This is also why `ranger` needed *a* basic attack (`bolt` itself) rather
+than none: movement always needs an engagement range to approach to.
+
+**`mend` grants a heal *and* a shield in one `AbilityDefinition` (two
+effects on the same ability), instead of a fourth ability file.** The plan
+lists shield as its own implementation step (10.6) but the starter content
+list in section 4 is fixed at three named ability files —
+`strike`/`bolt`/`mend`. `AbilityDefinition.effects` was already designed as
+an array specifically so one ability can do more than one thing; bundling
+the shield onto mend (20 heal + 15 shield/60 ticks) exercises the shield
+status mechanism for real, inside the given content budget, rather than
+inventing a fourth ability the plan didn't ask for. Recorded here because
+it's a real interpretation call, not because it needed the array — the
+array was already there.
+
+**The lab's hero-stat override inputs (Phase 2) are removed, not extended
+to the new fields.** They don't generalise: overriding "max HP" applied to
+*every* hero in the catalogue at once defeats the reason three different
+heroes exist. Replaced with a scenario `<select>` (`duel` / `three-vs-three`)
+in the same tuning drawer. `LabScenario`'s export/import format changed
+shape to match (`{version: 2, seed, scenario}`, dropping `heroOverrides`
+entirely) — old exports don't import; `parseScenario` rejects anything but
+version 2 rather than silently reinterpreting it, continuing the fix from
+the Phase 1+2 review pass. Tuning for the discovery session below now means
+editing `packages/content` directly and reloading, which is arguably more
+honest for data-driven catalogue content than a live-only input ever was.
+
+**Recording samples every tick and is built incrementally by the live
+session, not by re-simulating after the fact.** `packages/game`'s
+`recordBattle` (used by `scripts/simulate.ts`'s own verification and
+available for headless use) runs a battle start-to-finish and samples a
+snapshot after every `stepBattle` call. `apps/client`'s local session does
+the equivalent live — it already calls `stepBattle` every tick, so it just
+also pushes the resulting snapshot and events onto its own recording
+buffers, discarding them on `reset()`. `getRecording()` returns `null`
+until `state.result !== null`, so a mid-battle Replay click is a defined
+no-op rather than replaying a partial fight.
+
+**Playback is a second, separate `BattleLabSession` implementation
+(`createPlaybackSession`), not a mode flag on the live session.** It steps
+an index into the recording's frame list instead of calling `stepBattle`,
+but exposes the *exact* same interface, so `battle-lab-scene.ts`,
+`battle-view.ts` and every HUD panel render it with zero changes. `main.ts`
+owns swapping between the two — a `mount()` helper disposes whichever scene
+is active and creates a fresh one over the new session. Verified at the
+session level (not just by clicking through it once): stepping a playback
+session to its own end reproduces the live run's exact terminal tick,
+`BattleResult`, and full ordered event list — checked by direct comparison,
+not by eye. The DOM-level swap itself (`mount`'s dispose-then-recreate) is
+exercised structurally by the pre-existing scenario-import flow, which
+takes the same code path; a full 297-tick duel was not manually stepped
+through the browser tool just to watch the same swap happen again.
+
+**Units are drawn as distinct shapes by role (circle/triangle/diamond) and
+carry a persistent shield ring plus a fading cast-cue ring, instead of only
+varying by team colour.** Not asked for by name in the plan's "distinct
+cast cues" line, but directly serves it: with three roles now on screen at
+once (six units in `three-vs-three`), team-colour-only rendering from
+Phase 2 would make bruiser/ranger/support indistinguishable at a glance.
+Confirmed in the browser, not assumed: the ranger's long engagement ring
+and target line visibly explain its kiting behaviour, and a support's
+shield ring is visible on whichever ally it just protected.
+
+**The unit inspector shows ability cooldown state (`ready` / ticks
+remaining) and shield status instead of the old flat damage/range chips.**
+Those chips read straight off `UnitState.attackDamage`/`attackRangeUnits`,
+which no longer exist — the inspector's `update()` now also takes the
+current tick (previously just the unit), needed to compute "ticks until
+ready" and "ticks of shield left" from the stored absolute tick numbers.
+
+## Phase 3 review pass
+
+An independent review (a second model, given the diff and no prior context)
+found two bugs that should have blocked the phase and one place where this
+document overclaimed what verification actually showed. Fixed here, not
+silently — the point of asking for a cold review was to catch exactly this.
+
+**Movement/HUD showed one target, damage landed on another.**
+`resolveTarget` (retaining: keep the current target until it dies) governed
+`UnitState.targetUnitId`, which drove movement and everything the HUD reads.
+`resolveAbilityTarget`'s `"nearest-enemy"` branch called `findNearestEnemy`
+independently — freshly, with no retention — so an ability could fire on
+whichever enemy was nearest *this tick*, not the one the unit was shown
+approaching. Measured on `three-vs-three` seed 1 before the fix: 18 of 90
+casts (20%) hit a different unit than `targetUnitId` named. Fixed by making
+`resolveAbilityTarget`'s enemy branch call `resolveTarget` itself, so
+movement, the HUD, and damage resolution are now provably the same
+lookup — not just conventionally kept in sync by hand.
+
+**`effects.ts` and `step-battle.ts`'s effect dispatch were not exhaustive.**
+Both were an if-chain that treated anything that wasn't `"damage"` or
+`"heal"` as `"shield"`, with no `default` case. Confirmed empirically: adding
+a fourth `EffectDefinition` kind to the type and typechecking passed clean —
+the new kind would have silently behaved like a shield at runtime. Rewritten
+as `switch` statements ending in `const exhaustive: never = x` (no cast, so
+`require-safety-comment-for-type-assertion` doesn't apply), so a future
+effect kind fails to compile here instead of misbehaving silently. This is
+what the plan's "use exhaustive switches" was actually asking for; the prior
+if-chain read as exhaustive but wasn't.
+
+**A fizzled cast (target died to a higher-priority action earlier the same
+tick) burned its ability's cooldown and emitted nothing.** The cooldown
+burn is correct — section 10's action model consumes the cooldown at
+proposal time, before resolution can know the target will still be legal —
+but silence wasn't: a support's `mend` could go on a 90-tick cooldown with
+no visible cause. Added a `cast-fizzled` event, emitted from the same branch
+that used to just `continue`, described in the event feed as "X's Y
+fizzled, Z was no longer a legal target."
+
+**Catalogue validation didn't check that an effect's kind matched its
+ability's target policy.** A `damage` effect on a `lowest-hp-fraction-ally`
+ability (or a `heal`/`shield` effect on a `nearest-enemy` one) would have
+validated cleanly and then friendly-fired or healed an enemy at runtime.
+`validateAbilities` now rejects that combination by content ID, matching
+the existing style of every other check in this file.
+
+**`scenario-editor.ts`'s `parseScenario` had an unannounced implicit
+`any`.** `JSON.parse`'s result flowed untyped into `parsed.seed`, and
+`Number(parsed.seed)` turned a missing or malformed seed into `NaN`, then
+silently into seed `0` on the next `>>> 0` inside `createRng` — a rejection
+had turned into a quiet wrong answer. Rewritten with hand-written guards
+(`isRecord`, `isFiniteNumber`, `isScenarioKind`, none of them using `typeof`
+or `as`, matching this project's existing `no-runtime-typeof` /
+`require-safety-comment-for-type-assertion` workarounds) so a malformed
+scenario throws instead of importing as seed 0.
+
+**Clicking Step after a battle ends appended a duplicate terminal frame to
+the recording.** `stepBattle` early-returns without advancing the tick once
+`state.result` is set, but `local-session.ts`'s `stepOnceInternal` pushed a
+recording frame unconditionally regardless. Confirmed: three post-battle
+Step clicks produced 698 frames instead of 695, the last four all at the
+final tick, and playback then stalled on the frozen duplicates. Fixed by
+making `stepOnceInternal` a true no-op once `state.result !== null`.
+
+**Reset during Replay silently did the wrong thing.** `createPlaybackSession`'s
+`reset()` ignored its `seed`/`scenario` arguments entirely and just rewound
+the tape to frame 0 — so the seed field and scenario `<select>` in the
+tuning drawer looked live during replay but weren't; the only real way back
+to a live battle was the scenario-import textarea. `battle-controls.ts` no
+longer calls `session.reset()` directly; it calls an `onReset` callback,
+exactly mirroring how Replay already works. `main.ts` now tracks whether
+the active session is a replay and, on Reset, either resets the live
+session in place (unchanged behaviour) or mounts a brand-new live session
+with the chosen seed/scenario (exiting replay mode, which is what the
+control looked like it should always have done). `main.ts`'s `mount()` also
+now calls the outgoing session's own `dispose()` before dropping it, which
+was previously skipped — currently a no-op in practice (both session
+implementations' `dispose()` just clear an already-emptied listener set,
+since `activeScene?.dispose()` unsubscribes first) but is the correct
+lifecycle regardless of what a future session implementation's `dispose()`
+ends up doing.
+
+**Correction to this document's own claim: the seed does not exercise
+anything the shipped scenarios' outcomes can show.** The RNG's only
+consumer is `shufflePriority` (same-tick resolution order among
+simultaneous actions); every scenario this project ships
+(`duel`/`three-vs-three`/`three-bruisers`) is a mirrored, symmetric
+matchup, where within-tick resolution order cannot change who wins, only
+(in principle) fine timing — and even that didn't move across 200 sampled
+seeds per scenario in testing, all landing on identical tick counts and
+`draw: mutual-elimination`. "Run `pnpm simulate three-vs-three 1` twice,
+compare digest" genuinely proves same-seed reproducibility (a real,
+worthwhile check — it would have caught the Phase 1+2 lexicographic-order
+bug this project already fixed once). It does **not** prove the pipeline is
+free of new order-dependence, because a symmetric matchup can't distinguish
+"order-independent" from "order-dependent but still mirror-cancels." See
+`docs/phase-status.md`'s corrected discovery-session entry for what follows
+from this for the Phase 4 gate.
+
+**A unit could get permanently stuck exactly at its own engage range,
+unable to ever attack.** Found while chasing down why `three-bruisers` (a
+same-hero mirror — this project's own established way to catch order/bias
+bugs, see `docs/decisions.md`'s earlier entries from the previous game) was
+producing a *deterministic win* instead of a draw, on every seed tried.
+Traced with a throwaway probe script (written, run, deleted — not left in
+the repo): `A-2`'s distance to its target settled at
+`10.000000000000004`, `B-2`'s mirror-symmetric distance to its own target
+settled at `9.999999999999998` — the same real-world distance, off by
+about 6e-15 due to ordinary floating-point rounding in the movement math,
+landing on opposite sides of the `> ability.range` check used by
+`abilities.ts`'s range test. `movement.ts`'s stop condition
+(`distanceToTarget <= engageRangeUnits`) uses the complementary comparison,
+so a unit that rounds a hair *over* range stops advancing (it believes
+it's arrived) while `proposeAction`'s strict `>` check keeps rejecting it
+(it isn't *quite* there) — a self-consistent trap with no way out: the
+remaining true distance is sub-ULP, so further movement steps round to no
+movement at all. `A-2` sat frozen 10 units from its target for 150 ticks,
+unable to land a single hit, while its mirror `B-2` fought normally.
+Fixed with a shared `isWithinRange(actualDistance, range)` helper
+(`math/vector.ts`, tolerance `RANGE_EPSILON = 1e-6` in `constants.ts`) used
+by both the movement stop check and the ability range check, so the two
+can no longer disagree about the same boundary. Re-running
+`three-bruisers` across seeds 1–5 post-fix now gives an exact mirror
+result every time — `draw: mutual-elimination` at tick 392, with
+`A-1`/`B-1`, `A-2`/`B-2`, `A-3`/`B-3` damage dealt pairs bit-identical —
+confirming the fix, not just plausible reasoning about it. This bug
+predates this review pass; it was latent in the original Phase 3 movement/
+ability code, just never surfaced by a scenario that put two mirrored
+units on the exact same range boundary at the exact same tick until this
+investigation ran one. It is not limited to mirror matchups — any unit
+whose approach happens to round onto this knife-edge could have gone
+silently, permanently idle in a normal fight, which is a worse failure
+mode than the deterministic-mirror-win symptom that happened to make it
+visible here.
+
+**Not fixed here, and deliberately so: support units rarely reach the ally
+they're trying to heal.** `getEngageRange` derives a unit's stopping
+distance from its basic attack's range only (`strike`, 10 for support), but
+`mend` targets an ally at range 8, and movement only ever chases the
+nearest *enemy* — there is no notion of "move toward the ally I'm about to
+heal" anywhere in `movement.ts`. Measured (re-verified after the two fixes
+above, since both changed simulated behaviour — this is the current
+figure): in `three-vs-three` seed 1, 8 of the support's 12 `mend` casts
+landed on itself, because the wounded ally was routinely out of range
+while the support was still in position to engage the enemy. A real fix
+means deciding how a support
+should actually behave — stop advancing on the enemy to peel back to a
+wounded ally? only when badly hurt? never break formation? — which is a
+gameplay call, not a bug fix, and is left open pending that decision rather
+than picked unilaterally.

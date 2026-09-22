@@ -5,8 +5,9 @@ import type { BattleResult } from "./result.js";
 import type { Catalogue } from "../definitions.js";
 import { resolveTarget } from "./targeting.js";
 import { proposeMovement } from "./movement.js";
-import { proposeAttack, type AttackProposal } from "./attacks.js";
-import { applyDamage } from "./damage.js";
+import { getEngageRange, proposeAction, type ActionProposal } from "./abilities.js";
+import { applyEffect } from "./effects.js";
+import { expireShield } from "./statuses.js";
 
 export interface BattleStep {
   tick: number;
@@ -103,7 +104,7 @@ function evaluateResult(state: BattleState): BattleResult | null {
   return null;
 }
 
-export function stepBattle(state: BattleState, _catalogue: Catalogue): BattleStep {
+export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep {
   if (state.result !== null) {
     return { tick: state.tick, events: [], result: state.result };
   }
@@ -111,7 +112,20 @@ export function stepBattle(state: BattleState, _catalogue: Catalogue): BattleSte
   state.tick += 1;
 
   const events: BattleEvent[] = [];
+
   const eligible = state.units.filter((unit) => unit.alive);
+
+  for (const unit of eligible) {
+    if (expireShield(unit, state.tick)) {
+      events.push({
+        kind: "status-expired",
+        tick: state.tick,
+        sequence: nextSequence(state),
+        unitId: unit.unitId,
+        status: "shield",
+      });
+    }
+  }
 
   for (const unit of eligible) {
     const target = resolveTarget(unit, state.units);
@@ -124,7 +138,13 @@ export function stepBattle(state: BattleState, _catalogue: Catalogue): BattleSte
         ? null
         : (state.units.find((candidate) => candidate.unitId === unit.targetUnitId) ?? null);
 
-    return proposeMovement(unit, target, state.arenaWidth, state.arenaHeight);
+    return proposeMovement(
+      unit,
+      target,
+      getEngageRange(unit, catalogue),
+      state.arenaWidth,
+      state.arenaHeight,
+    );
   });
 
   for (const proposal of movementProposals) {
@@ -135,53 +155,129 @@ export function stepBattle(state: BattleState, _catalogue: Catalogue): BattleSte
     }
   }
 
-  const attackProposals: AttackProposal[] = [];
+  const actionProposals: ActionProposal[] = [];
 
   for (const unit of eligible) {
-    const target =
-      unit.targetUnitId === null
-        ? null
-        : (state.units.find((candidate) => candidate.unitId === unit.targetUnitId) ?? null);
+    const proposal = proposeAction(unit, state.units, state.tick, catalogue);
 
-    const proposal = proposeAttack(unit, target, state.tick);
-
-    if (proposal !== null) {
-      attackProposals.push(proposal);
-      unit.nextAttackTick = state.tick + unit.attackIntervalTicks;
+    if (proposal === null) {
+      continue;
     }
+
+    const ability = catalogue.abilities[proposal.abilityId];
+
+    if (ability === undefined) {
+      continue;
+    }
+
+    unit.abilityCooldowns[proposal.abilityId] = state.tick + ability.cooldownTicks;
+    actionProposals.push(proposal);
   }
 
   const priorityRank = new Map(state.resolutionPriority.map((unitId, index) => [unitId, index]));
 
-  attackProposals.sort((a, b) => {
+  actionProposals.sort((a, b) => {
     const rankA = priorityRank.get(a.sourceUnitId) ?? Number.POSITIVE_INFINITY;
     const rankB = priorityRank.get(b.sourceUnitId) ?? Number.POSITIVE_INFINITY;
 
     return rankA - rankB;
   });
 
-  for (const proposal of attackProposals) {
+  for (const proposal of actionProposals) {
     const source = state.units.find((candidate) => candidate.unitId === proposal.sourceUnitId);
     const target = state.units.find((candidate) => candidate.unitId === proposal.targetUnitId);
+    const ability = catalogue.abilities[proposal.abilityId];
 
-    if (target === undefined || !target.alive) {
+    if (ability === undefined) {
       continue;
     }
 
-    const actual = applyDamage(target, proposal.amount);
+    if (target === undefined || !target.alive) {
+      events.push({
+        kind: "cast-fizzled",
+        tick: state.tick,
+        sequence: nextSequence(state),
+        sourceUnitId: proposal.sourceUnitId,
+        abilityId: proposal.abilityId,
+        targetUnitId: proposal.targetUnitId,
+      });
 
-    if (source !== undefined) {
-      source.damageDealt += actual;
+      continue;
     }
 
+    const castSequence = nextSequence(state);
     events.push({
-      kind: "attack-hit",
+      kind: "cast",
       tick: state.tick,
-      sequence: nextSequence(state),
+      sequence: castSequence,
       sourceUnitId: proposal.sourceUnitId,
+      abilityId: proposal.abilityId,
       targetUnitId: proposal.targetUnitId,
-      amount: actual,
+      isBasicAttack: proposal.isBasicAttack,
     });
+
+    for (const effect of ability.effects) {
+      const outcome = applyEffect(effect, target, state.tick);
+
+      switch (outcome.kind) {
+        case "damage": {
+          if (source !== undefined) {
+            source.damageDealt += outcome.hpLost;
+          }
+
+          events.push({
+            kind: "damage-dealt",
+            tick: state.tick,
+            sequence: nextSequence(state),
+            causeSequence: castSequence,
+            sourceUnitId: proposal.sourceUnitId,
+            targetUnitId: proposal.targetUnitId,
+            abilityId: proposal.abilityId,
+            amount: outcome.hpLost,
+            shieldAbsorbed: outcome.shieldAbsorbed,
+          });
+
+          break;
+        }
+
+        case "heal": {
+          events.push({
+            kind: "healing-done",
+            tick: state.tick,
+            sequence: nextSequence(state),
+            causeSequence: castSequence,
+            sourceUnitId: proposal.sourceUnitId,
+            targetUnitId: proposal.targetUnitId,
+            abilityId: proposal.abilityId,
+            amount: outcome.amountHealed,
+          });
+
+          break;
+        }
+
+        case "shield": {
+          events.push({
+            kind: "shield-applied",
+            tick: state.tick,
+            sequence: nextSequence(state),
+            causeSequence: castSequence,
+            sourceUnitId: proposal.sourceUnitId,
+            targetUnitId: proposal.targetUnitId,
+            abilityId: proposal.abilityId,
+            amount: outcome.amount,
+            expiresAtTick: outcome.expiresAtTick,
+          });
+
+          break;
+        }
+
+        default: {
+          const exhaustive: never = outcome;
+
+          void exhaustive;
+        }
+      }
+    }
 
     if (!target.alive) {
       events.push({

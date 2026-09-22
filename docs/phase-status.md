@@ -206,8 +206,218 @@ pnpm --filter @jev-game/client dev        # + / in two browser sessions,
                                            #   override/export/import, at 1x and 4x
 ```
 
+## Phase 3 — Add distinct roles and an ability system — done
+
+### What works now
+
+- Three heroes: `bruiser` (melee `strike`), `ranger` (ranged `bolt`, no
+  melee fallback), `support` (heal+shield `mend`, falls back to `strike`
+  when no ally needs it). Every hero has a `basicAttackId` plus an ordered
+  `abilityIds` list; a unit tries its abilities in priority order each tick
+  and falls back to its basic attack, at most one action per tick.
+- A small effect union (`damage`, `heal`, `shield`) shared by abilities and
+  the basic attack — `battle/effects.ts` is the single dispatcher, so a new
+  ability needs a content entry, not a tick-loop change.
+- `mend` grants a heal *and* a shield in one ability (two effects on one
+  `AbilityDefinition`) — the plan names shield as a separate implementation
+  step but the starter content list is fixed at three named abilities
+  (`strike`/`bolt`/`mend`); bundling shield onto mend exercises the status
+  mechanism without inventing a fourth ability file.
+- `apps/client`'s lab defaults to a `three-vs-three` scenario (2 bruisers +
+  2 rangers + 2 support, mirrored formations) with `duel` still selectable;
+  a scenario `<select>` replaced the old hero-stat-override inputs (cut —
+  see Deliberately deferred).
+- Units render as distinct shapes by role (circle/triangle/diamond), with a
+  persistent ring for an active shield and a fading ring at the impact point
+  for damage/heal/shield casts (orange/green/blue).
+- The unit inspector shows HP, speed, current movement target, shield
+  amount + ticks remaining, and every ability's cooldown state
+  (`ready` or ticks remaining) — replacing the old flat dmg/rng stat chips
+  that no longer map to anything on `UnitState`.
+- The event feed describes `cast`, `damage-dealt` (with shield-absorbed
+  noted inline), `healing-done`, `shield-applied`, `status-expired`,
+  `cast-fizzled` (a proposed action whose target died earlier the same
+  tick — the cooldown is still consumed, but it's now visible instead of
+  silent) and `death` in plain text.
+- Catalogue validation rejects an ability whose effect kind doesn't match
+  its target policy (e.g. a `damage` effect on an ally-targeting ability),
+  not just malformed numbers.
+- `packages/game/src/battle/recording.ts` (`recordBattle`) and
+  `apps/client/src/session/local-session.ts` (incremental accumulation)
+  both produce a `BattleRecording` — sampled every tick, available once a
+  battle ends. A "Replay" control in the lab swaps the live session for a
+  `createPlaybackSession(recording, scenario)` that implements the exact
+  same `BattleLabSession` interface, so the existing scene/view/HUD stack
+  renders a completed battle without rerunning the simulation.
+- `pnpm simulate <duel|three-vs-three|three-bruisers> <seed>` — the third
+  scenario (all-bruiser mirror of `three-vs-three`'s formation) exists
+  specifically for the discovery-session comparison below, headless only.
+
+### Verified, not assumed
+
+- **Same-seed reproducibility unchanged by the new pipeline stages:** `pnpm
+  simulate three-vs-three 1` run twice produces identical tick count,
+  result and digest — this is a real check (it would have caught the
+  Phase 1+2 lexicographic-resolution-order bug this project already fixed
+  once). It is **not** a check that the pipeline is free of new
+  order-dependence: every shipped scenario is a mirrored, symmetric
+  matchup, and 200 sampled seeds per scenario all land on identical tick
+  counts and `draw: mutual-elimination` — the RNG's only consumer
+  (`shufflePriority`) has no shipped scenario where it could visibly change
+  an outcome. See `docs/decisions.md`'s "Phase 3 review pass" entry.
+- **Two independent live-vs-standalone targeting/damage paths agreed, once
+  fixed.** Before the review-pass fix, movement/HUD (`resolveTarget`,
+  retaining) and ability resolution (`resolveAbilityTarget`, freshest
+  nearest-enemy, no retention) could name different targets — measured at
+  20% of casts in one `three-vs-three` run. `resolveAbilityTarget`'s enemy
+  branch now calls `resolveTarget` directly, so there is exactly one
+  enemy-targeting decision per unit per tick, not two that happen to agree
+  most of the time.
+- **A same-hero mirror match now actually produces a mirror result.**
+  `pnpm simulate three-bruisers <any seed>` used to end in a deterministic
+  *win*, always for the same team, regardless of seed — a same-hero mirror
+  probe (this project's own established bias-detector) failing its own
+  test. Root cause was a floating-point knife-edge: a unit's distance to
+  its target could round to a hair over its ability's range on one side of
+  a mirror and a hair under on the other, permanently stranding the
+  "over" unit within its stop-movement radius but outside its own
+  attack-range check — unable to move (already "arrived") or act ("not
+  quite there"), forever. Fixed with a shared range-tolerance helper (see
+  `docs/decisions.md`'s "Phase 3 review pass"). Re-verified across seeds
+  1–5: exact mirror damage totals every time, `draw: mutual-elimination`
+  at tick 392.
+- **Heals never exceed max HP** — checked directly on `unit.hp` after every
+  tick of a full `three-vs-three` battle, not just at the healer's call site.
+- **Shield mechanics, checked in isolation** (not just observed in a full
+  battle, since a shield that gets fully depleted by damage clears itself
+  through a different code path than a shield that survives to its own
+  timer): a shield absorbs up to its amount and any excess spills to HP in
+  the same hit; a depleted shield clears immediately; an *undamaged* shield
+  survives untouched tick-by-tick until exactly its `expiresAtTick`, not one
+  tick early or late; reapplying a shield replaces its amount and refreshes
+  its duration rather than stacking. The first full `three-vs-three` run
+  happened not to exercise the time-based expiry path at all (every shield
+  in that seed got damage-depleted first) — caught by testing the mechanism
+  directly instead of trusting one battle's coverage.
+- **Two copies of a hero have independent state:** a second `support` unit
+  added to the 3v3 setup has its own `abilityCooldowns` map and its own
+  `targetUnitId`; forcing one's cooldown doesn't touch the other's.
+- **An invalid definition fails at catalogue validation naming the content
+  ID** — a non-integer hero stat is rejected by `validateCatalogue` with the
+  hero's own ID in the message.
+- **A fresh battle retains nothing from the last one** — after a `3v3` run
+  accumulates shields and non-zero cooldowns, a new `createBattle` call
+  (what `reset()` does) starts every unit with `shield: null` and every
+  ability at cooldown `0`.
+- **Recorded playback reconstructs the exact same terminal result without
+  rerunning the simulation** — checked at the session level: a live session
+  stepped to completion, its recording handed to `createPlaybackSession`,
+  and the playback stepped to its own end independently. Final tick, final
+  `BattleResult`, and the full ordered event list all matched the live
+  run exactly. The DOM-level "click Replay, watch it play" path was
+  exercised structurally (scenario import already dispose-and-remounts the
+  scene the same way `handleReplay` does; only one `<canvas>` element ever
+  exists no matter how many times the session is swapped) rather than by
+  manually stepping a full battle to completion through the browser tool.
+- **Six actors stay visually understandable at a glance** — confirmed in
+  the browser: bruiser/ranger/support read as distinct shapes per team
+  colour, the ranger's long engagement ring and target line make its
+  kiting role legible, and a support's shield ring and heal/shield cast
+  cues make its role visible without needing the inspector open.
+- **`packages/game` is still pure** — `pnpm -r typecheck` and `pnpm lint`
+  both stayed clean through this phase; the Phase 1+2 review's
+  `packages/game/**` import seal (no Node, no Colyseus, no `@jev-game/*`)
+  was never touched and nothing in this phase needed to touch it.
+
+### Deliberately deferred (see `docs/decisions.md` for why)
+
+- **The lab's per-hero stat override inputs are gone, not extended.** They
+  don't generalise cleanly once a scenario has three different heroes with
+  independent stats — overriding "max HP" for every hero in the catalogue
+  at once defeats the point of role differentiation. Replaced with scenario
+  selection; ability/hero tuning for the discovery session below happens by
+  editing `packages/content` directly and reloading.
+- Section 10's optional step 12 (multi-tick wind-up: `releaseTick` /
+  `recoveryUntilTick`, cancel-on-death-during-wind-up) — the plan frames it
+  as conditional ("if an attack needs a visible wind-up"); nothing in this
+  phase's acceptance checks needs it, and every ability resolves same-tick
+  for now.
+- A fourth ability file for shield — see "What works now" above; folded
+  into `mend` instead.
+- `battle/triggers.ts` (bounded reactions) — explicitly Phase 4 in the
+  plan's own file table.
+
+### Known gaps / minor rough edges
+
+- Recorded playback samples every tick (not a coarser interval) — fine at
+  this unit count and battle length; revisit if a much longer or larger
+  battle makes a full-resolution recording expensive to hold in memory.
+- The Replay and Step buttons have no enabled/disabled state — clicking
+  Replay before a battle ends is a silent no-op, and clicking Step after a
+  battle ends is now also a no-op (fixed in the review pass: it used to
+  append a duplicate terminal frame to the recording) rather than either
+  being visibly disabled. Would need `battle-controls.ts` to receive live
+  view updates, which it currently doesn't (it's fire-and-forget event
+  wiring, unlike the `update()`-driven inspector/event-log/status).
+- Control glyphs, including the new replay icon, are unicode placeholders —
+  logged in `missing_assets.md`.
+- **Support units rarely reach the ally they're trying to heal.** Movement
+  only ever chases the nearest enemy; `getEngageRange` uses the basic
+  attack's range even when a shorter-ranged, ally-targeting ability
+  (`mend`, range 8 vs. `strike`'s 10) is what the unit is actually trying
+  to use. Measured: 8 of a support's 12 `mend` casts in one `three-vs-three`
+  run were self-heals. Not fixed — it needs a decision about how a support
+  should actually behave (break formation for a wounded ally? only past
+  some HP threshold? never?), not a one-line range change. See
+  `docs/decisions.md`'s "Phase 3 review pass" entry.
+
+### Commands used to verify this phase
+
+```
+pnpm -r typecheck
+pnpm lint
+pnpm build
+pnpm simulate duel 1                      # run twice, compare digest
+pnpm simulate three-vs-three 1            # run twice, compare digest
+pnpm simulate three-bruisers 1            # discovery-session comparison
+pnpm --filter @jev-game/client dev        # + / in the browser: select/step/
+                                           #   play/pause/reset/speed/scenario/
+                                           #   export/import/replay
+```
+
+### Discovery session (per the plan, before Phase 4)
+
+Not yet run by a human, and its scope turned out narrower than first
+written here. Both shipped scenarios are mirrored, symmetric matchups
+(three-bruisers-vs-three-bruisers, three-mixed-vs-three-mixed) — there is
+no scenario where mixed roles actually *fight* three identical bruisers, so
+`pnpm simulate three-bruisers 1` vs `pnpm simulate three-vs-three 1` cannot
+answer "do mixed roles create an understandable advantage over three
+identical bruisers." What it *can* still usefully compare: fight duration
+(bruiser mirror now ends at tick 392, mixed mirror at tick 829 — mixed
+roles take over twice as long to resolve a mirror match, post the review
+pass's targeting and range-boundary fixes; see `docs/decisions.md`) and
+each run's own damage distribution. Whether that's "an understandable
+difference" worth a human eyeballing before Phase 4 is still a legitimate,
+smaller question — just not the one originally written here. A true
+advantage comparison would need an asymmetric scenario (three mixed vs.
+three bruisers on the same side count), not currently in the content
+package.
+
+Damage-dealt breakdown from `pnpm simulate three-vs-three 1`, re-run after
+the review pass's fixes (both the targeting-retention fix and the
+range-boundary fix changed this run's numbers from what was first recorded
+here — this is the current, verified figure, not the original one):
+`A-1`/`B-1` (bruiser) 50, `A-2`/`B-2` (ranger) 190, `A-3`/`B-3` (support,
+via its `strike` fallback — see the support-melee gap above) 120. The
+ranger's long range still clearly dominates raw damage output at these
+numbers, which is itself worth a second look before Phase 4 touches
+build-driven stat changes. Note this run's damage is now itself an exact
+mirror (`A-1` = `B-1`, etc.) since it's a symmetric matchup with no
+surviving order-dependence — a useful sanity check in its own right.
+
 ### Next concrete task
 
-Phase 3: distinct roles and an ability system (bruiser/ranger/support,
-strike/bolt/mend, statuses, recording). Not started. Per the plan, wait for
-sign-off on this phase before starting it.
+Phase 4: make upgrades change the way builds play. Not started. Per the
+plan, wait for the discovery session above (and its review) before
+starting it.

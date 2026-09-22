@@ -1,7 +1,7 @@
 import type { UnitState } from "@jev-game/game";
 
 export interface UnitInspectorView {
-  update(unit: UnitState | null): void;
+  update(unit: UnitState | null, tick: number): void;
   dispose(): void;
 }
 
@@ -17,7 +17,7 @@ function statChip(parent: HTMLElement, label: string, value: string): void {
 
 export function createUnitInspectorView(container: HTMLElement): UnitInspectorView {
   return {
-    update(unit) {
+    update(unit, tick) {
       container.replaceChildren();
 
       if (unit === null) {
@@ -49,11 +49,25 @@ export function createUnitInspectorView(container: HTMLElement): UnitInspectorVi
       const stats = document.createElement("div");
       stats.className = "hud-stats";
       statChip(stats, "hp", `${unit.hp}/${unit.maxHp}`);
-      statChip(stats, "dmg", String(unit.attackDamage));
-      statChip(stats, "rng", String(unit.attackRangeUnits));
       statChip(stats, "spd", String(unit.moveSpeedUnitsPerSecond));
       statChip(stats, "target", unit.targetUnitId ?? "none");
+
+      if (unit.shield !== null) {
+        const ticksLeft = Math.max(0, unit.shield.expiresAtTick - tick);
+        statChip(stats, "shield", `${unit.shield.amount} (${ticksLeft}t)`);
+      }
+
       container.appendChild(stats);
+
+      const abilities = document.createElement("div");
+      abilities.className = "hud-stats";
+
+      for (const [abilityId, readyTick] of Object.entries(unit.abilityCooldowns)) {
+        const remaining = readyTick - tick;
+        statChip(abilities, abilityId, remaining <= 0 ? "ready" : `${remaining}t`);
+      }
+
+      container.appendChild(abilities);
     },
 
     dispose() {

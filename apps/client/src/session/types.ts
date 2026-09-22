@@ -1,8 +1,11 @@
-import type { BattleEvent, BattleSnapshot } from "@jev-game/game";
+import type { BattleEvent, BattleRecording, BattleSnapshot } from "@jev-game/game";
+
+export type LabScenarioKind = "duel" | "three-vs-three";
 
 export interface BattleLabView {
   snapshot: BattleSnapshot;
   seed: number;
+  scenario: LabScenarioKind;
   isRunning: boolean;
   speedMultiplier: number;
   behindBySteps: number;
@@ -11,21 +14,14 @@ export interface BattleLabView {
 
 export interface BattleLabSession {
   getView(): BattleLabView;
-  peekSnapshot(): { seed: number; snapshot: BattleSnapshot };
+  peekSnapshot(): { seed: number; scenario: LabScenarioKind; snapshot: BattleSnapshot };
+  getRecording(): BattleRecording | null;
   subscribe(listener: () => void): () => void;
   play(): void;
   pause(): void;
   stepOnce(): void;
   setSpeed(multiplier: number): void;
-  reset(seed: number, overrides?: Partial<HeroOverrides>): void;
+  reset(seed: number, scenario?: LabScenarioKind): void;
   advanceRealTime(deltaSeconds: number): void;
   dispose(): void;
-}
-
-export interface HeroOverrides {
-  maxHp: number;
-  attackDamage: number;
-  attackRangeUnits: number;
-  attackIntervalTicks: number;
-  moveSpeedUnitsPerSecond: number;
 }

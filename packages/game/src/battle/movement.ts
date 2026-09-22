@@ -1,5 +1,5 @@
 import type { UnitState } from "./state.js";
-import { clampToArena, directionTo, distance, type Vector2 } from "../math/vector.js";
+import { clampToArena, directionTo, distance, isWithinRange, type Vector2 } from "../math/vector.js";
 import { TICK_SECONDS } from "../constants.js";
 
 export interface MovementProposal {
@@ -10,6 +10,7 @@ export interface MovementProposal {
 export function proposeMovement(
   unit: UnitState,
   target: UnitState | null,
+  engageRangeUnits: number,
   arenaWidth: number,
   arenaHeight: number,
 ): MovementProposal {
@@ -19,12 +20,12 @@ export function proposeMovement(
 
   const distanceToTarget = distance(unit.position, target.position);
 
-  if (distanceToTarget <= unit.attackRangeUnits) {
+  if (isWithinRange(distanceToTarget, engageRangeUnits)) {
     return { unitId: unit.unitId, position: unit.position };
   }
 
   const maxStep = unit.moveSpeedUnitsPerSecond * TICK_SECONDS;
-  const remaining = distanceToTarget - unit.attackRangeUnits;
+  const remaining = distanceToTarget - engageRangeUnits;
   const step = Math.min(maxStep, remaining);
   const direction = directionTo(unit.position, target.position);
 

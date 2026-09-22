@@ -41,7 +41,7 @@ when the client needs real networking again (Phase 6).
 
 | Package | Job | Publishes |
 | --- | --- | --- |
-| `@jev-game/game` | Pure battle engine — ticks, targeting, movement, attacks, damage, results. No workspace or Node/browser/Colyseus imports, enforced by lint. | `dist/` (ESM + `.d.ts`) |
+| `@jev-game/game` | Pure battle engine — ticks, targeting, movement, abilities/effects (damage/heal/shield), statuses, results, recording. No workspace or Node/browser/Colyseus imports, enforced by lint. | `dist/` (ESM + `.d.ts`) |
 | `@jev-game/content` | Hero/arena/scenario definitions and catalogue validation | `dist/` (ESM + `.d.ts`) |
 | `@jev-game/shared` | Code (not just types) needed by both server and client — currently `stepEntity`, arena/tick constants. As of the one-page consolidation, only `apps/server` still imports it. | `dist/` (ESM + `.d.ts`) |
 | `@jev-game/server-runtime` | The actual `defineServer(...)` result, room implementations (`Arena`), and a type-only `/contract` export (`GameServer = typeof server`) for client-side SDK inference | `dist/` (ESM + `.d.ts`); `./contract` subpath is types-only, no `import` condition |

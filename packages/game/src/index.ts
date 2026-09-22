@@ -10,6 +10,8 @@ export * from "./random/rng.js";
 
 export * from "./battle/state.js";
 
+export * from "./battle/statuses.js";
+
 export * from "./battle/result.js";
 
 export * from "./battle/events.js";
@@ -24,6 +26,10 @@ export * from "./battle/targeting.js";
 
 export * from "./battle/movement.js";
 
-export * from "./battle/attacks.js";
+export * from "./battle/abilities.js";
+
+export * from "./battle/effects.js";
 
 export * from "./battle/damage.js";
+
+export * from "./battle/recording.js";
