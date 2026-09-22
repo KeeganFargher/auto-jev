@@ -1,67 +1,96 @@
 import type { UnitState } from "@jev-game/game";
-import { WORLD_TO_PIXELS } from "./arena-view.js";
+import type { CanvasTransform } from "./arena-view.js";
 
-export interface UnitView {
-  update(unit: UnitState, isSelected: boolean): void;
-  dispose(): void;
-}
+const RADIUS_PIXELS = 9;
 
-export function createUnitView(
-  container: HTMLElement,
-  onSelect: (unitId: string) => void,
-): UnitView {
-  let currentUnitId = "";
+const HEALTH_BAR_WIDTH = 32;
 
-  const root = document.createElement("div");
-  root.className = "lab-unit";
+const HEALTH_BAR_HEIGHT = 4;
 
-  const rangeRing = document.createElement("div");
-  rangeRing.className = "lab-unit-range";
-  root.appendChild(rangeRing);
+const TEAM_A_COLOR = "#4ea1ff";
 
-  const body = document.createElement("div");
-  body.className = "lab-unit-body";
-  root.appendChild(body);
+const TEAM_B_COLOR = "#ff6b6b";
 
-  const label = document.createElement("div");
-  label.className = "lab-unit-label";
-  root.appendChild(label);
+const OTHER_TEAM_COLOR = "#c084fc";
 
-  const healthTrack = document.createElement("div");
-  healthTrack.className = "lab-unit-health-track";
-  const healthFill = document.createElement("div");
-  healthFill.className = "lab-unit-health-fill";
-  healthTrack.appendChild(healthFill);
-  root.appendChild(healthTrack);
+const DEAD_COLOR = "#6b7280";
 
-  container.appendChild(root);
-
-  function handleClick(): void {
-    onSelect(currentUnitId);
+function colorForUnit(unit: UnitState): string {
+  if (!unit.alive) {
+    return DEAD_COLOR;
   }
 
-  root.addEventListener("click", handleClick);
+  if (unit.teamId === "A") {
+    return TEAM_A_COLOR;
+  }
 
-  return {
-    update(unit, isSelected) {
-      currentUnitId = unit.unitId;
-      root.style.left = `${unit.position.x * WORLD_TO_PIXELS}px`;
-      root.style.top = `${unit.position.y * WORLD_TO_PIXELS}px`;
-      root.classList.toggle("dead", !unit.alive);
-      root.classList.toggle("selected", isSelected);
-      root.dataset.team = unit.teamId;
-      label.textContent = unit.unitId;
-      healthFill.style.width = `${Math.max(0, unit.hp / unit.maxHp) * 100}%`;
+  if (unit.teamId === "B") {
+    return TEAM_B_COLOR;
+  }
 
-      const rangeDiameter = unit.attackRangeUnits * 2 * WORLD_TO_PIXELS;
-      rangeRing.style.display = isSelected ? "block" : "none";
-      rangeRing.style.width = `${rangeDiameter}px`;
-      rangeRing.style.height = `${rangeDiameter}px`;
-    },
+  return OTHER_TEAM_COLOR;
+}
 
-    dispose() {
-      root.removeEventListener("click", handleClick);
-      root.remove();
-    },
-  };
+export function drawUnit(
+  ctx: CanvasRenderingContext2D,
+  unit: UnitState,
+  isSelected: boolean,
+  transform: CanvasTransform,
+): void {
+  const center = transform.worldToCanvas(unit.position);
+  const color = colorForUnit(unit);
+
+  if (isSelected) {
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, unit.attackRangeUnits * transform.scale, 0, Math.PI * 2);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = "rgba(78, 161, 255, 0.4)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.beginPath();
+  ctx.arc(center.x, center.y, RADIUS_PIXELS, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  if (isSelected) {
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+  }
+
+  const barX = center.x - HEALTH_BAR_WIDTH / 2;
+  const barY = center.y + RADIUS_PIXELS + 6;
+  const hpFraction = Math.max(0, unit.hp / unit.maxHp);
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.fillRect(barX, barY, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT);
+  ctx.fillStyle = color;
+  ctx.fillRect(barX, barY, HEALTH_BAR_WIDTH * hpFraction, HEALTH_BAR_HEIGHT);
+
+  ctx.fillStyle = "#f3f4f6";
+  ctx.font = "10px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText(unit.unitId, center.x, barY + HEALTH_BAR_HEIGHT + 12);
+}
+
+export function drawTargetLine(
+  ctx: CanvasRenderingContext2D,
+  from: UnitState,
+  to: UnitState,
+  transform: CanvasTransform,
+): void {
+  const start = transform.worldToCanvas(from.position);
+  const end = transform.worldToCanvas(to.position);
+
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(end.x, end.y);
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
 }

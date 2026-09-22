@@ -1,3 +1,4 @@
+import type { SafeAreaInsets } from "../views/arena-view.js";
 import { createBattleView } from "../views/battle-view.js";
 import { createEventLogView } from "../../hud/event-log.js";
 import { createUnitInspectorView } from "../../hud/unit-inspector.js";
@@ -9,18 +10,27 @@ export interface BattleLabScene {
 }
 
 export function createBattleLabScene(
-  root: HTMLElement,
+  canvasRoot: HTMLElement,
+  hudRoot: HTMLElement,
+  statusEl: HTMLElement,
   session: BattleLabSession,
 ): BattleLabScene {
-  const arenaContainer = document.createElement("div");
-  arenaContainer.className = "lab-arena-container";
-  const sidebar = document.createElement("div");
-  sidebar.className = "lab-sidebar";
-  root.append(arenaContainer, sidebar);
+  const hudSideRoot = hudRoot.querySelector<HTMLElement>(".lab-hud-side")!;
+  const hudTop = hudRoot.querySelector<HTMLElement>(".lab-hud-top")!;
+  const hudBottom = hudRoot.querySelector<HTMLElement>(".lab-hud-bottom")!;
 
-  const statusEl = document.createElement("p");
-  statusEl.className = "lab-status";
-  sidebar.appendChild(statusEl);
+  function getSafeAreaInsets(): SafeAreaInsets {
+    const sideRect = hudSideRoot.getBoundingClientRect();
+    const topRect = hudTop.getBoundingClientRect();
+    const bottomRect = hudBottom.getBoundingClientRect();
+
+    return {
+      top: topRect.bottom,
+      right: Math.max(0, window.innerWidth - sideRect.left),
+      bottom: Math.max(0, window.innerHeight - bottomRect.top),
+      left: 0,
+    };
+  }
 
   let selectedUnitId: string | null = null;
 
@@ -32,15 +42,16 @@ export function createBattleLabScene(
   const initialSnapshot = session.getView().snapshot;
 
   const battleView = createBattleView(
-    arenaContainer,
+    canvasRoot,
     initialSnapshot.arenaWidth,
     initialSnapshot.arenaHeight,
+    getSafeAreaInsets,
     handleSelect,
   );
 
-  const inspector = createUnitInspectorView(sidebar);
-  const eventLog = createEventLogView(sidebar);
-  const controls = createBattleControlsView(sidebar, session);
+  const inspector = createUnitInspectorView(hudSideRoot);
+  const eventLog = createEventLogView(hudSideRoot);
+  const controls = createBattleControlsView(hudSideRoot, session);
 
   function render(): void {
     const view = session.getView();
@@ -55,8 +66,12 @@ export function createBattleLabScene(
 
     inspector.update(selectedUnit);
 
-    const resultText = view.snapshot.result === null ? "active" : JSON.stringify(view.snapshot.result);
-    const behindText = view.behindBySteps > 0 ? ` — falling behind by ${view.behindBySteps} steps` : "";
+    const resultText =
+      view.snapshot.result === null ? "active" : JSON.stringify(view.snapshot.result);
+
+    const behindText =
+      view.behindBySteps > 0 ? ` — falling behind by ${view.behindBySteps} steps` : "";
+
     statusEl.textContent = `tick ${view.snapshot.tick}/${view.snapshot.tickLimit} — ${resultText}${behindText}`;
   }
 
@@ -83,9 +98,6 @@ export function createBattleLabScene(
       eventLog.dispose();
       inspector.dispose();
       battleView.dispose();
-      statusEl.remove();
-      arenaContainer.remove();
-      sidebar.remove();
     },
   };
 }

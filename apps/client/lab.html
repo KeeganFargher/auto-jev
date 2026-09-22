@@ -7,12 +7,16 @@
     <title>jev-game battle lab</title>
   </head>
   <body>
-    <div id="lab">
-      <h1>Battle laboratory</h1>
-      <div id="lab-scene"></div>
-      <details id="lab-scenario">
+    <div id="lab-canvas-root"></div>
+    <div id="lab-hud">
+      <div class="lab-hud-top">
+        <h1>Battle laboratory</h1>
+        <p id="lab-status" class="lab-status"></p>
+      </div>
+      <div id="lab-hud-side" class="lab-hud-side"></div>
+      <details id="lab-scenario" class="lab-hud-bottom">
         <summary>Scenario export / import</summary>
-        <textarea id="lab-scenario-text" rows="10"></textarea>
+        <textarea id="lab-scenario-text" rows="6"></textarea>
         <div class="lab-button-row">
           <button id="lab-scenario-export">Export current</button>
           <button id="lab-scenario-import">Import</button>

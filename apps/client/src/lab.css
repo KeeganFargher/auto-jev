@@ -1,158 +1,105 @@
 :root {
   --text: #6b6375;
   --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --arena-bg: rgba(17, 17, 34, 0.08);
+  --bg: #101018;
+  --panel-bg: rgba(16, 16, 24, 0.72);
+  --border: rgba(255, 255, 255, 0.12);
   --team-a: #4ea1ff;
   --team-b: #ff6b6b;
-  --dead: #9ca3af;
-  --range-ring: rgba(78, 161, 255, 0.25);
-  --target-line: rgba(8, 6, 13, 0.35);
+  --dead: #6b7280;
+  --range-ring: rgba(78, 161, 255, 0.4);
+  --target-line: rgba(255, 255, 255, 0.35);
 
   font:
     16px/1.5 system-ui,
     "Segoe UI",
     Roboto,
     sans-serif;
-  color-scheme: light dark;
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --arena-bg: #1114;
-    --target-line: rgba(243, 244, 246, 0.35);
-  }
-}
-
+html,
 body {
   margin: 0;
-}
-
-#lab {
-  max-width: 1100px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-}
-
-#lab h1 {
-  color: var(--text-h);
-  font-size: 28px;
-  margin: 0 0 16px;
-}
-
-#lab-scene {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-
-.lab-arena-container {
-  position: relative;
-}
-
-.lab-arena {
-  position: relative;
-  background: var(--arena-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: visible;
-}
-
-.lab-lines {
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-}
-
-.lab-target-line {
-  stroke: var(--target-line);
-  stroke-width: 1;
-  stroke-dasharray: 4 3;
-}
-
-.lab-unit {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  text-align: center;
-}
-
-.lab-unit-range {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 1px dashed var(--range-ring);
-  pointer-events: none;
-}
-
-.lab-unit-body {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  background: var(--team-a);
-  margin: 0 auto;
-}
-
-.lab-unit[data-team="B"] .lab-unit-body {
-  background: var(--team-b);
-}
-
-.lab-unit.dead .lab-unit-body {
-  background: var(--dead);
-}
-
-.lab-unit.selected .lab-unit-body {
-  outline: 2px solid var(--text-h);
-  outline-offset: 2px;
-}
-
-.lab-unit-label {
-  font-size: 10px;
-  color: var(--text-h);
-  white-space: nowrap;
-}
-
-.lab-unit-health-track {
-  width: 28px;
-  height: 4px;
-  background: var(--border);
-  border-radius: 2px;
-  margin: 2px auto 0;
+  height: 100%;
   overflow: hidden;
 }
 
-.lab-unit-health-fill {
+#lab-canvas-root {
+  position: fixed;
+  inset: 0;
+}
+
+#lab-canvas-root canvas {
+  display: block;
+  width: 100%;
   height: 100%;
-  background: var(--team-a);
 }
 
-.lab-unit[data-team="B"] .lab-unit-health-fill {
-  background: var(--team-b);
-}
-
-.lab-sidebar {
-  flex: 1;
-  min-width: 260px;
+#lab-hud {
+  position: fixed;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  justify-content: space-between;
+  padding: 16px;
+  pointer-events: none;
+}
+
+#lab-hud > * {
+  pointer-events: auto;
+}
+
+.lab-hud-top,
+.lab-hud-side,
+.lab-hud-bottom {
+  background: var(--panel-bg);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.lab-hud-top {
+  align-self: flex-start;
+}
+
+.lab-hud-top h1 {
+  color: var(--text-h);
+  font-size: 18px;
+  margin: 0 0 4px;
 }
 
 .lab-status {
   margin: 0;
   font-weight: 600;
   color: var(--text-h);
+  font-size: 13px;
+}
+
+.lab-hud-side {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.lab-hud-bottom {
+  align-self: flex-start;
+  max-width: 420px;
+}
+
+.lab-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .lab-controls {
@@ -165,6 +112,10 @@ body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.lab-button-row button {
+  cursor: pointer;
 }
 
 .lab-field {
@@ -230,7 +181,7 @@ body {
 }
 
 .lab-error {
-  color: #e5484d;
+  color: #ff8080;
   font-size: 13px;
   min-height: 1em;
 }

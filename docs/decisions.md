@@ -139,3 +139,24 @@ which `validateCatalogue` already rejects with a clear message, and the caller
 already wraps `parseScenario` in a `try`/`catch`. Revisit if scenario import
 grows real structure (Phase 4's builds, Phase 5's run setups) worth a proper
 schema.
+
+**Corrected mid-review: the lab renders to a full-viewport `<canvas>` with
+the HUD as an absolutely-positioned overlay on top, not a DOM arena box
+sitting next to an HTML sidebar.** The user caught this after the first
+pass — "html with elements and a canvas inside" is exactly what section 4's
+"ordinary HTML and CSS... alongside the canvas" does *not* mean. Rebuilt
+`game/views/arena-view.ts` to own a canvas sized to `window.innerWidth/
+innerHeight` (with devicePixelRatio scaling) instead of a bounded DOM box;
+`unit-view.ts` became pure `CanvasRenderingContext2D` draw functions instead
+of persistent DOM nodes; `battle-view.ts` does hit-testing for unit
+selection from canvas click coordinates instead of per-unit click
+listeners. The real bug this surfaced: centering the arena across the
+*entire* viewport put units directly underneath the opaque HUD sidebar.
+Fixed with `SafeAreaInsets` — `arena-view.ts` fits the arena into
+`viewport minus insets`, and `battle-lab-scene.ts` computes those insets
+from the actual HUD panels' `getBoundingClientRect()` (recomputed on window
+resize and on the scenario-editor `<details>` toggling) rather than
+hardcoding panel dimensions that would drift from the CSS. Verified: at
+1024×768 both units are now visible and centered in the space left of the
+sidebar; the same mutual-elimination duel replays identically on the canvas
+renderer at both 1x and 4x speed.

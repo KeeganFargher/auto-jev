@@ -1,8 +1,8 @@
-import type { BattleSnapshot, UnitState } from "@jev-game/game";
-import { createArenaView, WORLD_TO_PIXELS } from "./arena-view.js";
-import { createUnitView, type UnitView } from "./unit-view.js";
+import { distance, type BattleSnapshot, type UnitState } from "@jev-game/game";
+import { createArenaView, type SafeAreaInsets } from "./arena-view.js";
+import { drawTargetLine, drawUnit } from "./unit-view.js";
 
-const SVG_NS = "http://www.w3.org/2000/svg";
+const CLICK_TOLERANCE_PIXELS = 14;
 
 export interface BattleView {
   update(snapshot: BattleSnapshot, selectedUnitId: string | null): void;
@@ -13,76 +13,93 @@ export function createBattleView(
   container: HTMLElement,
   arenaWidthUnits: number,
   arenaHeightUnits: number,
+  getSafeAreaInsets: () => SafeAreaInsets,
   onSelectUnit: (unitId: string) => void,
 ): BattleView {
-  const arena = createArenaView(container, arenaWidthUnits, arenaHeightUnits);
+  let latestSnapshot: BattleSnapshot | null = null;
+  let latestSelectedUnitId: string | null = null;
 
-  const linesLayer = document.createElementNS(SVG_NS, "svg");
-  linesLayer.classList.add("lab-lines");
-  linesLayer.setAttribute("width", String(arenaWidthUnits * WORLD_TO_PIXELS));
-  linesLayer.setAttribute("height", String(arenaHeightUnits * WORLD_TO_PIXELS));
-  arena.element.appendChild(linesLayer);
-
-  const unitViews = new Map<string, UnitView>();
-
-  function redrawTargetLines(units: readonly UnitState[]): void {
-    while (linesLayer.firstChild !== null) {
-      linesLayer.removeChild(linesLayer.firstChild);
+  function render(): void {
+    if (latestSnapshot === null) {
+      return;
     }
 
-    for (const unit of units) {
+    const transform = arena.getTransform();
+    arena.clear();
+    arena.drawBoundary();
+
+    for (const unit of latestSnapshot.units) {
       if (!unit.alive || unit.targetUnitId === null) {
         continue;
       }
 
-      const target = units.find((candidate) => candidate.unitId === unit.targetUnitId);
+      const target = latestSnapshot.units.find(
+        (candidate) => candidate.unitId === unit.targetUnitId,
+      );
 
       if (target === undefined || !target.alive) {
         continue;
       }
 
-      const line = document.createElementNS(SVG_NS, "line");
-      line.setAttribute("x1", String(unit.position.x * WORLD_TO_PIXELS));
-      line.setAttribute("y1", String(unit.position.y * WORLD_TO_PIXELS));
-      line.setAttribute("x2", String(target.position.x * WORLD_TO_PIXELS));
-      line.setAttribute("y2", String(target.position.y * WORLD_TO_PIXELS));
-      line.setAttribute("class", "lab-target-line");
-      linesLayer.appendChild(line);
+      drawTargetLine(arena.ctx, unit, target, transform);
+    }
+
+    for (const unit of latestSnapshot.units) {
+      drawUnit(arena.ctx, unit, unit.unitId === latestSelectedUnitId, transform);
     }
   }
 
+  const arena = createArenaView(
+    container,
+    arenaWidthUnits,
+    arenaHeightUnits,
+    getSafeAreaInsets,
+    render,
+  );
+
+  function handleClick(event: MouseEvent): void {
+    if (latestSnapshot === null) {
+      return;
+    }
+
+    const rect = arena.canvas.getBoundingClientRect();
+    const transform = arena.getTransform();
+
+    const worldPoint = transform.canvasToWorld({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    });
+
+    let closest: UnitState | null = null;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    for (const unit of latestSnapshot.units) {
+      const candidateDistance = distance(unit.position, worldPoint);
+
+      if (candidateDistance < closestDistance) {
+        closest = unit;
+        closestDistance = candidateDistance;
+      }
+    }
+
+    const toleranceWorldUnits = CLICK_TOLERANCE_PIXELS / transform.scale;
+
+    if (closest !== null && closestDistance <= toleranceWorldUnits) {
+      onSelectUnit(closest.unitId);
+    }
+  }
+
+  arena.canvas.addEventListener("click", handleClick);
+
   return {
     update(snapshot, selectedUnitId) {
-      const seenUnitIds = new Set<string>();
-
-      for (const unit of snapshot.units) {
-        seenUnitIds.add(unit.unitId);
-        let view = unitViews.get(unit.unitId);
-
-        if (view === undefined) {
-          view = createUnitView(arena.element, onSelectUnit);
-          unitViews.set(unit.unitId, view);
-        }
-
-        view.update(unit, unit.unitId === selectedUnitId);
-      }
-
-      for (const [unitId, view] of unitViews) {
-        if (!seenUnitIds.has(unitId)) {
-          view.dispose();
-          unitViews.delete(unitId);
-        }
-      }
-
-      redrawTargetLines(snapshot.units);
+      latestSnapshot = snapshot;
+      latestSelectedUnitId = selectedUnitId;
+      render();
     },
 
     dispose() {
-      for (const view of unitViews.values()) {
-        view.dispose();
-      }
-
-      unitViews.clear();
+      arena.canvas.removeEventListener("click", handleClick);
       arena.dispose();
     },
   };

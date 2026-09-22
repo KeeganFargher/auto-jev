@@ -3,7 +3,11 @@ import { createLocalBattleLabSession } from "./session/local-session.js";
 import { createBattleLabScene } from "./game/scenes/battle-lab-scene.js";
 import { parseScenario, serializeScenario, type LabScenario } from "./dev/scenario-editor.js";
 
-const sceneContainer = document.getElementById("lab-scene")!;
+const canvasRoot = document.getElementById("lab-canvas-root")!;
+
+const hudRoot = document.getElementById("lab-hud")!;
+
+const statusEl = document.getElementById("lab-status")!;
 
 const scenarioText = document.querySelector<HTMLTextAreaElement>("#lab-scenario-text")!;
 
@@ -13,9 +17,15 @@ const importButton = document.getElementById("lab-scenario-import")!;
 
 const errorEl = document.getElementById("lab-scenario-error")!;
 
+const scenarioDetails = document.getElementById("lab-scenario")!;
+
+scenarioDetails.addEventListener("toggle", () => {
+  window.dispatchEvent(new Event("resize"));
+});
+
 const session = createLocalBattleLabSession(1);
 
-createBattleLabScene(sceneContainer, session);
+createBattleLabScene(canvasRoot, hudRoot, statusEl, session);
 
 function currentScenario(): LabScenario {
   const view = session.getView();
