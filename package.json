@@ -15,12 +15,16 @@
     "build": "pnpm -r --if-present build",
     "lint": "oxlint",
     "format": "oxfmt",
-    "format:check": "oxfmt --check"
+    "format:check": "oxfmt --check",
+    "simulate": "tsx scripts/simulate.ts"
   },
   "devDependencies": {
+    "@jev-game/content": "workspace:*",
+    "@jev-game/game": "workspace:*",
     "@oxlint/plugins": "1.83.0",
     "oxfmt": "^0.68.0",
-    "oxlint": "^1.83.0"
+    "oxlint": "^1.83.0",
+    "tsx": "^4.23.15"
   },
   "devEngines": {
     "packageManager": {

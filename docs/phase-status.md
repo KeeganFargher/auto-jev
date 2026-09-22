@@ -67,8 +67,99 @@ pnpm --filter @jev-game/server test
 pnpm dev                                       # + two browser tabs, + a live edit to packages/shared
 ```
 
+## Phase 2 — Build the smallest battle and laboratory — done
+
+### What works now
+
+- `packages/game`: pure, dependency-free (per the plan's table — no
+  workspace imports) battle engine. Fixed 30 tick/s simulation, mulberry32
+  RNG threaded through `BattleState` from creation (unused by any Phase 2
+  mechanic yet, but wired so Phase 3 doesn't have to retrofit it), the
+  section-6 tick pipeline (target retention, shared-snapshot movement,
+  post-movement attack collection, priority-ordered resolution, win/draw/
+  timeout evaluation), and a read-only `getBattleSnapshot`.
+- `packages/content`: `bruiser` hero, `flat-arena`, a `duel` scenario
+  (two mirrored bruisers), a catalogue, and `validateCatalogue`.
+- `pnpm simulate duel <seed>` (root script): headless runner. Prints tick
+  count, result, an event-count + FNV-1a digest of the full event log, and
+  per-unit damage dealt.
+- `apps/client/lab.html` (`pnpm --filter @jev-game/client dev`, then
+  `/lab.html`): the battle laboratory. Two DOM/SVG-rendered units with
+  health bars, team colors, a dashed target line, and a range ring on the
+  selected unit; play/pause/step/reset/speed (0.5x–4x) controls; hero-stat
+  override inputs (applied on next reset, never by mutating shared content);
+  a unit inspector; a capped, prepend-ordered event log; and a scenario
+  export/import panel (seed + hero overrides as JSON).
+- `apps/client/index.html` (the Phase-1 movement/prediction demo) is
+  untouched and still reachable — a separate Vite entry, not touched by any
+  of the above.
+
+### Verified, not assumed
+
+- **Determinism, including event order, not just the final result:**
+  `pnpm simulate duel 1` run twice produces identical tick count, result,
+  and digest. The browser lab reaches the *exact* same terminal tick and
+  result at both 1x and 4x speed for the same seed/stats as the headless
+  run (297 ticks, mutual-elimination, same per-tick damage log) — confirmed
+  by screenshot/log comparison, not just by reading the code.
+- **No resolution-order bias:** the mirror duel (two identical bruisers,
+  symmetric spawns) ends in a genuine mutual-elimination draw with 100/100
+  damage dealt each — not "the first unit in the array always wins." See
+  `docs/decisions.md` for the collect-then-resolve mechanics this depends
+  on.
+- **Edge cases:** same-position spawns don't produce `NaN` (checked
+  directly on `unit.position` after several ticks); a zero-speed,
+  out-of-range setup correctly times out as a `draw`/`timeout` at its
+  configured `tickLimit` rather than hanging.
+- **No fabricated victories:** `createBattle` rejects a setup with fewer
+  than two distinct team IDs (a bug caught in review before any UI could
+  construct one).
+- **No duplicate sprites/listeners across resets:** 10 consecutive resets
+  leave exactly 2 unit elements (+1 SVG layer) in the arena — the same
+  `unitId`s are reused across the `BattleView`'s internal map rather than
+  torn down and recreated per reset.
+- **Content changes need no rendering-code changes:** raising attack damage
+  5x (via the lab's override inputs, which build a fresh `Catalogue` rather
+  than mutating the shared `bruiser` constant) produces a visibly shorter
+  fight (57 ticks vs. 297) with zero changes to any view/HUD file.
+
+### Deliberately deferred (see `docs/decisions.md` for why)
+
+- Phaser — not installed, not needed for Phase 2's acceptance checks; the
+  lab is plain DOM/CSS/SVG, matching the Phase 1 movement demo's approach.
+- Branded ID types (`HeroDefinitionId`, `UnitId`, …) — plain `string`
+  aliases instead; branding needs an unchecked cast that the "no comments"
+  rule's lint consequence (`SAFETY:` justification required) forbids.
+- A schema library for scenario JSON import — plain coercion instead,
+  relying on `validateCatalogue` downstream for real validation.
+
+### Known gaps / minor rough edges
+
+- The controls panel's seed `<input>` doesn't sync from session state after
+  an *import* sets a different seed (it does reflect what you type before
+  clicking Reset). Cosmetic only — the underlying battle did reset with the
+  imported seed, confirmed via the inspector/event log, not the input's
+  displayed value.
+- `abilities/strike.ts` and a formal `rulesets/prototype.ts` were not
+  created — Phase 2 explicitly has "no statuses, casts or reaction queue,"
+  so the basic attack lives entirely in `HeroDefinition`'s own fields.
+  Phase 3 introduces the ability system properly.
+
+### Commands used to verify this phase
+
+```
+pnpm install
+pnpm -r typecheck
+pnpm lint
+pnpm build
+pnpm simulate duel 1                      # run twice, compare digest
+pnpm --filter @jev-game/client dev        # + /lab.html in two browser sessions,
+                                           #   play/pause/step/reset/speed/select/
+                                           #   override/export/import, at 1x and 4x
+```
+
 ### Next concrete task
 
-Phase 2: the smallest battle and laboratory (`packages/game`, headless
-`scripts/simulate.ts`, `BattleLabScene`). Not started. Per the plan, wait for
+Phase 3: distinct roles and an ability system (bruiser/ranger/support,
+strike/bolt/mend, statuses, recording). Not started. Per the plan, wait for
 sign-off on this phase before starting it.

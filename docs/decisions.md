@@ -54,3 +54,88 @@ Why: moving them into `packages/server-runtime` would be a bigger diff for
 no behavioral gain in Phase 1 — apps are allowed to import types/values from
 packages (that's normal), just not from each other. Revisit only if
 `server-runtime` grows its own test suite independent of `apps/server`.
+
+**No code comments anywhere from this point on, including in code written
+before the rule (stripped retroactively in Phase 1's `contract.ts`,
+`main.ts`, `index.ts`, `oxlint.config.ts`).**
+Why: the user added "do not ever write comments, you are forbidden" to
+`agents.md`/`claude.md` mid-Phase-1 and confirmed it was intentional. Applies
+to code comments; README/docs prose is unaffected. This constrains later
+choices below (branded IDs, scenario parsing) that would otherwise have used
+a justifying comment.
+
+## Phase 2
+
+**No Phaser yet.** The plan names Phaser throughout (section 1's stack
+table, section 4's `game/create-game.ts`), but Phase 1 found it isn't
+actually installed — the existing demo is plain DOM/CSS. Phase 2's
+acceptance checks (circles approaching, health bars, a selected-unit range
+ring, target lines, an event log, clean resets) are all satisfiable with
+DOM/SVG, which this repo already has a working, tested pattern for. Adding a
+rendering engine before anything needs its specific capabilities (Phase 3's
+cast cues, maybe) repeats the Phase-1 esbuild mistake — a dependency added
+on the plan's say-so before it was confirmed necessary. Revisit when a
+concrete Phase 3+ need (sprite animation, particle effects) shows up.
+
+**No branded ID types (`HeroDefinitionId`, `UnitId`, etc. are plain
+`string` aliases).**
+Why: the standard branding pattern needs an unchecked type assertion to
+manufacture a branded value from a plain string, which the anti-slop lint
+config requires a `SAFETY:` comment to justify — precisely what's now
+forbidden. Plain aliases still document intent through parameter/field
+names; they just don't stop a caller from passing the wrong kind of string
+at compile time. Revisit if that gap actually causes a bug.
+
+**`stepBattle(state, catalogue)` takes `catalogue` from Phase 2 onward, even
+though Phase 2 doesn't read it.**
+Why: Phase 3's abilities need catalogue-driven lookups inside the tick
+pipeline (ability definitions aren't baked into `UnitState` the way basic
+stats are). Adding the parameter now costs nothing (every call site already
+has the catalogue in scope) and avoids changing the signature — and every
+caller — again next phase.
+
+**`createBattle` now rejects setups with fewer than two distinct
+`teamId`s.**
+Why: `evaluateResult` declares a win once exactly one team has living units,
+which is vacuously true for a single-team setup on tick 1 — a fabricated
+victory, which section 6 explicitly forbids. Caught during Phase 2 review
+before any UI could let someone build that setup by hand.
+
+**Lab hero-stat overrides build a fresh `Catalogue` object per reset;
+`packages/content`'s `bruiser` constant is never mutated.**
+Why: `bruiser` is a module-level singleton shared by the headless runner,
+every browser tab, and every past/future reset. Mutating it would corrupt
+sibling consumers silently. `catalogueWithOverrides` in
+`apps/client/src/session/local-session.ts` copies the hero record and runs
+the result back through `packages/content`'s own `validateCatalogue` before
+use — lab overrides get the same validation as any other catalogue, for
+free.
+
+**Determinism verification covers the event sequence, not just the final
+result.** `scripts/simulate.ts` accumulates every event and prints an FNV-1a
+digest alongside the tick count and result. Confirmed: identical seed → identical
+digest across repeated headless runs, and the browser lab (both at 1x and at
+4x speed) reaches the exact same terminal tick, result, and per-tick event
+text as the headless run for the same seed and stats. A result-only
+comparison would have passed even with event-order drift; the digest
+wouldn't.
+
+**Mirror-duel probe confirms no resolution-order bias.** Two identical
+bruisers, symmetric spawn positions: `stepBattle` collects all of a tick's
+attack proposals before applying any damage, and does not check whether a
+proposal's source is still alive before resolving it (only whether its
+target is). Result: a genuine mutual-elimination draw with 100/100 damage
+dealt, not "team A always wins." Verified via `pnpm simulate duel 1`.
+
+**Scenario export/import (`apps/client/src/dev/scenario-editor.ts`) parses
+JSON with plain property access and `Number(...)` coercion, not hand-written
+`typeof` guards or a schema library.** Why: the lint config's
+`no-runtime-typeof` rule bans typeof-based narrowing outright (even inside
+type-guard functions — `allowInTypeGuards` defaults to and stays `false`),
+and its intended replacement (parse with a schema library at the I/O
+boundary) would mean adding `zod` back for one small feature. Malformed
+input naturally fails downstream: bad numbers become `NaN`/`undefined`,
+which `validateCatalogue` already rejects with a clear message, and the caller
+already wraps `parseScenario` in a `try`/`catch`. Revisit if scenario import
+grows real structure (Phase 4's builds, Phase 5's run setups) worth a proper
+schema.

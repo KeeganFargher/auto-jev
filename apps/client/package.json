@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@colyseus/sdk": "^0.18.1",
+    "@jev-game/content": "workspace:*",
+    "@jev-game/game": "workspace:*",
     "@jev-game/shared": "workspace:*"
   },
   "devDependencies": {
