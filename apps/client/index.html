@@ -4,16 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>jev-game</title>
+    <title>jev-game battle lab</title>
   </head>
   <body>
-    <div id="app">
-      <h1>jev-game</h1>
-      <p id="status">Connecting…</p>
-      <div id="arena"></div>
-      <p class="hint">
-        Move with <kbd>WASD</kbd> or the arrow keys. Open a second tab to see another player.
-      </p>
+    <div id="lab-canvas-root"></div>
+    <div id="lab-hud">
+      <div class="lab-hud-top">
+        <h1>Battle laboratory</h1>
+        <p id="lab-status" class="lab-status"></p>
+      </div>
+      <div id="lab-hud-side" class="lab-hud-side"></div>
+      <details id="lab-scenario" class="lab-hud-bottom">
+        <summary>Scenario export / import</summary>
+        <textarea id="lab-scenario-text" rows="6"></textarea>
+        <div class="lab-button-row">
+          <button id="lab-scenario-export">Export current</button>
+          <button id="lab-scenario-import">Import</button>
+        </div>
+        <p id="lab-scenario-error" class="lab-error"></p>
+      </details>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -1,123 +1,60 @@
 import "./style.css";
-import { ColyseusSDK, Callbacks, Predict } from "@colyseus/sdk";
-import { stepEntity, type MoveInputLike } from "@jev-game/shared";
-import type { GameServer } from "@jev-game/server-runtime/contract";
+import { createLocalBattleLabSession } from "./session/local-session.js";
+import { createBattleLabScene } from "./game/scenes/battle-lab-scene.js";
+import { parseScenario, serializeScenario, type LabScenario } from "./dev/scenario-editor.js";
 
-// The server runs as its own process (apps/server, port 2567 by default —
-// see apps/server/src/index.ts) rather than sharing this app's origin, so
-// the endpoint has to be explicit. Override per environment with
-// VITE_COLYSEUS_ENDPOINT (e.g. in apps/client/.env.production).
-const endpoint = import.meta.env.VITE_COLYSEUS_ENDPOINT ?? "http://localhost:2567";
+const canvasRoot = document.getElementById("lab-canvas-root")!;
 
-const statusEl = document.getElementById("status")!;
+const hudRoot = document.getElementById("lab-hud")!;
 
-const arenaEl = document.getElementById("arena")!;
+const statusEl = document.getElementById("lab-status")!;
 
-const client = new ColyseusSDK<GameServer>(endpoint);
+const scenarioText = document.querySelector<HTMLTextAreaElement>("#lab-scenario-text")!;
 
-const held = new Set<string>();
+const exportButton = document.getElementById("lab-scenario-export")!;
 
-addEventListener("keydown", (e) => held.add(e.key.toLowerCase()));
+const importButton = document.getElementById("lab-scenario-import")!;
 
-addEventListener("keyup", (e) => held.delete(e.key.toLowerCase()));
+const errorEl = document.getElementById("lab-scenario-error")!;
 
-/** Opposite keys cancel out, so the axis is always exactly -1, 0 or 1. */
-function axis(negative: string[], positive: string[]): -1 | 0 | 1 {
-  const back = negative.some((k) => held.has(k));
-  const forward = positive.some((k) => held.has(k));
+const scenarioDetails = document.getElementById("lab-scenario")!;
 
-  if (back === forward) {
-    return 0;
-  }
+scenarioDetails.addEventListener("toggle", () => {
+  window.dispatchEvent(new Event("resize"));
+});
 
-  return back ? -1 : 1;
+const session = createLocalBattleLabSession(1);
+
+createBattleLabScene(canvasRoot, hudRoot, statusEl, session);
+
+function currentScenario(): LabScenario {
+  const view = session.getView();
+  const unit = view.snapshot.units[0];
+
+  return {
+    version: 1,
+    seed: view.seed,
+    heroOverrides: {
+      maxHp: unit?.maxHp ?? 0,
+      attackDamage: unit?.attackDamage ?? 0,
+      attackRangeUnits: unit?.attackRangeUnits ?? 0,
+      attackIntervalTicks: unit?.attackIntervalTicks ?? 0,
+      moveSpeedUnitsPerSecond: unit?.moveSpeedUnitsPerSecond ?? 0,
+    },
+  };
 }
 
-async function main() {
-  const room = await client.joinOrCreate("arena");
-  const predict = Predict.get(room);
+exportButton.addEventListener("click", () => {
+  errorEl.textContent = "";
+  scenarioText.value = serializeScenario(currentScenario());
+});
 
-  // Other players' inputs aren't ours to predict: interpolate them toward the
-  // latest snapshot instead. `smoothMs` springs the interpolated output — ~65 ms
-  // of extra display lag buys velocity that stays continuous even when the
-  // snapshot stream is rough. Use 0 where draw == hit precision matters most.
-  predict.attachAll("players", { mode: "lerp", fields: ["x", "y"], smoothMs: 65 });
-
-  const input = room.input<MoveInputLike>({ mode: "reliable" });
-
-  // The first patch is what creates our own Player.
-  await new Promise<void>((resolve) => room.onStateChange.once(() => resolve()));
-  const self = room.state.players.get(room.sessionId);
-
-  if (self === undefined)
-    throw new Error(`no Player for own sessionId ${room.sessionId} after first state patch`);
-
-  predict.reconciler(self, {
-    input,
-    fields: ["x", "y", "vx", "vy"],
-    // The same function the server runs — determinism is the whole contract.
-    step: (ctx, predicted, command) => stepEntity(predicted, command, ctx.dt),
-  });
-
-  statusEl.textContent = `Connected as ${room.sessionId}`;
-
-  const nodes = new Map<string, HTMLElement>();
-  const callbacks = Callbacks.get(room);
-
-  callbacks.onAdd("players", (_player, key) => {
-    // SAFETY: MapSchema keys are always strings on the wire; the callback
-    // signature widens it to `string | number` to also cover ArraySchema.
-    const sessionId = key as string;
-    const node = document.createElement("div");
-    node.className = sessionId === room.sessionId ? "player self" : "player";
-    arenaEl.appendChild(node);
-    nodes.set(sessionId, node);
-  });
-
-  callbacks.onRemove("players", (_player, key) => {
-    // SAFETY: MapSchema keys are always strings on the wire; the callback
-    // signature widens it to `string | number` to also cover ArraySchema.
-    const sessionId = key as string;
-    nodes.get(sessionId)?.remove();
-    nodes.delete(sessionId);
-  });
-
-  room.onLeave(() => {
-    statusEl.textContent = "Disconnected";
-    nodes.forEach((node) => node.remove());
-    nodes.clear();
-  });
-
-  function frame(now: number) {
-    // Drives prediction, interpolation and the reconciler, and returns how many
-    // fixed steps came due — so input rate follows the simulation rate, not the
-    // monitor's refresh rate.
-    const steps = predict.tick(now);
-
-    for (let i = 0; i < steps; i++) {
-      input.data.moveX = axis(["a", "arrowleft"], ["d", "arrowright"]);
-      input.data.moveY = axis(["w", "arrowup"], ["s", "arrowdown"]);
-      input.send();
-    }
-
-    for (const [sessionId, player] of room.state.players) {
-      const node = nodes.get(sessionId);
-
-      if (!node) {
-        continue;
-      }
-
-      // Predicted for us, interpolated for everyone else — one read either way.
-      node.style.transform = `translate(${predict.value(player, "x")}px, ${predict.value(player, "y")}px)`;
-    }
-
-    requestAnimationFrame(frame);
+importButton.addEventListener("click", () => {
+  try {
+    const scenario = parseScenario(scenarioText.value);
+    errorEl.textContent = "";
+    session.reset(scenario.seed, scenario.heroOverrides);
+  } catch (error) {
+    errorEl.textContent = error instanceof Error ? error.message : "invalid scenario";
   }
-
-  requestAnimationFrame(frame);
-}
-
-main().catch((e) => {
-  console.error(e);
-  statusEl.textContent = "Could not connect";
 });

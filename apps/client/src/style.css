@@ -1,80 +1,187 @@
 :root {
   --text: #6b6375;
   --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --arena-bg: rgba(17, 17, 34, 0.08);
-  --self: #ffd24e;
-  --other: #4ea1ff;
+  --bg: #101018;
+  --panel-bg: rgba(16, 16, 24, 0.72);
+  --border: rgba(255, 255, 255, 0.12);
+  --team-a: #4ea1ff;
+  --team-b: #ff6b6b;
+  --dead: #6b7280;
+  --range-ring: rgba(78, 161, 255, 0.4);
+  --target-line: rgba(255, 255, 255, 0.35);
 
   font:
     16px/1.5 system-ui,
     "Segoe UI",
     Roboto,
     sans-serif;
-  color-scheme: light dark;
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --arena-bg: #1114;
-  }
-}
-
+html,
 body {
   margin: 0;
-}
-
-#app {
-  max-width: 848px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-  text-align: center;
-}
-
-h1 {
-  color: var(--text-h);
-  font-size: 32px;
-  margin: 0 0 8px;
-}
-
-#status {
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-#arena {
-  position: relative;
-  width: 800px;
-  max-width: 100%;
-  height: 600px;
-  margin: 0 auto;
-  background: var(--arena-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  height: 100%;
   overflow: hidden;
 }
 
-.player {
+#lab-canvas-root {
+  position: fixed;
+  inset: 0;
+}
+
+#lab-canvas-root canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#lab-hud {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  pointer-events: none;
+}
+
+#lab-hud > * {
+  pointer-events: auto;
+}
+
+.lab-hud-top,
+.lab-hud-side,
+.lab-hud-bottom {
+  background: var(--panel-bg);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.lab-hud-top {
+  align-self: flex-start;
+}
+
+.lab-hud-top h1 {
+  color: var(--text-h);
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.lab-status {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-h);
+  font-size: 13px;
+}
+
+.lab-hud-side {
   position: absolute;
-  width: 24px;
-  height: 24px;
-  margin: -12px 0 0 -12px;
-  border-radius: 4px;
-  background: var(--other);
-  will-change: transform;
+  top: 16px;
+  right: 16px;
+  bottom: 16px;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
 }
 
-.player.self {
-  background: var(--self);
+.lab-hud-bottom {
+  align-self: flex-start;
+  max-width: 420px;
 }
 
-.hint {
-  font-size: 14px;
+.lab-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.lab-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lab-button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lab-button-row button {
+  cursor: pointer;
+}
+
+.lab-field {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.lab-field input,
+.lab-field select {
+  width: 90px;
+}
+
+.lab-stats {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px 12px;
+}
+
+.lab-inspector {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.lab-inspector dt {
+  color: var(--text);
+}
+
+.lab-inspector dd {
+  margin: 0;
+  color: var(--text-h);
+  text-align: right;
+}
+
+.lab-event-log {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 12px;
+  font-family: monospace;
+}
+
+#lab-scenario-text {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.lab-error {
+  color: #ff8080;
+  font-size: 13px;
+  min-height: 1em;
 }

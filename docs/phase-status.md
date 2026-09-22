@@ -83,16 +83,19 @@ pnpm dev                                       # + two browser tabs, + a live ed
 - `pnpm simulate duel <seed>` (root script): headless runner. Prints tick
   count, result, an event-count + FNV-1a digest of the full event log, and
   per-unit damage dealt.
-- `apps/client/lab.html` (`pnpm --filter @jev-game/client dev`, then
-  `/lab.html`): the battle laboratory. Two DOM/SVG-rendered units with
-  health bars, team colors, a dashed target line, and a range ring on the
-  selected unit; play/pause/step/reset/speed (0.5x–4x) controls; hero-stat
-  override inputs (applied on next reset, never by mutating shared content);
-  a unit inspector; a capped, prepend-ordered event log; and a scenario
-  export/import panel (seed + hero overrides as JSON).
-- `apps/client/index.html` (the Phase-1 movement/prediction demo) is
-  untouched and still reachable — a separate Vite entry, not touched by any
-  of the above.
+- `apps/client/index.html` (`pnpm --filter @jev-game/client dev`, then `/`):
+  the battle laboratory, and the app's only page. A full-viewport `<canvas>`
+  renders two units with health bars, team colors, a dashed target line, and
+  a range ring on the selected unit; the HUD (status, play/pause/step/
+  reset/speed 0.5x–4x, hero-stat override inputs applied on next reset,
+  never by mutating shared content, a unit inspector, a capped
+  prepend-ordered event log, and a scenario export/import panel) is
+  absolutely-positioned overlay panels on top of the same canvas, sized from
+  the panels' own `getBoundingClientRect()` so the arena never renders under
+  them. The Phase-1 movement/prediction demo's page was removed — one HTML
+  file, not two (see `docs/decisions.md`); `packages/shared`'s `stepEntity`
+  and the server's `Arena` room it demonstrated are unaffected, only the
+  client-side demo page is gone.
 
 ### Verified, not assumed
 
@@ -114,10 +117,10 @@ pnpm dev                                       # + two browser tabs, + a live ed
 - **No fabricated victories:** `createBattle` rejects a setup with fewer
   than two distinct team IDs (a bug caught in review before any UI could
   construct one).
-- **No duplicate sprites/listeners across resets:** 10 consecutive resets
-  leave exactly 2 unit elements (+1 SVG layer) in the arena — the same
-  `unitId`s are reused across the `BattleView`'s internal map rather than
-  torn down and recreated per reset.
+- **No duplicate sprites/listeners across resets:** the canvas is cleared
+  and fully redrawn from the current snapshot every frame — there's nothing
+  per-unit to accumulate, and there's exactly one `click` listener on the
+  canvas for the whole battle's lifetime, not one per unit.
 - **Content changes need no rendering-code changes:** raising attack damage
   5x (via the lab's override inputs, which build a fresh `Catalogue` rather
   than mutating the shared `bruiser` constant) produces a visibly shorter
@@ -126,7 +129,7 @@ pnpm dev                                       # + two browser tabs, + a live ed
 ### Deliberately deferred (see `docs/decisions.md` for why)
 
 - Phaser — not installed, not needed for Phase 2's acceptance checks; the
-  lab is plain DOM/CSS/SVG, matching the Phase 1 movement demo's approach.
+  lab renders to a plain `<canvas>` with an HTML/CSS HUD overlay.
 - Branded ID types (`HeroDefinitionId`, `UnitId`, …) — plain `string`
   aliases instead; branding needs an unchecked cast that the "no comments"
   rule's lint consequence (`SAFETY:` justification required) forbids.
@@ -153,7 +156,7 @@ pnpm -r typecheck
 pnpm lint
 pnpm build
 pnpm simulate duel 1                      # run twice, compare digest
-pnpm --filter @jev-game/client dev        # + /lab.html in two browser sessions,
+pnpm --filter @jev-game/client dev        # + / in two browser sessions,
                                            #   play/pause/step/reset/speed/select/
                                            #   override/export/import, at 1x and 4x
 ```

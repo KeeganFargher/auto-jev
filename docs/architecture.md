@@ -32,7 +32,7 @@ depends on `apps/server`. Enforced by `oxlint.config.ts`'s per-directory
 | `@jev-game/shared` | Code (not just types) needed by both server and client — currently `stepEntity`, arena/tick constants | `dist/` (ESM + `.d.ts`) |
 | `@jev-game/server-runtime` | The actual `defineServer(...)` result, room implementations (`Arena`), and a type-only `/contract` export (`GameServer = typeof server`) for client-side SDK inference | `dist/` (ESM + `.d.ts`); `./contract` subpath is types-only, no `import` condition |
 | `@jev-game/server` (`apps/server`) | Environment/startup wrapper only: `listen(server)`. No room/route logic lives here. | N/A (deployable app) |
-| `@jev-game/client` (`apps/client`) | Phaser-free-for-now Vite app; the existing keyboard-movement + client-prediction demo | N/A (static build) |
+| `@jev-game/client` (`apps/client`) | Phaser-free Vite app, single page. As of Phase 1: the keyboard-movement + client-prediction demo. As of Phase 2: replaced by the battle laboratory — see `docs/phase-status.md` | N/A (static build) |
 
 ## The server type boundary
 

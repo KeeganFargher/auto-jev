@@ -160,3 +160,16 @@ hardcoding panel dimensions that would drift from the CSS. Verified: at
 1024×768 both units are now visible and centered in the space left of the
 sidebar; the same mutual-elimination duel replays identically on the canvas
 renderer at both 1x and 4x speed.
+
+**One HTML page, not two: the battle lab is `apps/client/index.html` at
+`/`; the Phase-1 movement/prediction demo's page is gone.** The user
+explicitly rejected having both `index.html` (movement demo) and `lab.html`
+(battle lab) as separate Vite entries — "`/lab` should just be `/`."
+`lab.ts`/`lab.css` were promoted to `main.ts`/`style.css`; the old
+`main.ts`/`style.css` (the demo's DOM wiring and page styling) and
+`apps/client/vite.config.ts` (only needed for the two-entry
+`rollupOptions.input`) were deleted. `packages/shared`'s `stepEntity` and
+the server's `Arena` room stay exactly as they were — Phase 1's networking
+proof lives on in git history and isn't otherwise affected; only the
+client-side demo page is gone. `pnpm build` now emits a single
+`dist/index.html` again.
