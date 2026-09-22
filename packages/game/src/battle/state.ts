@@ -17,6 +17,7 @@ export interface UnitState {
   targetUnitId: UnitId | null;
   nextAttackTick: number;
   alive: boolean;
+  damageDealt: number;
 }
 
 export interface BattleState {
@@ -32,4 +33,5 @@ export interface BattleState {
   rng: RngState;
   eventSequence: number;
   result: BattleResult | null;
+  resolutionPriority: UnitId[];
 }

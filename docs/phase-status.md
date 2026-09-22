@@ -89,10 +89,14 @@ pnpm dev                                       # + two browser tabs, + a live ed
   a range ring on the selected unit; the HUD (status, play/pause/step/
   reset/speed 0.5x–4x, hero-stat override inputs applied on next reset,
   never by mutating shared content, a unit inspector, a capped
-  prepend-ordered event log, and a scenario export/import panel) is
-  absolutely-positioned overlay panels on top of the same canvas, sized from
-  the panels' own `getBoundingClientRect()` so the arena never renders under
-  them. The Phase-1 movement/prediction demo's page was removed — one HTML
+  prepend-ordered event feed, and a collapsed `tuning` drawer holding seed,
+  hero-stat overrides and scenario export/import) is edge-anchored translucent
+  chrome floating on top of that same canvas: status pill top centre, feed top
+  right, selected-unit card bottom left, transport bar bottom centre, tuning
+  bottom right. The canvas paints a grid floor across its whole surface and
+  the arena's own boundary is no longer stroked, so there is no frame around
+  the play area and the floor continues underneath every HUD panel — verified
+  with `getImageData`, not by eye (see `docs/decisions.md`). The Phase-1 movement/prediction demo's page was removed — one HTML
   file, not two (see `docs/decisions.md`); `packages/shared`'s `stepEntity`
   and the server's `Arena` room it demonstrated are unaffected, only the
   client-side demo page is gone.
@@ -147,6 +151,47 @@ pnpm dev                                       # + two browser tabs, + a live ed
   created — Phase 2 explicitly has "no statuses, casts or reaction queue,"
   so the basic attack lives entirely in `HeroDefinition`'s own fields.
   Phase 3 introduces the ability system properly.
+- Phase 1's contract-boundary acceptance checks (two clients connecting,
+  a misspelled room name failing to compile) no longer have a demonstration
+  site — the client's only networking call site was the movement demo,
+  deleted for the one-page consolidation. `packages/server-runtime` and its
+  `/contract` export are untouched; `apps/client` just has nothing left that
+  imports them. Revisit when the client needs real networking again (Phase 6).
+
+### Phase 1 + 2 review pass
+
+A read-through against the plan's Phase 1 and 2 text turned up one API
+footgun and several gaps against the §6 simulation contract. All fixed and
+re-verified; full rationale in `docs/decisions.md`. Summary:
+
+- `BattleLabSession` had a getter (`getView()`) with a hidden destructive
+  side effect (draining the pending event queue) and two call sites. Split
+  into `getView()` (still draining, now one caller) and `peekSnapshot()`
+  (non-destructive, used by Export).
+- `packages/game` could import Node built-ins, Colyseus and other workspace
+  packages without either `typecheck` or `lint` catching it — verified with
+  a throwaway probe file before and after. Sealed with an `oxlint`
+  `no-restricted-imports` override scoped to `packages/game/**`.
+- Attack resolution order was lexicographic by unit ID, not seeded as §6
+  requires. Now a Fisher–Yates shuffle of `resolutionPriority`, done once in
+  `createBattle` from the battle's own RNG.
+- `validateCatalogue` now requires integer HP/damage/attack-interval;
+  `applyDamage` rounds its input; the lab's tuning inputs round before
+  calling `reset()` so a typed decimal can't throw out of an unguarded
+  click handler.
+- `createBattle` now rejects an out-of-arena spawn instead of silently
+  clamping it on the unit's first move.
+- `BattleResult` now carries per-unit `damageDealt`; `BattleSnapshot` now
+  carries a cloned copy of the RNG state. Both were named as required §6
+  concepts and were missing. `scripts/simulate.ts` reads `damageDealt` off
+  the result instead of re-deriving it from the event log.
+- `kind: "failure"` was declared but unreachable; added a non-finite-state
+  check as the one corrupt-state backstop §6 actually asks for.
+- Scenario import silently overwrote the version field it claimed to
+  validate; it now reads and checks it, and rejects anything but `1`.
+- Removed `apps/client`'s unused `@colyseus/sdk` / `@jev-game/shared` /
+  `@jev-game/server-runtime` dependencies (no source imports any of them
+  after the one-page consolidation).
 
 ### Commands used to verify this phase
 

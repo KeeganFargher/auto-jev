@@ -1,5 +1,6 @@
 import type { BattleState, UnitState } from "./state.js";
 import type { BattleResult } from "./result.js";
+import { cloneRng, type RngState } from "../random/rng.js";
 
 export interface BattleSnapshot {
   tick: number;
@@ -8,6 +9,7 @@ export interface BattleSnapshot {
   arenaHeight: number;
   units: UnitState[];
   result: BattleResult | null;
+  rng: RngState;
 }
 
 export function getBattleSnapshot(state: BattleState): BattleSnapshot {
@@ -18,5 +20,6 @@ export function getBattleSnapshot(state: BattleState): BattleSnapshot {
     arenaHeight: state.arenaHeight,
     units: state.units.map((unit) => ({ ...unit, position: { ...unit.position } })),
     result: state.result,
+    rng: cloneRng(state.rng),
   };
 }

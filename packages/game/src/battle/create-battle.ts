@@ -2,7 +2,7 @@ import type { ArenaDefinitionId, HeroDefinitionId, TeamId, UnitId } from "../ids
 import type { Catalogue } from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
 import type { BattleState, UnitState } from "./state.js";
-import { createRng } from "../random/rng.js";
+import { createRng, nextInt, type RngState } from "../random/rng.js";
 import { DEFAULT_TICK_LIMIT } from "../constants.js";
 
 export interface UnitSetup {
@@ -23,6 +23,25 @@ export interface BattleSetup {
 
 function isFiniteVector(vector: Vector2): boolean {
   return Number.isFinite(vector.x) && Number.isFinite(vector.y);
+}
+
+function isWithinArena(vector: Vector2, arenaWidth: number, arenaHeight: number): boolean {
+  return (
+    vector.x >= 0 && vector.x <= arenaWidth && vector.y >= 0 && vector.y <= arenaHeight
+  );
+}
+
+function shufflePriority(unitIds: readonly UnitId[], rng: RngState): UnitId[] {
+  const order = [...unitIds];
+
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    const swapIndex = nextInt(rng, index + 1);
+    const current = order[index]!;
+    order[index] = order[swapIndex]!;
+    order[swapIndex] = current;
+  }
+
+  return order;
 }
 
 export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleState {
@@ -63,6 +82,10 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
       throw new Error(`unit "${unitSetup.unitId}" has a non-finite spawn position`);
     }
 
+    if (!isWithinArena(unitSetup.spawn, arena.width, arena.height)) {
+      throw new Error(`unit "${unitSetup.unitId}" has a spawn position outside the arena`);
+    }
+
     return {
       unitId: unitSetup.unitId,
       heroId: unitSetup.heroId,
@@ -77,8 +100,16 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
       targetUnitId: null,
       nextAttackTick: 0,
       alive: true,
+      damageDealt: 0,
     };
   });
+
+  const rng = createRng(setup.seed);
+
+  const resolutionPriority = shufflePriority(
+    units.map((unit) => unit.unitId),
+    rng,
+  );
 
   return {
     rulesetId: setup.rulesetId,
@@ -90,8 +121,9 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
     tick: 0,
     tickLimit: setup.tickLimit ?? DEFAULT_TICK_LIMIT,
     units,
-    rng: createRng(setup.seed),
+    rng,
     eventSequence: 0,
     result: null,
+    resolutionPriority,
   };
 }

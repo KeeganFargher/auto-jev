@@ -17,23 +17,17 @@ const importButton = document.getElementById("lab-scenario-import")!;
 
 const errorEl = document.getElementById("lab-scenario-error")!;
 
-const scenarioDetails = document.getElementById("lab-scenario")!;
-
-scenarioDetails.addEventListener("toggle", () => {
-  window.dispatchEvent(new Event("resize"));
-});
-
 const session = createLocalBattleLabSession(1);
 
 createBattleLabScene(canvasRoot, hudRoot, statusEl, session);
 
 function currentScenario(): LabScenario {
-  const view = session.getView();
-  const unit = view.snapshot.units[0];
+  const { seed, snapshot } = session.peekSnapshot();
+  const unit = snapshot.units[0];
 
   return {
     version: 1,
-    seed: view.seed,
+    seed,
     heroOverrides: {
       maxHp: unit?.maxHp ?? 0,
       attackDamage: unit?.attackDamage ?? 0,

@@ -40,7 +40,6 @@ function main(): void {
   const { scenario, seed } = parseArgs(process.argv.slice(2));
   const setup = buildSetup(scenario, seed);
   const state = createBattle(setup, catalogue);
-  const damageByUnit = new Map<string, number>();
 
   const eventLog: string[] = [];
 
@@ -49,13 +48,6 @@ function main(): void {
 
     for (const event of step.events) {
       eventLog.push(JSON.stringify(event));
-
-      if (event.kind === "attack-hit") {
-        damageByUnit.set(
-          event.sourceUnitId,
-          (damageByUnit.get(event.sourceUnitId) ?? 0) + event.amount,
-        );
-      }
     }
   }
 
@@ -71,7 +63,7 @@ function main(): void {
   console.log(`event digest: ${fnv1aHex(eventLog)}`);
   console.log("damage dealt:");
 
-  for (const [unitId, amount] of damageByUnit) {
+  for (const [unitId, amount] of Object.entries(state.result.damageDealt)) {
     console.log(`  ${unitId}: ${amount}`);
   }
 }

@@ -11,6 +11,7 @@ export interface BattleLabView {
 
 export interface BattleLabSession {
   getView(): BattleLabView;
+  peekSnapshot(): { seed: number; snapshot: BattleSnapshot };
   subscribe(listener: () => void): () => void;
   play(): void;
   pause(): void;

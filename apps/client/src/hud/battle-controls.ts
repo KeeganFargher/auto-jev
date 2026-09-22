@@ -7,14 +7,28 @@ export interface BattleControlsView {
 
 const SPEED_OPTIONS = [0.5, 1, 2, 4] as const;
 
+function iconButton(parent: HTMLElement, glyph: string, label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.className = "hud-icon-button";
+  button.textContent = glyph;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  parent.appendChild(button);
+
+  return button;
+}
+
 function numberField(
   parent: HTMLElement,
   label: string,
   initialValue: number,
 ): HTMLInputElement {
   const wrapper = document.createElement("label");
-  wrapper.className = "lab-field";
-  wrapper.textContent = label;
+  wrapper.className = "hud-field";
+
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  wrapper.appendChild(caption);
 
   const input = document.createElement("input");
   input.type = "number";
@@ -28,116 +42,95 @@ function numberField(
 }
 
 export function createBattleControlsView(
-  container: HTMLElement,
+  barContainer: HTMLElement,
+  tuningContainer: HTMLElement,
   session: BattleLabSession,
 ): BattleControlsView {
-  const root = document.createElement("div");
-  root.className = "lab-controls";
-  container.appendChild(root);
+  const playButton = iconButton(barContainer, "▶", "Play");
+  const pauseButton = iconButton(barContainer, "‖", "Pause");
+  const stepButton = iconButton(barContainer, "▶‖", "Step one tick");
+  const resetButton = iconButton(barContainer, "↻", "Reset");
 
-  const buttonRow = document.createElement("div");
-  buttonRow.className = "lab-button-row";
-  root.appendChild(buttonRow);
+  const speedGroup = document.createElement("div");
+  speedGroup.className = "hud-speed";
+  barContainer.appendChild(speedGroup);
 
-  const playButton = document.createElement("button");
-  playButton.textContent = "Play";
-  const pauseButton = document.createElement("button");
-  pauseButton.textContent = "Pause";
-  const stepButton = document.createElement("button");
-  stepButton.textContent = "Step";
-  const resetButton = document.createElement("button");
-  resetButton.textContent = "Reset";
-  buttonRow.append(playButton, pauseButton, stepButton, resetButton);
-
-  const speedLabel = document.createElement("label");
-  speedLabel.className = "lab-field";
-  speedLabel.textContent = "Speed";
-  const speedSelect = document.createElement("select");
+  const speedButtons: HTMLButtonElement[] = [];
 
   for (const speed of SPEED_OPTIONS) {
-    const option = document.createElement("option");
-    option.value = String(speed);
-    option.textContent = `${speed}x`;
+    const chip = document.createElement("button");
+    chip.className = "hud-chip";
+    chip.textContent = `${speed}x`;
 
     if (speed === 1) {
-      option.selected = true;
+      chip.classList.add("is-active");
     }
 
-    speedSelect.appendChild(option);
+    chip.addEventListener("click", () => {
+      session.setSpeed(speed);
+
+      for (const other of speedButtons) {
+        other.classList.remove("is-active");
+      }
+
+      chip.classList.add("is-active");
+    });
+
+    speedGroup.appendChild(chip);
+    speedButtons.push(chip);
   }
 
-  speedLabel.appendChild(speedSelect);
-  root.appendChild(speedLabel);
+  const fields = document.createElement("div");
+  fields.className = "hud-fields";
+  tuningContainer.appendChild(fields);
 
-  const seedInput = numberField(root, "Seed", 1);
-
-  const statsFieldset = document.createElement("fieldset");
-  statsFieldset.className = "lab-stats";
-  const legend = document.createElement("legend");
-  legend.textContent = "Bruiser stats (applied on next reset)";
-  statsFieldset.appendChild(legend);
-  root.appendChild(statsFieldset);
-
-  const maxHpInput = numberField(statsFieldset, "Max HP", bruiser.maxHp);
-  const attackDamageInput = numberField(statsFieldset, "Attack damage", bruiser.attackDamage);
-  const attackRangeInput = numberField(statsFieldset, "Attack range", bruiser.attackRangeUnits);
+  const seedInput = numberField(fields, "seed", 1);
+  const maxHpInput = numberField(fields, "max hp", bruiser.maxHp);
+  const attackDamageInput = numberField(fields, "attack damage", bruiser.attackDamage);
+  const attackRangeInput = numberField(fields, "attack range", bruiser.attackRangeUnits);
 
   const attackIntervalInput = numberField(
-    statsFieldset,
-    "Attack interval (ticks)",
+    fields,
+    "attack interval",
     bruiser.attackIntervalTicks,
   );
 
-  const moveSpeedInput = numberField(
-    statsFieldset,
-    "Move speed",
-    bruiser.moveSpeedUnitsPerSecond,
-  );
+  const moveSpeedInput = numberField(fields, "move speed", bruiser.moveSpeedUnitsPerSecond);
 
   function readOverrides(): HeroOverrides {
     return {
-      maxHp: Number(maxHpInput.value),
-      attackDamage: Number(attackDamageInput.value),
+      maxHp: Math.round(Number(maxHpInput.value)),
+      attackDamage: Math.round(Number(attackDamageInput.value)),
       attackRangeUnits: Number(attackRangeInput.value),
-      attackIntervalTicks: Number(attackIntervalInput.value),
+      attackIntervalTicks: Math.round(Number(attackIntervalInput.value)),
       moveSpeedUnitsPerSecond: Number(moveSpeedInput.value),
     };
   }
 
-  function handlePlay(): void {
+  playButton.addEventListener("click", () => {
     session.play();
-  }
+  });
 
-  function handlePause(): void {
+  pauseButton.addEventListener("click", () => {
     session.pause();
-  }
+  });
 
-  function handleStep(): void {
+  stepButton.addEventListener("click", () => {
     session.stepOnce();
-  }
+  });
 
-  function handleReset(): void {
+  resetButton.addEventListener("click", () => {
     session.reset(Number(seedInput.value), readOverrides());
-  }
-
-  function handleSpeedChange(): void {
-    session.setSpeed(Number(speedSelect.value));
-  }
-
-  playButton.addEventListener("click", handlePlay);
-  pauseButton.addEventListener("click", handlePause);
-  stepButton.addEventListener("click", handleStep);
-  resetButton.addEventListener("click", handleReset);
-  speedSelect.addEventListener("change", handleSpeedChange);
+  });
 
   return {
     dispose() {
-      playButton.removeEventListener("click", handlePlay);
-      pauseButton.removeEventListener("click", handlePause);
-      stepButton.removeEventListener("click", handleStep);
-      resetButton.removeEventListener("click", handleReset);
-      speedSelect.removeEventListener("change", handleSpeedChange);
-      root.remove();
+      playButton.remove();
+      pauseButton.remove();
+      stepButton.remove();
+      resetButton.remove();
+      speedGroup.remove();
+      fields.remove();
     },
   };
 }

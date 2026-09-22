@@ -2,20 +2,17 @@ import type { Vector2 } from "@jev-game/game";
 
 const PADDING_PIXELS = 32;
 
+const GRID_UNITS = 10;
+
+const FLOOR_COLOR = "#191926";
+
+const GRID_COLOR = "rgba(255, 255, 255, 0.06)";
+
 export interface CanvasTransform {
   scale: number;
   worldToCanvas(point: Vector2): Vector2;
   canvasToWorld(point: Vector2): Vector2;
 }
-
-export interface SafeAreaInsets {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
-
-const NO_INSETS: SafeAreaInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 
 export interface ArenaView {
   canvas: HTMLCanvasElement;
@@ -23,34 +20,22 @@ export interface ArenaView {
   arenaWidthUnits: number;
   arenaHeightUnits: number;
   getTransform(): CanvasTransform;
-  clear(): void;
-  drawBoundary(): void;
+  drawFloor(): void;
   dispose(): void;
 }
 
 function computeTransform(
   viewportWidth: number,
   viewportHeight: number,
-  insets: SafeAreaInsets,
   arenaWidthUnits: number,
   arenaHeightUnits: number,
 ): CanvasTransform {
-  const safeLeft = insets.left + PADDING_PIXELS;
-  const safeTop = insets.top + PADDING_PIXELS;
-
-  const safeWidth = Math.max(
-    1,
-    viewportWidth - insets.left - insets.right - PADDING_PIXELS * 2,
-  );
-
-  const safeHeight = Math.max(
-    1,
-    viewportHeight - insets.top - insets.bottom - PADDING_PIXELS * 2,
-  );
+  const safeWidth = Math.max(1, viewportWidth - PADDING_PIXELS * 2);
+  const safeHeight = Math.max(1, viewportHeight - PADDING_PIXELS * 2);
 
   const scale = Math.min(safeWidth / arenaWidthUnits, safeHeight / arenaHeightUnits);
-  const offsetX = safeLeft + (safeWidth - arenaWidthUnits * scale) / 2;
-  const offsetY = safeTop + (safeHeight - arenaHeightUnits * scale) / 2;
+  const offsetX = (viewportWidth - arenaWidthUnits * scale) / 2;
+  const offsetY = (viewportHeight - arenaHeightUnits * scale) / 2;
 
   return {
     scale,
@@ -66,7 +51,6 @@ export function createArenaView(
   container: HTMLElement,
   arenaWidthUnits: number,
   arenaHeightUnits: number,
-  getSafeAreaInsets: () => SafeAreaInsets,
   onResize: () => void,
 ): ArenaView {
   const canvas = document.createElement("canvas");
@@ -74,7 +58,7 @@ export function createArenaView(
 
   const ctx = canvas.getContext("2d")!;
 
-  let transform = computeTransform(1, 1, NO_INSETS, arenaWidthUnits, arenaHeightUnits);
+  let transform = computeTransform(1, 1, arenaWidthUnits, arenaHeightUnits);
 
   function resize(): void {
     const dpr = window.devicePixelRatio || 1;
@@ -83,13 +67,7 @@ export function createArenaView(
     canvas.width = width * dpr;
     canvas.height = height * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    transform = computeTransform(
-      width,
-      height,
-      getSafeAreaInsets(),
-      arenaWidthUnits,
-      arenaHeightUnits,
-    );
+    transform = computeTransform(width, height, arenaWidthUnits, arenaHeightUnits);
     onResize();
   }
 
@@ -103,20 +81,37 @@ export function createArenaView(
     arenaHeightUnits,
     getTransform: () => transform,
 
-    clear() {
-      ctx.clearRect(0, 0, container.clientWidth, container.clientHeight);
-    },
+    drawFloor() {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
 
-    drawBoundary() {
-      const topLeft = transform.worldToCanvas({ x: 0, y: 0 });
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+      ctx.fillStyle = FLOOR_COLOR;
+      ctx.fillRect(0, 0, width, height);
+
+      const topLeftWorld = transform.canvasToWorld({ x: 0, y: 0 });
+      const bottomRightWorld = transform.canvasToWorld({ x: width, y: height });
+
+      ctx.strokeStyle = GRID_COLOR;
       ctx.lineWidth = 1;
-      ctx.strokeRect(
-        topLeft.x,
-        topLeft.y,
-        arenaWidthUnits * transform.scale,
-        arenaHeightUnits * transform.scale,
-      );
+      ctx.beginPath();
+
+      const firstWorldX = Math.floor(topLeftWorld.x / GRID_UNITS) * GRID_UNITS;
+
+      for (let worldX = firstWorldX; worldX <= bottomRightWorld.x; worldX += GRID_UNITS) {
+        const canvasX = transform.worldToCanvas({ x: worldX, y: 0 }).x;
+        ctx.moveTo(canvasX, 0);
+        ctx.lineTo(canvasX, height);
+      }
+
+      const firstWorldY = Math.floor(topLeftWorld.y / GRID_UNITS) * GRID_UNITS;
+
+      for (let worldY = firstWorldY; worldY <= bottomRightWorld.y; worldY += GRID_UNITS) {
+        const canvasY = transform.worldToCanvas({ x: 0, y: worldY }).y;
+        ctx.moveTo(0, canvasY);
+        ctx.lineTo(width, canvasY);
+      }
+
+      ctx.stroke();
     },
 
     dispose() {

@@ -10,13 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@colyseus/sdk": "^0.18.1",
     "@jev-game/content": "workspace:*",
-    "@jev-game/game": "workspace:*",
-    "@jev-game/shared": "workspace:*"
+    "@jev-game/game": "workspace:*"
   },
   "devDependencies": {
-    "@jev-game/server-runtime": "workspace:*",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }

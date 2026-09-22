@@ -56,6 +56,55 @@ export default defineConfig({
         ],
       },
     },
+    {
+      files: ["packages/game/**"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              "fs",
+              "path",
+              "http",
+              "https",
+              "net",
+              "crypto",
+              "os",
+              "child_process",
+              "util",
+              "stream",
+              "events",
+              "url",
+              "querystring",
+              "zlib",
+              "tls",
+              "dns",
+              "readline",
+              "assert",
+              "colyseus",
+            ].map((name) => ({
+              name,
+              message: "packages/game must stay pure — no Node built-ins or Colyseus.",
+            })),
+            patterns: [
+              {
+                regex: "^node:",
+                message: "packages/game must stay pure — no Node built-ins.",
+              },
+              {
+                regex: "^@colyseus/",
+                message: "packages/game must stay pure — no Colyseus.",
+              },
+              {
+                regex: "^@jev-game/",
+                message:
+                  "packages/game must stay pure — no workspace imports (allowed workspace imports: none).",
+              },
+            ],
+          },
+        ],
+      },
+    },
   ],
   rules: {
     "oxc/no-accumulating-spread": "error",

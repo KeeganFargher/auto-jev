@@ -12,6 +12,11 @@ export function serializeScenario(scenario: LabScenario): string {
 
 export function parseScenario(json: string): LabScenario {
   const parsed = JSON.parse(json);
+
+  if (parsed.version !== 1) {
+    throw new Error(`unsupported scenario version "${String(parsed.version)}"`);
+  }
+
   const overrides = parsed.heroOverrides;
 
   return {

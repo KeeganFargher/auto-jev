@@ -16,25 +16,43 @@ a map, not the territory.
 ## Package graph
 
 ```
-packages/shared           — no workspace deps
-packages/server-runtime   — depends on packages/shared
-apps/server                — depends on packages/shared, packages/server-runtime
-apps/client                 — depends on packages/shared (runtime);
-                               packages/server-runtime (type-only, via /contract)
+packages/game              — no workspace deps (deliberately: pure engine)
+packages/shared             — no workspace deps
+packages/content            — depends on packages/game
+packages/server-runtime    — depends on packages/shared
+apps/server                 — depends on packages/shared, packages/server-runtime
+apps/client                  — depends on packages/game, packages/content
 ```
 
 No app imports another app, directly or transitively. `apps/client` never
 depends on `apps/server`. Enforced by `oxlint.config.ts`'s per-directory
-`overrides` (`no-restricted-imports`), not just convention.
+`overrides` (`no-restricted-imports`), not just convention; `packages/game`
+additionally has its own override blocking Node built-ins, Colyseus and any
+`@jev-game/*` import, so it can't quietly acquire a dependency either.
+
+**`apps/client` currently has no dependency on `packages/shared` or
+`packages/server-runtime`.** It did through Phase 1 (the movement demo used
+`ColyseusSDK` against the `/contract` type export, described below). That
+demo was deleted when the lab became the app's only page — see
+`docs/decisions.md`'s "One HTML page, not two" entry — and nothing replaced
+it as a networking call site. The contract boundary below is still real and
+still builds; it just has no current consumer to prove it against. Revisit
+when the client needs real networking again (Phase 6).
 
 | Package | Job | Publishes |
 | --- | --- | --- |
-| `@jev-game/shared` | Code (not just types) needed by both server and client — currently `stepEntity`, arena/tick constants | `dist/` (ESM + `.d.ts`) |
+| `@jev-game/game` | Pure battle engine — ticks, targeting, movement, attacks, damage, results. No workspace or Node/browser/Colyseus imports, enforced by lint. | `dist/` (ESM + `.d.ts`) |
+| `@jev-game/content` | Hero/arena/scenario definitions and catalogue validation | `dist/` (ESM + `.d.ts`) |
+| `@jev-game/shared` | Code (not just types) needed by both server and client — currently `stepEntity`, arena/tick constants. As of the one-page consolidation, only `apps/server` still imports it. | `dist/` (ESM + `.d.ts`) |
 | `@jev-game/server-runtime` | The actual `defineServer(...)` result, room implementations (`Arena`), and a type-only `/contract` export (`GameServer = typeof server`) for client-side SDK inference | `dist/` (ESM + `.d.ts`); `./contract` subpath is types-only, no `import` condition |
 | `@jev-game/server` (`apps/server`) | Environment/startup wrapper only: `listen(server)`. No room/route logic lives here. | N/A (deployable app) |
-| `@jev-game/client` (`apps/client`) | Phaser-free Vite app, single page. As of Phase 1: the keyboard-movement + client-prediction demo. As of Phase 2: replaced by the battle laboratory — see `docs/phase-status.md` | N/A (static build) |
+| `@jev-game/client` (`apps/client`) | Phaser-free Vite app, single page: the battle laboratory — see `docs/phase-status.md` | N/A (static build) |
 
 ## The server type boundary
+
+Currently unexercised by any client code — see the package-graph note above.
+Described here because the mechanism is unchanged and will matter again once
+the client reconnects to a live server.
 
 `packages/server-runtime/src/app.config.ts` holds the real `defineServer(...)`
 call (rooms, routes, express middleware — moved here from `apps/server` in

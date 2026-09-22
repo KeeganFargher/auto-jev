@@ -1,20 +1,20 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
+  --text: #9aa0b8;
+  --text-strong: #eef0f6;
   --bg: #101018;
-  --panel-bg: rgba(16, 16, 24, 0.72);
-  --border: rgba(255, 255, 255, 0.12);
+  --chrome: rgba(10, 10, 18, 0.62);
+  --chrome-strong: rgba(10, 10, 18, 0.82);
+  --hairline: rgba(255, 255, 255, 0.08);
+  --accent: #4ea1ff;
   --team-a: #4ea1ff;
   --team-b: #ff6b6b;
-  --dead: #6b7280;
-  --range-ring: rgba(78, 161, 255, 0.4);
-  --target-line: rgba(255, 255, 255, 0.35);
 
   font:
-    16px/1.5 system-ui,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
+    13px/1.4 ui-monospace,
+    SFMono-Regular,
+    "SF Mono",
+    Menlo,
+    monospace;
   color-scheme: dark;
   color: var(--text);
   background: var(--bg);
@@ -41,147 +41,282 @@ body {
 #lab-hud {
   position: fixed;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 16px;
   pointer-events: none;
 }
 
 #lab-hud > * {
+  position: absolute;
   pointer-events: auto;
 }
 
-.lab-hud-top,
-.lab-hud-side,
-.lab-hud-bottom {
-  background: var(--panel-bg);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
+.hud-status {
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--chrome);
+  backdrop-filter: blur(8px);
+  color: var(--text-strong);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
-.lab-hud-top {
-  align-self: flex-start;
-}
-
-.lab-hud-top h1 {
-  color: var(--text-h);
-  font-size: 18px;
-  margin: 0 0 4px;
-}
-
-.lab-status {
-  margin: 0;
-  font-weight: 600;
-  color: var(--text-h);
-  font-size: 13px;
-}
-
-.lab-hud-side {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  bottom: 16px;
-  width: 280px;
+.hud-feed {
+  top: 44px;
+  right: 12px;
+  width: 260px;
+  max-height: 40vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-}
-
-.lab-hud-bottom {
-  align-self: flex-start;
-  max-width: 420px;
-}
-
-.lab-lines {
-  position: absolute;
-  inset: 0;
+  gap: 2px;
+  text-align: right;
+  font-size: 11px;
   pointer-events: none;
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
 }
 
-.lab-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.hud-feed div {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.lab-button-row {
+.hud-unit {
+  left: 12px;
+  bottom: 58px;
+  min-width: 190px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--chrome);
+  backdrop-filter: blur(8px);
+}
+
+.hud-unit[hidden] {
+  display: none;
+}
+
+.hud-unit-name {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-strong);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.hud-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--team-a);
+}
+
+.hud-dot.is-team-b {
+  background: var(--team-b);
+}
+
+.hud-hp {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  margin-bottom: 7px;
+  overflow: hidden;
+}
+
+.hud-hp span {
+  display: block;
+  height: 100%;
+  background: var(--team-a);
+}
+
+.hud-hp.is-team-b span {
+  background: var(--team-b);
+}
+
+.hud-stats {
+  display: flex;
   flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 11px;
 }
 
-.lab-button-row button {
+.hud-stats b {
+  color: var(--text-strong);
+  font-weight: 500;
+}
+
+.hud-bar {
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--chrome-strong);
+  backdrop-filter: blur(8px);
+}
+
+.hud-icon-button {
+  width: 34px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-family: inherit;
   cursor: pointer;
 }
 
-.lab-field {
+.hud-icon-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hud-speed {
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
+  gap: 2px;
+  margin-left: 4px;
+  padding-left: 7px;
+  border-left: 1px solid var(--hairline);
 }
 
-.lab-field input,
-.lab-field select {
-  width: 90px;
+.hud-chip {
+  min-width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
 }
 
-.lab-stats {
-  border: 1px solid var(--border);
+.hud-chip:hover {
+  color: var(--text-strong);
+}
+
+.hud-chip.is-active {
+  background: var(--accent);
+  color: #08121f;
+}
+
+.hud-tuning {
+  right: 12px;
+  bottom: 12px;
+  max-width: 260px;
+}
+
+.hud-tuning summary {
+  list-style: none;
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--chrome);
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.hud-tuning summary::-webkit-details-marker {
+  display: none;
+}
+
+.hud-tuning[open] summary {
+  margin-bottom: 6px;
+  color: var(--text-strong);
+}
+
+.hud-tuning-body {
+  padding: 10px 12px;
   border-radius: 8px;
+  background: var(--chrome-strong);
+  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px 12px 12px;
-}
-
-.lab-inspector {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin: 0;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
-  font-size: 13px;
-}
-
-.lab-inspector dt {
-  color: var(--text);
-}
-
-.lab-inspector dd {
-  margin: 0;
-  color: var(--text-h);
-  text-align: right;
-}
-
-.lab-event-log {
-  list-style: none;
-  margin: 0;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  max-height: 200px;
+  gap: 7px;
+  max-height: 60vh;
   overflow-y: auto;
-  font-size: 12px;
-  font-family: monospace;
+}
+
+.hud-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.hud-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+}
+
+.hud-field input {
+  width: 74px;
+  padding: 3px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: 11px;
+}
+
+.hud-row {
+  display: flex;
+  gap: 6px;
+}
+
+.hud-row button {
+  flex: 1;
+  padding: 5px;
+  border: 0;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hud-row button:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 #lab-scenario-text {
   width: 100%;
   box-sizing: border-box;
-  font-family: monospace;
-  font-size: 12px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: 11px;
+  resize: vertical;
 }
 
-.lab-error {
+.hud-error {
+  margin: 0;
   color: #ff8080;
-  font-size: 13px;
+  font-size: 11px;
   min-height: 1em;
+}
+
+.hud-error:empty {
+  min-height: 0;
 }

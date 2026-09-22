@@ -4,6 +4,10 @@ function isPositiveFinite(value: number): boolean {
   return Number.isFinite(value) && value > 0;
 }
 
+function isPositiveInteger(value: number): boolean {
+  return Number.isInteger(value) && value > 0;
+}
+
 export function validateCatalogue(catalogue: Catalogue): void {
   for (const [key, hero] of Object.entries(catalogue.heroes)) {
     if (hero.id !== key) {
@@ -11,10 +15,15 @@ export function validateCatalogue(catalogue: Catalogue): void {
     }
 
     if (
-      !isPositiveFinite(hero.maxHp) ||
-      !isPositiveFinite(hero.attackDamage) ||
+      !isPositiveInteger(hero.maxHp) ||
+      !isPositiveInteger(hero.attackDamage) ||
+      !isPositiveInteger(hero.attackIntervalTicks)
+    ) {
+      throw new Error(`hero "${hero.id}" has a non-integer HP, damage or attack interval`);
+    }
+
+    if (
       !isPositiveFinite(hero.attackRangeUnits) ||
-      !isPositiveFinite(hero.attackIntervalTicks) ||
       !isPositiveFinite(hero.moveSpeedUnitsPerSecond)
     ) {
       throw new Error(`hero "${hero.id}" has a non-positive or non-finite numeric field`);

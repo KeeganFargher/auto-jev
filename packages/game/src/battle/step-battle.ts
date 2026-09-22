@@ -1,3 +1,4 @@
+import type { UnitId } from "../ids.js";
 import type { BattleState, UnitState } from "./state.js";
 import type { BattleEvent } from "./events.js";
 import type { BattleResult } from "./result.js";
@@ -40,23 +41,63 @@ function livingUnitsByTeam(units: readonly UnitState[]): Map<string, UnitState[]
   return teams;
 }
 
+function collectDamageDealt(units: readonly UnitState[]): Record<UnitId, number> {
+  const damageDealt: Record<UnitId, number> = {};
+
+  for (const unit of units) {
+    damageDealt[unit.unitId] = unit.damageDealt;
+  }
+
+  return damageDealt;
+}
+
+function isCorruptUnitState(unit: UnitState): boolean {
+  return (
+    !Number.isFinite(unit.hp) || !Number.isFinite(unit.position.x) || !Number.isFinite(unit.position.y)
+  );
+}
+
 function evaluateResult(state: BattleState): BattleResult | null {
+  if (state.units.some(isCorruptUnitState)) {
+    return {
+      kind: "failure",
+      reason: "non-finite unit state",
+      endedAtTick: state.tick,
+      damageDealt: collectDamageDealt(state.units),
+    };
+  }
+
   const livingTeams = livingUnitsByTeam(state.units);
 
   if (livingTeams.size === 0) {
-    return { kind: "draw", reason: "mutual-elimination", endedAtTick: state.tick };
+    return {
+      kind: "draw",
+      reason: "mutual-elimination",
+      endedAtTick: state.tick,
+      damageDealt: collectDamageDealt(state.units),
+    };
   }
 
   if (livingTeams.size === 1) {
     const [winningTeamId] = [...livingTeams.keys()];
 
     if (winningTeamId !== undefined) {
-      return { kind: "win", winningTeamId, endedAtTick: state.tick };
+      return {
+        kind: "win",
+        winningTeamId,
+        endedAtTick: state.tick,
+        damageDealt: collectDamageDealt(state.units),
+      };
     }
   }
 
   if (state.tick >= state.tickLimit) {
-    return { kind: "draw", reason: "timeout", endedAtTick: state.tick };
+    return {
+      kind: "draw",
+      reason: "timeout",
+      endedAtTick: state.tick,
+      damageDealt: collectDamageDealt(state.units),
+    };
   }
 
   return null;
@@ -110,9 +151,17 @@ export function stepBattle(state: BattleState, _catalogue: Catalogue): BattleSte
     }
   }
 
-  attackProposals.sort((a, b) => (a.sourceUnitId < b.sourceUnitId ? -1 : 1));
+  const priorityRank = new Map(state.resolutionPriority.map((unitId, index) => [unitId, index]));
+
+  attackProposals.sort((a, b) => {
+    const rankA = priorityRank.get(a.sourceUnitId) ?? Number.POSITIVE_INFINITY;
+    const rankB = priorityRank.get(b.sourceUnitId) ?? Number.POSITIVE_INFINITY;
+
+    return rankA - rankB;
+  });
 
   for (const proposal of attackProposals) {
+    const source = state.units.find((candidate) => candidate.unitId === proposal.sourceUnitId);
     const target = state.units.find((candidate) => candidate.unitId === proposal.targetUnitId);
 
     if (target === undefined || !target.alive) {
@@ -120,6 +169,11 @@ export function stepBattle(state: BattleState, _catalogue: Catalogue): BattleSte
     }
 
     const actual = applyDamage(target, proposal.amount);
+
+    if (source !== undefined) {
+      source.damageDealt += actual;
+    }
+
     events.push({
       kind: "attack-hit",
       tick: state.tick,

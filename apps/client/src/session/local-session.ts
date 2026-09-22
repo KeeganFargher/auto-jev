@@ -67,6 +67,10 @@ export function createLocalBattleLabSession(initialSeed: number): BattleLabSessi
       };
     },
 
+    peekSnapshot() {
+      return { seed, snapshot: getBattleSnapshot(state) };
+    },
+
     subscribe(listener) {
       listeners.add(listener);
 

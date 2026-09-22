@@ -1,5 +1,5 @@
 import { distance, type BattleSnapshot, type UnitState } from "@jev-game/game";
-import { createArenaView, type SafeAreaInsets } from "./arena-view.js";
+import { createArenaView } from "./arena-view.js";
 import { drawTargetLine, drawUnit } from "./unit-view.js";
 
 const CLICK_TOLERANCE_PIXELS = 14;
@@ -13,7 +13,6 @@ export function createBattleView(
   container: HTMLElement,
   arenaWidthUnits: number,
   arenaHeightUnits: number,
-  getSafeAreaInsets: () => SafeAreaInsets,
   onSelectUnit: (unitId: string) => void,
 ): BattleView {
   let latestSnapshot: BattleSnapshot | null = null;
@@ -25,8 +24,7 @@ export function createBattleView(
     }
 
     const transform = arena.getTransform();
-    arena.clear();
-    arena.drawBoundary();
+    arena.drawFloor();
 
     for (const unit of latestSnapshot.units) {
       if (!unit.alive || unit.targetUnitId === null) {
@@ -49,13 +47,7 @@ export function createBattleView(
     }
   }
 
-  const arena = createArenaView(
-    container,
-    arenaWidthUnits,
-    arenaHeightUnits,
-    getSafeAreaInsets,
-    render,
-  );
+  const arena = createArenaView(container, arenaWidthUnits, arenaHeightUnits, render);
 
   function handleClick(event: MouseEvent): void {
     if (latestSnapshot === null) {
