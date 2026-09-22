@@ -1,12 +1,7 @@
 import "./style.css";
 import { ColyseusSDK, Callbacks, Predict } from "@colyseus/sdk";
 import { stepEntity, type MoveInputLike } from "@jev-game/shared";
-// The room contract is a *type-only* dependency here (see apps/client's
-// devDependencies): `typeof Arena` checks the room's state and message
-// shapes at compile time, and nothing from the contract package's runtime
-// (which pulls in the `colyseus` server framework) ends up in the browser
-// bundle. The client no longer depends on apps/server at all.
-import type { Arena } from "@jev-game/colyseus-contract";
+import type { GameServer } from "@jev-game/server-runtime/contract";
 
 // The server runs as its own process (apps/server, port 2567 by default —
 // see apps/server/src/index.ts) rather than sharing this app's origin, so
@@ -18,7 +13,7 @@ const statusEl = document.getElementById("status")!;
 
 const arenaEl = document.getElementById("arena")!;
 
-const client = new ColyseusSDK(endpoint);
+const client = new ColyseusSDK<GameServer>(endpoint);
 
 const held = new Set<string>();
 
@@ -39,7 +34,7 @@ function axis(negative: string[], positive: string[]): -1 | 0 | 1 {
 }
 
 async function main() {
-  const room = await client.joinOrCreate<Arena>("arena");
+  const room = await client.joinOrCreate("arena");
   const predict = Predict.get(room);
 
   // Other players' inputs aren't ours to predict: interpolate them toward the

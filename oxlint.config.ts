@@ -16,6 +16,47 @@ export default defineConfig({
     "tools/oxlint/anti-slop/**",
   ],
   jsPlugins: [{ name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" }],
+  overrides: [
+    {
+      files: ["apps/client/**"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            paths: [
+              {
+                name: "@jev-game/server-runtime",
+                message:
+                  'Import types only from "@jev-game/server-runtime/contract" — the package root pulls in server runtime code.',
+              },
+            ],
+            patterns: [
+              {
+                regex: "(^|/)apps/server(/|$)",
+                message: "apps/client must not import apps/server.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      files: ["apps/server/**"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                regex: "(^|/)apps/client(/|$)",
+                message: "apps/server must not import apps/client.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
   rules: {
     "oxc/no-accumulating-spread": "error",
     "anti-slop/no-array-filter-map": "error",

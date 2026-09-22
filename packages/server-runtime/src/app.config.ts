@@ -8,10 +8,7 @@ import {
   LobbyRoom,
 } from "colyseus";
 
-/**
- * Room contracts shared with the client — see packages/colyseus-contract.
- */
-import { Arena } from "@jev-game/colyseus-contract";
+import { Arena } from "./rooms/arena.js";
 
 const server = defineServer({
   /**

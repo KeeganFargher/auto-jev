@@ -9,10 +9,10 @@
   "main": "index.js",
   "scripts": {
     "dev:client": "pnpm --filter ./apps/client dev",
-    "dev:server": "pnpm --filter ./apps/server start",
-    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:server": "pnpm --filter ./apps/server dev",
+    "dev": "pnpm -r --if-present build && pnpm -r --parallel --if-present dev",
     "typecheck": "pnpm -r typecheck",
-    "build": "pnpm --filter \"./apps/*\" build",
+    "build": "pnpm -r --if-present build",
     "lint": "oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check"

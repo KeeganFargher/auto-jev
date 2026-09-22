@@ -1,8 +1,7 @@
 import assert from "assert";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
 
-import appConfig from "../src/app.config.js";
-import { ArenaState, type MoveInput } from "@jev-game/colyseus-contract";
+import appConfig, { ArenaState, type MoveInput } from "@jev-game/server-runtime";
 import { PLAYER_SPEED, TICK_RATE } from "@jev-game/shared";
 
 describe("testing your Colyseus app", () => {

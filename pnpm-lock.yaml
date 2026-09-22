@@ -27,9 +27,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
     devDependencies:
-      '@jev-game/colyseus-contract':
+      '@jev-game/server-runtime':
         specifier: workspace:*
-        version: link:../../packages/colyseus-contract
+        version: link:../../packages/server-runtime
       typescript:
         specifier: ~6.0.2
         version: 6.0.3
@@ -39,27 +39,15 @@ importers:
 
   apps/server:
     dependencies:
-      '@colyseus/playground':
-        specifier: ^0.18.3
-        version: 0.18.4(@colyseus/auth@0.18.2)(@colyseus/core@0.18.14)(zod@4.6.5)
-      '@colyseus/schema':
-        specifier: ^5.0.14
-        version: 5.0.33(typescript@5.9.3)
       '@colyseus/tools':
         specifier: ^0.18.1
         version: 0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1)
-      '@jev-game/colyseus-contract':
+      '@jev-game/server-runtime':
         specifier: workspace:*
-        version: link:../../packages/colyseus-contract
+        version: link:../../packages/server-runtime
       '@jev-game/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      colyseus:
-        specifier: ^0.18.2
-        version: 0.18.6(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.5))(@colyseus/core@0.18.14)(@colyseus/redis-driver@0.18.2(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.5))(@colyseus/schema@5.0.33(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.5))(@colyseus/redis-presence@0.18.4(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.5))(@colyseus/schema@5.0.33(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.5))(@colyseus/schema@5.0.33(typescript@5.9.3))(@colyseus/uwebsockets-transport@0.18.3(@colyseus/core@0.18.14))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(tsx@4.23.15))(zod@4.6.5)
-      express:
-        specifier: ^5.2.1
-        version: 5.2.1(supports-color@8.1.1)
     devDependencies:
       '@colyseus/loadtest':
         specifier: ^0.18.1
@@ -70,18 +58,12 @@ importers:
       '@colyseus/testing':
         specifier: ^0.18.5
         version: 0.18.5(@colyseus/core@0.18.14)(@colyseus/sdk@0.18.2(@colyseus/core@0.18.14)(typescript@5.9.3)(zod@4.6.5))(@colyseus/tools@0.18.3(@colyseus/core@0.18.14)(@colyseus/ws-transport@0.18.2)(supports-color@8.1.1))
-      '@types/express':
-        specifier: ^5.0.6
-        version: 5.0.6
       '@types/mocha':
         specifier: ^10.0.1
         version: 10.0.10
       '@types/node':
         specifier: ^22.13.13
         version: 22.20.4
-      esbuild:
-        specifier: ^0.28.2
-        version: 0.28.2
       mocha:
         specifier: ^11.7.5
         version: 11.8.0
@@ -92,8 +74,11 @@ importers:
         specifier: ^5.0.4
         version: 5.9.3
 
-  packages/colyseus-contract:
+  packages/server-runtime:
     dependencies:
+      '@colyseus/playground':
+        specifier: ^0.18.3
+        version: 0.18.4(@colyseus/auth@0.18.2)(@colyseus/core@0.18.14)(zod@4.6.5)
       '@colyseus/schema':
         specifier: ^5.0.14
         version: 5.0.33(typescript@5.9.3)
@@ -103,17 +88,13 @@ importers:
       colyseus:
         specifier: ^0.18.2
         version: 0.18.6(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.5))(@colyseus/core@0.18.14)(@colyseus/redis-driver@0.18.2(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.5))(@colyseus/schema@5.0.33(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.5))(@colyseus/redis-presence@0.18.4(@colyseus/auth@0.18.2)(@colyseus/better-call@1.3.3(zod@4.6.5))(@colyseus/schema@5.0.33(typescript@5.9.3))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(zod@4.6.5))(@colyseus/schema@5.0.33(typescript@5.9.3))(@colyseus/uwebsockets-transport@0.18.3(@colyseus/core@0.18.14))(@colyseus/ws-transport@0.18.2)(@pm2/io@6.1.0(supports-color@8.1.1))(express@5.2.1(supports-color@8.1.1))(supports-color@8.1.1)(vite@8.3.0(@types/node@22.20.4)(esbuild@0.28.2)(tsx@4.23.15))(zod@4.6.5)
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1(supports-color@8.1.1)
     devDependencies:
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-
-  packages/jev:
-    dependencies:
-      zod:
-        specifier: ^4.6.5
-        version: 4.6.5
-    devDependencies:
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
       '@types/node':
         specifier: ^22.13.13
         version: 22.20.4

@@ -35,31 +35,31 @@ export const ArenaState = schema({
 export type ArenaState = SchemaType<typeof ArenaState>;
 
 export class Arena extends Room<{ state: ArenaState; input: MoveInput }> {
-  maxClients = 8;
-  state = new ArenaState();
+  override maxClients = 8;
+  override state = new ArenaState();
 
   /**
    * Per-client input buffer. `sanitize` clamps every field as it is decoded —
    * never trust the wire — and the buffer holds ~2s of inputs at this tick rate
    * so a burst after a stall still replays in order.
    */
-  inputs = this.defineInput(MoveInput, {
+  override inputs = this.defineInput(MoveInput, {
     bufferMaxSize: 64,
     sanitize: { moveX: [-1, 1], moveY: [-1, 1] },
   });
 
   private joinCount = 0;
 
-  messages = {
+  override messages = {
     // movement arrives through the input buffer above — register handlers here
     // only for things that are not inputs (chat, emotes, …).
   };
 
-  onCreate(_options: any) {
+  override onCreate(_options: any) {
     this.setFixedTimestep((ctx) => this.step(ctx), TICK_RATE);
   }
 
-  onJoin(client: Client, _options: any) {
+  override onJoin(client: Client, _options: any) {
     console.log(client.sessionId, "joined!");
 
     // Deterministic spawn ring, so two players never start on top of each other.
@@ -75,12 +75,12 @@ export class Arena extends Room<{ state: ArenaState; input: MoveInput }> {
     );
   }
 
-  onLeave(client: Client, code: CloseCode) {
+  override onLeave(client: Client, code: CloseCode) {
     console.log(client.sessionId, "left!", code);
     this.state.players.delete(client.sessionId);
   }
 
-  onDispose() {
+  override onDispose() {
     console.log("room", this.roomId, "disposing...");
   }
 
@@ -108,7 +108,7 @@ export class Arena extends Room<{ state: ArenaState; input: MoveInput }> {
    * suspended tab, a tunnel change. Holding the seat lets the SDK retry into the
    * same session, so the player keeps their entity and their place in the room.
    */
-  onDrop(client: Client, _code: CloseCode) {
+  override onDrop(client: Client, _code: CloseCode) {
     // Deliberately not awaited: the framework routes the outcome to onReconnect()
     // or onLeave() by itself. The catch is only here because the promise also
     // rejects when the room is already disposing (server shutdown), which would
@@ -116,7 +116,7 @@ export class Arena extends Room<{ state: ArenaState; input: MoveInput }> {
     this.allowReconnection(client, 30).catch(() => {});
   }
 
-  onReconnect(client: Client) {
+  override onReconnect(client: Client) {
     console.log(client.sessionId, "reconnected!");
   }
 }

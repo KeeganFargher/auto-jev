@@ -1,0 +1,35 @@
+{
+  "name": "@jev-game/server-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Colyseus room implementations and the actual defineServer() definition. Server-only runtime code plus a type-only /contract subpath for client SDK inference.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./contract": {
+      "types": "./dist/contract.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@colyseus/playground": "^0.18.3",
+    "@colyseus/schema": "^5.0.14",
+    "@jev-game/shared": "workspace:*",
+    "colyseus": "^0.18.2",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.13.13",
+    "typescript": "^5.9.2"
+  }
+}
