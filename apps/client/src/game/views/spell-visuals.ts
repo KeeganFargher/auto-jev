@@ -1,23 +1,22 @@
 import { firebolt, flameWard, meteor } from "@jev-game/content";
 import { TICK_SECONDS } from "@jev-game/game";
 import {
-  AdditiveBlending,
   BufferGeometry,
   CircleGeometry,
   Color,
   ConeGeometry,
-  DoubleSide,
   Float32BufferAttribute,
   Group,
   IcosahedronGeometry,
   Mesh,
-  MeshBasicMaterial,
-  MeshStandardMaterial,
   RingGeometry,
   SphereGeometry,
   Vector3,
   type Material,
+  type MeshBasicMaterial,
+  type MeshStandardMaterial,
 } from "three";
+import { effectMaterials, releaseEffectMaterial } from "./effect-materials.js";
 import { createTrail, type ParticleStyle, type ParticleSystem } from "./particles.js";
 
 export interface SpellVisual {
@@ -35,6 +34,7 @@ export interface TickedVisual extends SpellVisual {
 export interface ProjectileVisual {
   readonly objects: Mesh[];
   place(from: Vector3, to: Vector3, progress: number): void;
+  dispose(): void;
 }
 
 interface SpellGeometry {
@@ -45,6 +45,8 @@ interface SpellGeometry {
   ring: BufferGeometry;
   flame: BufferGeometry;
   disc: BufferGeometry;
+  core: BufferGeometry;
+  corona: BufferGeometry;
 }
 
 interface TickClock {
@@ -361,6 +363,7 @@ function jaggedDisc(radius: number, next: () => number): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
+  geometry.computeVertexNormals();
 
   return geometry;
 }
@@ -374,41 +377,50 @@ function geometries(): SpellGeometry {
     ring: new RingGeometry(0.82, 1, 48),
     flame: flameGeometry(),
     disc: new CircleGeometry(1, 40),
+    core: new SphereGeometry(1.2, 12, 8),
+    corona: new SphereGeometry(2, 12, 8),
   };
 
   return shared;
 }
 
 function glowMaterial(color: Color, opacity: number): MeshBasicMaterial {
-  return new MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    side: DoubleSide,
-  });
+  const material = effectMaterials.glow.take();
+  material.color.copy(color);
+  material.opacity = opacity;
+
+  return material;
 }
 
 function flameMaterial(opacity: number): MeshBasicMaterial {
-  return new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity, depthWrite: false, side: DoubleSide });
+  const material = effectMaterials.flame.take();
+  material.opacity = opacity;
+
+  return material;
 }
 
 function rockMaterial(glow: number): MeshStandardMaterial {
-  return new MeshStandardMaterial({
-    color: ROCK,
-    emissive: EMBER,
-    emissiveIntensity: glow,
-    flatShading: true,
-    roughness: 0.95,
-  });
+  const material = effectMaterials.rock.take();
+  material.color.set(ROCK);
+  material.emissive.copy(EMBER);
+  material.emissiveIntensity = glow;
+
+  return material;
 }
 
-function disposeAll(root: Group, materials: readonly Material[]): void {
+function scorchMaterial(): MeshBasicMaterial {
+  const material = effectMaterials.scorch.take();
+  material.color.set(SCORCH);
+  material.opacity = 0;
+
+  return material;
+}
+
+function retire(root: Group, materials: readonly Material[]): void {
   root.removeFromParent();
 
   for (const material of materials) {
-    material.dispose();
+    releaseEffectMaterial(material);
   }
 }
 
@@ -461,15 +473,8 @@ function meteorFall(
   const stone = rockMaterial(0.55);
   const shellSurface = glowMaterial(FIRE, 0.7);
 
-  const trailSurface = new MeshBasicMaterial({
-    vertexColors: true,
-    transparent: true,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    side: DoubleSide,
-  });
-
-  const shadowSurface = new MeshBasicMaterial({ color: SCORCH, transparent: true, opacity: 0, depthWrite: false });
+  const trailSurface = effectMaterials.trail.take();
+  const shadowSurface = scorchMaterial();
   const rock = new Mesh(kit.rock, stone);
   const shell = new Mesh(kit.shell, shellSurface);
   const trail = new Mesh(kit.trail, trailSurface);
@@ -528,7 +533,7 @@ function meteorFall(
     },
 
     dispose() {
-      disposeAll(root, [stone, shellSurface, trailSurface, shadowSurface]);
+      retire(root, [stone, shellSurface, trailSurface, shadowSurface]);
     },
   };
 }
@@ -610,7 +615,7 @@ function meteorBlast(particles: ParticleSystem, center: Vector3, radius: number)
     },
 
     dispose() {
-      disposeAll(root, [domeSurface, flashSurface, ringSurface, tongueSurface, debrisSurface]);
+      retire(root, [domeSurface, flashSurface, ringSurface, tongueSurface, debrisSurface]);
     },
   };
 }
@@ -619,7 +624,7 @@ function burningGround(particles: ParticleSystem, center: Vector3, radius: numbe
   const kit = geometries();
   const next = random(seed * 977 + 31);
   const scorchGeometry = jaggedDisc(radius * 0.92, next);
-  const scorchSurface = new MeshBasicMaterial({ color: SCORCH, transparent: true, opacity: 0, depthWrite: false });
+  const scorchSurface = scorchMaterial();
   const fireSurface = flameMaterial(0);
   const glowSurface = glowMaterial(FIRE, 0);
   const root = new Group();
@@ -712,7 +717,7 @@ function burningGround(particles: ParticleSystem, center: Vector3, radius: numbe
 
     dispose() {
       scorchGeometry.dispose();
-      disposeAll(root, [scorchSurface, fireSurface, glowSurface]);
+      retire(root, [scorchSurface, fireSurface, glowSurface]);
     },
   };
 }
@@ -774,15 +779,18 @@ function flameWardBurst(particles: ParticleSystem, center: Vector3, radius: numb
     },
 
     dispose() {
-      disposeAll(root, [tongueSurface, ringSurface, flashSurface]);
+      retire(root, [tongueSurface, ringSurface, flashSurface]);
     },
   };
 }
 
 function fireball(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
-  const core = new Mesh(new SphereGeometry(1.2, 12, 8), new MeshBasicMaterial({ color: GOLD }));
-  const shell = new Mesh(new SphereGeometry(2, 12, 8), glowMaterial(FIRE, 0.8));
-  const tail = new Mesh(trailGeometry(), flameMaterial(0.9));
+  const kit = geometries();
+  const heart = effectMaterials.core.take();
+  heart.color.copy(GOLD);
+  const core = new Mesh(kit.core, heart);
+  const shell = new Mesh(kit.corona, glowMaterial(FIRE, 0.8));
+  const tail = new Mesh(kit.trail, flameMaterial(0.9));
   const heading = new Vector3();
   const embers = createTrail(particles, TRAIL_EMBERS, FIREBALL_EMBER_SPACING, launch);
   const smoke = createTrail(particles, TRAIL_SMOKE, FIREBALL_SMOKE_SPACING, launch);
@@ -799,6 +807,13 @@ function fireball(particles: ParticleSystem, launch: Vector3): ProjectileVisual 
       tail.position.copy(core.position).addScaledVector(heading, 3);
       embers.follow(core.position);
       smoke.follow(core.position);
+    },
+
+    dispose() {
+      for (const mesh of [core, shell, tail]) {
+        mesh.removeFromParent();
+        releaseEffectMaterial(mesh.material);
+      }
     },
   };
 }

@@ -24,6 +24,7 @@ import {
 } from "three";
 import type { BoardGrid, Vector2 } from "@jev-game/game";
 import { easeInOut } from "./easing.js";
+import { warmEffectMaterials } from "./effect-materials.js";
 import { createParticleSystem, type ParticleSystem } from "./particles.js";
 import { applyShadowQuality } from "./shadow-quality.js";
 import { createStageGlow } from "./stage-glow.js";
@@ -632,6 +633,12 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   fitCamera();
 
   let graphics = graphicsSettings.get();
+  let finishWarming: (() => void) | null = null;
+
+  function warmEffects(): void {
+    finishWarming?.();
+    finishWarming = warmEffectMaterials(scene);
+  }
 
   function applyGraphics(next: GraphicsSettings): void {
     graphics = next;
@@ -639,6 +646,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     glow.setSize(viewportWidth, viewportHeight, renderer.getPixelRatio());
     applyShadowQuality(renderer.shadowMap, lights.key, next.shadows);
     monitor.setVisible(next.monitor);
+    warmEffects();
   }
 
   applyGraphics(graphics);
@@ -662,6 +670,9 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       } else {
         renderer.render(scene, camera);
       }
+
+      finishWarming?.();
+      finishWarming = null;
     }
 
     monitor.record(now);
@@ -788,6 +799,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       if (board !== null && grid !== null) {
         rebuildBoard(grid, side);
       }
+
+      warmEffects();
     },
 
     onFrame(listener) {
@@ -802,6 +815,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
       stopGraphics();
+      finishWarming?.();
+      finishWarming = null;
       monitor.root.remove();
       listeners.clear();
 
