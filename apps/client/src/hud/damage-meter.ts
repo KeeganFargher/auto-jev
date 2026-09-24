@@ -1,5 +1,5 @@
 import { BASIC_ATTACK_ABILITY, type BattleEvent, type BattleSnapshot, type DamageDealtEvent } from "@jev-game/game";
-import { button, el } from "./dom.js";
+import { button, el, setText } from "./dom.js";
 import { meterIcon } from "./icons.js";
 import { heroFaceArt } from "./icon-art.js";
 import { attachTip, richText, tipCard, tipHint, tipSection, tipText } from "./tooltip.js";
@@ -153,6 +153,7 @@ export function createDamageMeter(): DamageMeter {
   let dirty = false;
   let renderedAt = Number.NEGATIVE_INFINITY;
   let trailing = 0;
+  let shownRows = -1;
 
   for (const option of METRICS) {
     const tab = button("meter-tab", () => choose(option), meterIcon(option));
@@ -169,6 +170,9 @@ export function createDamageMeter(): DamageMeter {
   }
 
   scroller.addEventListener("scroll", syncClip, { passive: true });
+  const clipWatcher = new ResizeObserver(syncClip);
+  clipWatcher.observe(scroller);
+  clipWatcher.observe(rows);
 
   function syncTabs(): void {
     title.textContent = METRIC_LABELS[metric];
@@ -285,13 +289,15 @@ export function createDamageMeter(): DamageMeter {
     ranked.forEach((entry, rank) => {
       const value = entry.totals[metric];
       entry.row.style.transform = `translateY(${rank * ROW_HEIGHT}px)`;
-      entry.value.textContent = formatAmount(value);
+      setText(entry.value, formatAmount(value));
       entry.fill.style.setProperty("--fill", String(top <= 0 ? 0 : value / top));
       entry.row.classList.toggle("is-dead", !entry.alive);
     });
 
-    rows.style.height = `${Math.max(1, ranked.length) * ROW_HEIGHT}px`;
-    syncClip();
+    if (ranked.length !== shownRows) {
+      shownRows = ranked.length;
+      rows.style.height = `${Math.max(1, ranked.length) * ROW_HEIGHT}px`;
+    }
   }
 
   function schedule(): void {
@@ -441,6 +447,7 @@ export function createDamageMeter(): DamageMeter {
     heroOfUnit.clear();
     summons.clear();
     rows.replaceChildren();
+    shownRows = -1;
     rows.style.height = "";
     scroller.scrollTop = 0;
     scroller.classList.remove("is-clipped");
@@ -499,6 +506,7 @@ export function createDamageMeter(): DamageMeter {
 
     dispose() {
       reset();
+      clipWatcher.disconnect();
       root.remove();
     },
   };

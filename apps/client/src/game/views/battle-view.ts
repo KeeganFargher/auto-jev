@@ -4,38 +4,27 @@ import {
   Color,
   DynamicDrawUsage,
   Float32BufferAttribute,
-  Line,
-  LineBasicMaterial,
   LineDashedMaterial,
   LineLoop,
   LineSegments,
   Mesh,
   MeshBasicMaterial,
-  OctahedronGeometry,
   RingGeometry,
   SphereGeometry,
   Vector3,
-  type Object3D,
 } from "three";
 import { CONDITION_DURATION_TICKS, type BattleEvent, type BattleSnapshot, type BoardGrid, type ComboKind, type ConditionKind, type DamageDealtEvent, type UnitState } from "@jev-game/game";
 import { abilityDefinition, heroDefinition } from "../catalogues.js";
-import {
-  castVisual,
-  impactVisual,
-  landingVisual,
-  projectileVisual,
-  zoneVisual,
-  type SpellVisual,
-  type TickedVisual,
-} from "./spell-visuals.js";
+import { castVisual, impactVisual, landingVisual, zoneVisual, type SpellVisual, type TickedVisual } from "./spell-visuals.js";
 import { conditionIcon, statusIcon } from "../../hud/icons.js";
 import { comboName } from "../../hud/tips.js";
+import { CONDITION_COLORS, createBattleEffects, type GroundMarker } from "./battle-effects.js";
 import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
 import { CHEST_FRACTION } from "./figure-base.js";
 import { createHealthTrail, type HealthTrail } from "./health-trail.js";
 import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
-import { emitHit, emitRelease, hitKind, hitTint, trailStyle } from "./hit-effects.js";
-import { createTrail, type ParticleStyle } from "./particles.js";
+import { emitHit, emitRelease, hitKind } from "./hit-effects.js";
+import type { ParticleStyle } from "./particles.js";
 import {
   createFallingTracker,
   playCast,
@@ -91,21 +80,13 @@ const PICK_RADIUS_PIXELS = 44;
 
 const PLATE_GAP_UNITS = 1.8;
 
-const PROJECTILE_SECONDS = 0.16;
-
-const ARC_SECONDS = 0.22;
-
 const UP = new Vector3(0, 1, 0);
 
 const SPRAY_LIFT = 0.7;
 
-const TRAIL_SPACING_UNITS = 1.1;
-
 const HEAL_MOTE_COUNT = 14;
 
 const HEAL_MOTE_HEIGHT = 1.5;
-
-const COMBO_SPARK_COUNT = 18;
 
 const SPAWN_MOTE_COUNT = 16;
 
@@ -157,12 +138,6 @@ const RANGE_RING_POINTS = 72;
 
 const MAX_TARGET_LINES = 32;
 
-const CONDITION_COLORS: Readonly<Record<ConditionKind, string>> = {
-  staggered: "#ffa928",
-  brittle: "#9fe8ff",
-  disoriented: "#b58cff",
-};
-
 const COMBO_CONDITION: Readonly<Record<ComboKind, ConditionKind>> = {
   overload: "staggered",
   shatter: "brittle",
@@ -193,25 +168,6 @@ const IMPACT_DUST: ParticleStyle = {
   life: [0.5, 1],
 };
 
-function comboSparks(color: string): ParticleStyle {
-  return {
-    blend: "solid",
-    from: new Color("#ffffff"),
-    to: new Color(color),
-    brightness: 1,
-    opacity: 1,
-    size: [2.2, 0.5],
-    life: [0.3, 0.55],
-    speed: [12, 26],
-    cone: Math.PI,
-    spread: 0.6,
-    gravity: 12,
-    drag: 3.5,
-    stretch: 0.04,
-    softness: 0.2,
-  };
-}
-
 function zoneColor(abilityId: string): string {
   switch (abilityId) {
     case "plague-cloud":
@@ -228,20 +184,12 @@ function zoneColor(abilityId: string): string {
   }
 }
 
-const COMBO_SPARKS: Readonly<Record<ConditionKind, ParticleStyle>> = {
-  staggered: comboSparks(CONDITION_COLORS.staggered),
-  brittle: comboSparks(CONDITION_COLORS.brittle),
-  disoriented: comboSparks(CONDITION_COLORS.disoriented),
-};
-
-const COMBO_BURST_SECONDS = 0.55;
-
 const BIG_HIT_FRACTION = 0.2;
 
 const BIG_HEAL_FRACTION = 0.15;
 
-interface GroundMarker {
-  mesh: Mesh<RingGeometry, MeshBasicMaterial>;
+interface MarkedArea {
+  marker: GroundMarker;
   seen: boolean;
 }
 
@@ -264,14 +212,6 @@ interface UnitRecord {
   bubble: Mesh<SphereGeometry, MeshBasicMaterial>;
   frost: Mesh<RingGeometry, MeshBasicMaterial>;
   conditionRing: Mesh<RingGeometry, MeshBasicMaterial>;
-}
-
-interface TransientEffect {
-  objects: Object3D[];
-  age: number;
-  duration: number;
-  step: (progress: number) => void;
-  onDone: (() => void) | null;
 }
 
 function angleToward(fromX: number, fromZ: number, toX: number, toZ: number): number {
@@ -361,7 +301,7 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
 
 export function createBattleView(stage: BoardStage, options: BattleViewOptions): BattleView {
   const records = new Map<string, UnitRecord>();
-  const effects: TransientEffect[] = [];
+  const effects = createBattleEffects(stage.scene, stage.particles);
   const chainTargets = new Map<number, string>();
 
   const falling = createFallingTracker();
@@ -370,8 +310,6 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
   const bubbleGeometry = new SphereGeometry(6.4, 20, 14);
   const frostGeometry = new RingGeometry(4.9, 5.8, 32);
-  const sparkGeometry = new OctahedronGeometry(1, 0);
-  const boltGeometry = new OctahedronGeometry(0.7, 0);
   const selectionGeometry = new RingGeometry(5.2, 6.1, 40);
 
   const selectionRing = new Mesh(
@@ -402,22 +340,13 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   stage.scene.add(selectionRing, rangeRing, targetLines);
 
   let snapshot: BattleSnapshot | null = null;
-  const groundMarkers = new Map<string, GroundMarker>();
+  const groundMarkers = new Map<string, MarkedArea>();
   let selectedUnitId: string | null = null;
   let rangeRingRadius = -1;
   let lastTick = -1;
 
   function chestOf(record: UnitRecord): Vector3 {
     return record.position.clone().setY(record.figure.height * CHEST_FRACTION);
-  }
-
-  function addEffect(effect: TransientEffect): void {
-    for (const object of effect.objects) {
-      stage.scene.add(object);
-    }
-
-    effects.push(effect);
-    effect.step(0);
   }
 
   function showSpell(visual: SpellVisual): void {
@@ -461,24 +390,6 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     const area = abilityDefinition(abilityId)?.area;
 
     return area?.kind === "circle" ? area.radiusUnits : 0;
-  }
-
-  function disposeEffectObjects(effect: TransientEffect): void {
-    for (const object of effect.objects) {
-      object.removeFromParent();
-
-      if (object instanceof Mesh || object instanceof Line) {
-        const materials = Array.isArray(object.material) ? object.material : [object.material];
-
-        for (const surface of materials) {
-          surface.dispose();
-        }
-
-        if (object.geometry !== sparkGeometry && object.geometry !== boltGeometry) {
-          object.geometry.dispose();
-        }
-      }
-    }
   }
 
   function floatNumber(record: UnitRecord, text: string, kind: string): HTMLElement | null {
@@ -549,163 +460,38 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
   }
 
-  function groundRing(x: number, z: number, inner: number, outer: number, color: string, opacity: number): Mesh<RingGeometry, MeshBasicMaterial> {
-    const mesh = new Mesh(
-      new RingGeometry(inner, outer, 40),
-      new MeshBasicMaterial({ color, transparent: true, opacity, blending: AdditiveBlending, depthWrite: false }),
-    );
-
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, 0.18, z);
-
-    return mesh;
-  }
-
   function comboBurst(targetId: string, combo: ComboKind): void {
     const record = records.get(targetId);
 
-    if (record === undefined) {
-      return;
+    if (record !== undefined) {
+      effects.comboBurst(record.position, chestOf(record), COMBO_CONDITION[combo]);
     }
-
-    const condition = COMBO_CONDITION[combo];
-    const ring = groundRing(record.position.x, record.position.z, 1.5, 3, CONDITION_COLORS[condition], 0.9);
-
-    const flash = new Mesh(
-      sparkGeometry,
-      new MeshBasicMaterial({ color: CONDITION_COLORS[condition], transparent: true, blending: AdditiveBlending, depthWrite: false }),
-    );
-
-    const center = chestOf(record);
-    stage.particles.emit(COMBO_SPARKS[condition], center, UP, COMBO_SPARK_COUNT);
-
-    addEffect({
-      objects: [ring, flash],
-      age: 0,
-      duration: COMBO_BURST_SECONDS,
-      onDone: null,
-      step(progress) {
-        ring.scale.setScalar(1 + progress * 3.5);
-        ring.material.opacity = 0.9 * (1 - progress);
-        flash.position.copy(center);
-        flash.scale.setScalar(1.5 + progress * 5);
-        flash.rotation.y = progress * 4;
-        flash.material.opacity = 1 - progress;
-      },
-    });
   }
 
-  function impactFlash(x: number, z: number, radius: number, color: string): void {
-    const ring = groundRing(x, z, Math.max(0.5, radius * 0.2), Math.max(1, radius), color, 0.95);
-
-    addEffect({
-      objects: [ring],
-      age: 0,
-      duration: COMBO_BURST_SECONDS,
-      onDone: null,
-      step(progress) {
-        ring.scale.setScalar(1 + progress * 0.6);
-        ring.material.opacity = 0.95 * (1 - progress);
-      },
-    });
-  }
-
-  function projectile(sourceId: string, targetId: string, abilityId: string, onDone: () => void): void {
+  function projectile(sourceId: string, targetId: string, abilityId: string, land: () => void): void {
     const source = records.get(sourceId);
     const target = records.get(targetId);
 
     if (source === undefined || target === undefined) {
-      onDone();
+      land();
 
       return;
     }
 
-    const from = source.figure.castOrigin(new Vector3());
-    const visual = projectileVisual(stage.particles, abilityId, from);
-
-    if (visual !== null) {
-      addEffect({
-        objects: visual.objects,
-        age: 0,
-        duration: PROJECTILE_SECONDS,
-        onDone,
-        step(progress) {
-          visual.place(from, chestOf(target), progress);
-        },
-      });
-
-      return;
-    }
-
-    const kind = hitKind(abilityId);
-
-    const mesh = new Mesh(
-      boltGeometry,
-      new MeshBasicMaterial({ color: hitTint(kind), transparent: true, blending: AdditiveBlending, depthWrite: false }),
-    );
-
-    mesh.scale.set(0.8, 0.8, 3.2);
-    const trail = createTrail(stage.particles, trailStyle(kind), TRAIL_SPACING_UNITS, from);
-
-    addEffect({
-      objects: [mesh],
-      age: 0,
-      duration: PROJECTILE_SECONDS,
-      onDone,
-      step(progress) {
-        const end = chestOf(target);
-        mesh.position.lerpVectors(from, end, progress);
-        mesh.lookAt(end);
-        trail.follow(mesh.position);
-      },
-    });
+    effects.projectile(abilityId, source.figure.castOrigin(new Vector3()), () => chestOf(target), land);
   }
 
-  function arc(fromId: string, toId: string, abilityId: string, onDone: () => void): void {
+  function arc(fromId: string, toId: string, abilityId: string, land: () => void): void {
     const from = records.get(fromId);
     const to = records.get(toId);
 
     if (from === undefined || to === undefined) {
-      onDone();
+      land();
 
       return;
     }
 
-    const start = chestOf(from);
-    const end = chestOf(to);
-    const points: number[] = [];
-    const segments = 7;
-
-    for (let index = 0; index <= segments; index += 1) {
-      const point = start.clone().lerp(end, index / segments);
-      const jitter = index === 0 || index === segments ? 0 : 1.1;
-      points.push(point.x + (Math.random() - 0.5) * jitter, point.y + (Math.random() - 0.5) * jitter, point.z);
-    }
-
-    const geometry = new BufferGeometry();
-    geometry.setAttribute("position", new Float32BufferAttribute(points, 3));
-
-    const line = new Line(
-      geometry,
-      new LineBasicMaterial({ color: hitTint(hitKind(abilityId)), transparent: true, blending: AdditiveBlending, depthWrite: false }),
-    );
-
-    let landed = false;
-
-    addEffect({
-      objects: [line],
-      age: 0,
-      duration: ARC_SECONDS,
-      onDone: null,
-      step(progress) {
-        line.material.opacity = 1 - progress;
-
-        if (!landed && progress >= 0.3) {
-          landed = true;
-          onDone();
-        }
-      },
-    });
+    effects.arc(chestOf(from), chestOf(to), abilityId, land);
   }
 
   function healBurst(record: UnitRecord, amount: number): void {
@@ -716,15 +502,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
   }
 
-  function panAt(position: Vector3): number | undefined {
-    const point = stage.toScreen(position);
-    const width = stage.canvas.clientWidth;
-
-    return point === null || width === 0 ? undefined : (point.x / width) * 2 - 1;
-  }
-
   function panOf(record: UnitRecord): number | undefined {
-    return panAt(record.position);
+    return stage.screenPan(record.position);
   }
 
   function sourceOf(record: UnitRecord): SoundSource {
@@ -773,20 +552,20 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     if (event.kind === "unit-spawned") {
       const center = stage.toScene(event.position, 0);
-      impactFlash(center.x, center.z, 8, SPAWN_COLOR);
+      effects.impactFlash(center, 8, SPAWN_COLOR);
       stage.particles.emit(SPAWN_MOTES, center.clone().setY(1), UP, SPAWN_MOTE_COUNT);
-      playSpawn(event.heroId, panAt(center));
+      playSpawn(event.heroId, stage.screenPan(center));
 
       return;
     }
 
     if (event.kind === "impact-landed") {
       const center = stage.toScene(event.center, 0);
-      playLanding(event.abilityId, panAt(center));
+      playLanding(event.abilityId, stage.screenPan(center));
       const landing = landingVisual(stage.particles, event.abilityId, center, event.radiusUnits);
 
       if (landing === null) {
-        impactFlash(center.x, center.z, event.radiusUnits, IMPACT_COLOR);
+        effects.impactFlash(center, event.radiusUnits, IMPACT_COLOR);
         stage.particles.emit(IMPACT_DUST, center, UP, Math.round(event.radiusUnits * IMPACT_DUST_PER_UNIT));
       } else {
         showSpell(landing);
@@ -1050,26 +829,23 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   }
 
   function syncGroundMarkers(next: BattleSnapshot): void {
-    for (const marker of groundMarkers.values()) {
-      marker.seen = false;
+    for (const area of groundMarkers.values()) {
+      area.seen = false;
     }
 
     const spellKeys = new Set<string>();
 
     for (const impact of next.impacts) {
       const key = `impact-${impact.impactId}`;
-      let marker = groundMarkers.get(key);
+      let area = groundMarkers.get(key);
 
-      if (marker === undefined) {
-        const center = stage.toScene(impact.center, 0);
-        const radius = impact.radiusUnits;
-        marker = { mesh: groundRing(center.x, center.z, radius * 0.86, radius, IMPACT_COLOR, 0.55), seen: true };
-        stage.scene.add(marker.mesh);
-        groundMarkers.set(key, marker);
+      if (area === undefined) {
+        area = { marker: effects.marker(stage.toScene(impact.center, 0), 0.86, impact.radiusUnits, IMPACT_COLOR, 0.55), seen: true };
+        groundMarkers.set(key, area);
       }
 
-      marker.seen = true;
-      marker.mesh.material.opacity = 0.35 + 0.35 * Math.abs(Math.sin(next.tick / 3));
+      area.seen = true;
+      area.marker.setOpacity(0.35 + 0.35 * Math.abs(Math.sin(next.tick / 3)));
       syncStateVisual(key, next.tick, spellKeys, () =>
         impactVisual(
           stage.particles,
@@ -1084,17 +860,14 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     for (const zone of next.zones) {
       const key = `zone-${zone.zoneId}`;
-      let marker = groundMarkers.get(key);
+      let area = groundMarkers.get(key);
 
-      if (marker === undefined) {
-        const center = stage.toScene(zone.center, 0);
-        const radius = zone.radiusUnits;
-        marker = { mesh: groundRing(center.x, center.z, radius * 0.15, radius, zoneColor(zone.abilityId), 0.28), seen: true };
-        stage.scene.add(marker.mesh);
-        groundMarkers.set(key, marker);
+      if (area === undefined) {
+        area = { marker: effects.marker(stage.toScene(zone.center, 0), 0.15, zone.radiusUnits, zoneColor(zone.abilityId), 0.28), seen: true };
+        groundMarkers.set(key, area);
       }
 
-      marker.seen = true;
+      area.seen = true;
       syncStateVisual(key, next.tick, spellKeys, () =>
         zoneVisual(stage.particles, zone.abilityId, stage.toScene(zone.center, 0), zone.radiusUnits, zone.zoneId),
       );
@@ -1113,11 +886,9 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
     }
 
-    for (const [key, marker] of groundMarkers) {
-      if (!marker.seen) {
-        marker.mesh.removeFromParent();
-        marker.mesh.geometry.dispose();
-        marker.mesh.material.dispose();
+    for (const [key, area] of groundMarkers) {
+      if (!area.seen) {
+        area.marker.remove();
         groundMarkers.delete(key);
       }
     }
@@ -1231,24 +1002,9 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
   }
 
-  function stepEffects(deltaSeconds: number): void {
-    for (let index = effects.length - 1; index >= 0; index -= 1) {
-      const effect = effects[index]!;
-      effect.age += deltaSeconds;
-      const progress = Math.min(1, effect.age / effect.duration);
-      effect.step(progress);
-
-      if (progress >= 1) {
-        effects.splice(index, 1);
-        effect.onDone?.();
-        disposeEffectObjects(effect);
-      }
-    }
-  }
-
   const stopFrames = stage.onFrame((deltaSeconds) => {
     stepRecords(deltaSeconds);
-    stepEffects(deltaSeconds);
+    effects.step(deltaSeconds);
     stepSpells(deltaSeconds);
     updateSelection();
     updateTargetLines();
@@ -1285,6 +1041,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
   return {
     update(next, nextSelectedUnitId, latestEvents) {
+      if (next === snapshot && nextSelectedUnitId === selectedUnitId && latestEvents.length === 0) {
+        return;
+      }
+
       stage.showBoard(snapshotGrid(next), options.viewSide, options.insets);
 
       const snapAll = snapshot === null || next.tick < lastTick || next.tick - lastTick > TICK_JUMP_FOR_SNAP;
@@ -1312,7 +1072,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       falling.sync(next.impacts, next.tick, (impactId) => {
         const impact = next.impacts.find((candidate) => candidate.impactId === impactId);
 
-        return impact === undefined ? undefined : panAt(stage.toScene(impact.center, 0));
+        return impact === undefined ? undefined : stage.screenPan(stage.toScene(impact.center, 0));
       });
     },
 
@@ -1320,12 +1080,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       stopFrames();
       stage.canvas.removeEventListener("click", handleClick);
       stage.particles.clear();
-
-      for (const effect of effects) {
-        disposeEffectObjects(effect);
-      }
-
-      effects.length = 0;
+      effects.dispose();
 
       for (const visual of spellVisuals) {
         visual.dispose();
@@ -1345,10 +1100,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       records.clear();
 
-      for (const marker of groundMarkers.values()) {
-        marker.mesh.removeFromParent();
-        marker.mesh.geometry.dispose();
-        marker.mesh.material.dispose();
+      for (const area of groundMarkers.values()) {
+        area.marker.remove();
       }
 
       groundMarkers.clear();
@@ -1361,7 +1114,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       targetLineGeometry.dispose();
       targetLines.material.dispose();
 
-      for (const geometry of [bubbleGeometry, frostGeometry, sparkGeometry, boltGeometry, selectionGeometry]) {
+      for (const geometry of [bubbleGeometry, frostGeometry, selectionGeometry]) {
         geometry.dispose();
       }
 

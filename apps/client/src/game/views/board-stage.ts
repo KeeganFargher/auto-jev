@@ -24,6 +24,7 @@ import {
 } from "three";
 import type { BoardGrid, Vector2 } from "@jev-game/game";
 import { easeInOut } from "./easing.js";
+import { warmEffectMaterials } from "./effect-materials.js";
 import { createParticleSystem, type ParticleSystem } from "./particles.js";
 import { applyShadowQuality } from "./shadow-quality.js";
 import { createStageGlow } from "./stage-glow.js";
@@ -151,6 +152,7 @@ export interface BoardStage {
   setOrbit(radians: number): void;
   toScene(point: Vector2, height: number): Vector3;
   toScreen(point: Vector3): ScreenPoint | null;
+  screenPan(point: Vector3): number | undefined;
   groundPointAt(clientX: number, clientY: number): Vector2 | null;
   setExposure(multiplier: number): void;
   setTheme(theme: StageTheme): void;
@@ -632,6 +634,12 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   fitCamera();
 
   let graphics = graphicsSettings.get();
+  let finishWarming: (() => void) | null = null;
+
+  function warmEffects(): void {
+    finishWarming?.();
+    finishWarming = warmEffectMaterials(scene);
+  }
 
   function applyGraphics(next: GraphicsSettings): void {
     graphics = next;
@@ -639,6 +647,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     glow.setSize(viewportWidth, viewportHeight, renderer.getPixelRatio());
     applyShadowQuality(renderer.shadowMap, lights.key, next.shadows);
     monitor.setVisible(next.monitor);
+    warmEffects();
   }
 
   applyGraphics(graphics);
@@ -662,6 +671,9 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       } else {
         renderer.render(scene, camera);
       }
+
+      finishWarming?.();
+      finishWarming = null;
     }
 
     monitor.record(now);
@@ -678,6 +690,10 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     particles,
 
     showBoard(nextGrid, nextSide, nextInsets) {
+      if (board !== null && sameGrid(grid, nextGrid) && side === nextSide && sameInsets(insets, nextInsets)) {
+        return;
+      }
+
       if (!sameGrid(grid, nextGrid) || side !== nextSide || board === null) {
         rebuildBoard(nextGrid, nextSide);
       }
@@ -742,6 +758,12 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       };
     },
 
+    screenPan(point) {
+      const projected = point.clone().project(camera);
+
+      return projected.z > 1 ? undefined : Math.max(-1, Math.min(1, projected.x));
+    },
+
     groundPointAt(clientX, clientY) {
       const rect = canvas.getBoundingClientRect();
 
@@ -788,6 +810,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       if (board !== null && grid !== null) {
         rebuildBoard(grid, side);
       }
+
+      warmEffects();
     },
 
     onFrame(listener) {
@@ -802,6 +826,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       cancelAnimationFrame(animationFrame);
       resizeObserver.disconnect();
       stopGraphics();
+      finishWarming?.();
+      finishWarming = null;
       monitor.root.remove();
       listeners.clear();
 

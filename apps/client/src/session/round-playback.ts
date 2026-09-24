@@ -96,6 +96,10 @@ export function createRoundPlayback(battles: readonly RoundBattle[], catalogue: 
     },
 
     eventsBetween(battle, afterTick, uptoTick) {
+      if (uptoTick <= afterTick) {
+        return [];
+      }
+
       return recordingFor(battle).events.filter((event) => event.tick > afterTick && event.tick <= uptoTick);
     },
   };
