@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { Color, Scene, Vector3 } from "three";
+import { Color, InterleavedBufferAttribute, Mesh, Scene, ShaderMaterial, Vector3 } from "three";
 import { claimSlots, coneDirection, createParticleSystem, createTrail, type ParticleStyle } from "../src/game/views/particles.js";
 
 const EMBER: ParticleStyle = {
@@ -97,5 +97,76 @@ test("a trail leaves the same particles over a distance however many frames it t
   assert.equal(choppy.alive(), 10);
   smooth.dispose();
   choppy.dispose();
+});
+
+function glowLayer(scene: Scene): Mesh {
+  const layer = scene.children.find((child) => child instanceof Mesh && child.renderOrder === 2);
+
+  if (!(layer instanceof Mesh)) {
+    throw new Error("the glow layer is not in the scene");
+  }
+
+  return layer;
+}
+
+function attribute(mesh: Mesh, name: string): InterleavedBufferAttribute {
+  const found = mesh.geometry.getAttribute(name);
+
+  if (!(found instanceof InterleavedBufferAttribute)) {
+    throw new Error(`particle attribute ${name} is missing`);
+  }
+
+  return found;
+}
+
+function shownSlots(scene: Scene, slots: number): number[] {
+  const layer = glowLayer(scene);
+
+  if (!(layer.material instanceof ShaderMaterial)) {
+    throw new Error("the glow layer has no shader");
+  }
+
+  const time: number = layer.material.uniforms.uTime!.value;
+  const clearEpoch: number = layer.material.uniforms.uEpoch!.value;
+  const origin = attribute(layer, "aOrigin");
+  const velocity = attribute(layer, "aVelocity");
+  const epochs = attribute(layer, "aEpoch");
+  const shown: number[] = [];
+
+  for (let slot = 0; slot < slots; slot += 1) {
+    const age = time - origin.getW(slot);
+
+    if (epochs.getX(slot) >= clearEpoch && age >= 0 && age < velocity.getW(slot)) {
+      shown.push(slot);
+    }
+  }
+
+  return shown;
+}
+
+test("a clear hides particles emitted earlier in the same frame, but not ones emitted after it", () => {
+  const scene = new Scene();
+  const particles = createParticleSystem(scene);
+  particles.update(0.5);
+  particles.emit(EMBER, new Vector3(), new Vector3(0, 1, 0), 3);
+  particles.clear();
+  particles.emit(EMBER, new Vector3(), new Vector3(0, 1, 0), 2);
+
+  assert.deepEqual(shownSlots(scene, 8), [3, 4]);
+  particles.dispose();
+});
+
+test("trail particles land a spacing apart along the path, carrying the remainder between frames", () => {
+  const scene = new Scene();
+  const particles = createParticleSystem(scene);
+  const trail = createTrail(particles, { ...EMBER, spread: 0 }, 1, new Vector3());
+  trail.follow(new Vector3(0.6, 0, 0));
+  trail.follow(new Vector3(4, 0, 0));
+
+  const origin = attribute(glowLayer(scene), "aOrigin");
+  const placed = [0, 1, 2, 3].map((slot) => Math.round(origin.getX(slot) * 1000) / 1000);
+
+  assert.deepEqual(placed, [1, 2, 3, 4]);
+  particles.dispose();
 });
 

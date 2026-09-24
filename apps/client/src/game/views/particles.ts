@@ -62,7 +62,7 @@ interface ParticleLayer {
   expiries: Float32Array;
 }
 
-const STRIDE = 21;
+const STRIDE = 22;
 
 const GLOW_CAPACITY = 4096;
 
@@ -80,7 +80,7 @@ const BITANGENT = new Vector3();
 
 const VERTEX_SHADER = `
 uniform float uTime;
-uniform float uClearedAt;
+uniform float uEpoch;
 
 attribute vec4 aOrigin;
 attribute vec4 aVelocity;
@@ -88,6 +88,7 @@ attribute vec4 aFrom;
 attribute vec4 aTo;
 attribute vec4 aMotion;
 attribute float aSoftness;
+attribute float aEpoch;
 
 varying vec2 vCorner;
 varying vec4 vColor;
@@ -97,7 +98,7 @@ void main() {
   float age = uTime - aOrigin.w;
   float life = aVelocity.w;
 
-  if (aOrigin.w < uClearedAt || age < 0.0 || age >= life) {
+  if (aEpoch < uEpoch || age < 0.0 || age >= life) {
     vCorner = vec2(0.0);
     vColor = vec4(0.0);
     vSoftness = 0.0;
@@ -199,6 +200,7 @@ function createLayer(scene: Scene, capacity: number, blend: ParticleBlend, unifo
   geometry.setAttribute("aTo", new InterleavedBufferAttribute(buffer, 4, 12));
   geometry.setAttribute("aMotion", new InterleavedBufferAttribute(buffer, 4, 16));
   geometry.setAttribute("aSoftness", new InterleavedBufferAttribute(buffer, 1, 20));
+  geometry.setAttribute("aEpoch", new InterleavedBufferAttribute(buffer, 1, 21));
 
   const material = new ShaderMaterial({
     uniforms,
@@ -218,7 +220,7 @@ function createLayer(scene: Scene, capacity: number, blend: ParticleBlend, unifo
 }
 
 export function createParticleSystem(scene: Scene): ParticleSystem {
-  const uniforms = { uTime: { value: 0 }, uClearedAt: { value: 0 } };
+  const uniforms = { uTime: { value: 0 }, uEpoch: { value: 0 } };
   const glow = createLayer(scene, GLOW_CAPACITY, "glow", uniforms);
   const solid = createLayer(scene, SOLID_CAPACITY, "solid", uniforms);
   const heading = new Vector3();
@@ -226,6 +228,7 @@ export function createParticleSystem(scene: Scene): ParticleSystem {
   const from = new Color();
   const to = new Color();
   let now = 0;
+  let epoch = 0;
 
   function write(layer: ParticleLayer, slot: number, style: ParticleStyle, origin: Vector3, direction: Vector3): void {
     const data = layer.buffer.array;
@@ -257,6 +260,7 @@ export function createParticleSystem(scene: Scene): ParticleSystem {
     data[base + 18] = style.gravity;
     data[base + 19] = style.drag;
     data[base + 20] = style.softness;
+    data[base + 21] = epoch;
     layer.expiries[slot] = now + life;
   }
 
@@ -300,7 +304,8 @@ export function createParticleSystem(scene: Scene): ParticleSystem {
     },
 
     clear() {
-      uniforms.uClearedAt.value = now;
+      epoch += 1;
+      uniforms.uEpoch.value = epoch;
       glow.expiries.fill(0);
       solid.expiries.fill(0);
     },
@@ -333,15 +338,17 @@ export function createTrail(particles: ParticleSystem, style: ParticleStyle, spa
   return {
     follow(point) {
       const travelled = last.distanceTo(point);
-      const count = Math.floor((carried + travelled) / spacing);
-      carried = carried + travelled - count * spacing;
 
-      if (count > 0) {
+      if (travelled > 0) {
         backward.subVectors(last, point).normalize();
+        let along = spacing - carried;
 
-        for (let index = 1; index <= count; index += 1) {
-          particles.emit(style, spot.lerpVectors(last, point, index / count), backward, 1);
+        while (along <= travelled) {
+          particles.emit(style, spot.lerpVectors(last, point, along / travelled), backward, 1);
+          along += spacing;
         }
+
+        carried = travelled - (along - spacing);
       }
 
       last.copy(point);
