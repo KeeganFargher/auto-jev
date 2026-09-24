@@ -143,6 +143,7 @@ export interface BoardStage {
   readonly overlay: HTMLElement;
   showBoard(grid: BoardGrid, side: ViewSide, insets: ViewportInsets): void;
   frame(shot: StageShot | null): void;
+  setOrbit(radians: number): void;
   toScene(point: Vector2, height: number): Vector3;
   toScreen(point: Vector3): ScreenPoint | null;
   groundPointAt(clientX: number, clientY: number): Vector2 | null;
@@ -412,6 +413,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   let fit: CameraFit | null = null;
   let glide: CameraGlide | null = null;
   let shot: StageShot | null = null;
+  let orbit = 0;
   let theme = DEFAULT_STAGE_THEME;
   let exposureBoost = 1;
   const fog = new Fog(new Color(theme.atmosphere.backdrop));
@@ -472,11 +474,12 @@ export function createBoardStage(container: HTMLElement): BoardStage {
 
   function placeCamera(distance: number, pitch: number, target: Vector3): void {
     const direction = side === "south" ? 1 : -1;
+    const reach = distance * Math.cos(pitch);
 
     camera.position.set(
-      target.x,
+      target.x + direction * reach * Math.sin(orbit),
       target.y + distance * Math.sin(pitch),
-      target.z + direction * distance * Math.cos(pitch),
+      target.z + direction * reach * Math.cos(orbit),
     );
 
     camera.lookAt(target);
@@ -671,6 +674,14 @@ export function createBoardStage(container: HTMLElement): BoardStage {
         fitCamera();
       } else {
         glideCamera(fit);
+      }
+    },
+
+    setOrbit(radians) {
+      orbit = radians;
+
+      if (fit !== null) {
+        applyFit(fit);
       }
     },
 

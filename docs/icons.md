@@ -254,6 +254,5 @@ Rules the check enforces, from `scripts/icons/contract.ts`:
    - The face fills the ITEMS panel portrait (42 px), tooltip header
      icons (38 px), the reward role chips (24–34 px) and the damage
      meter rows (28 px).
-   - The glyph stays in the 18 px hero name chips, the small corner
-     badges on talent and train rewards, and the main menu emblems.
-     Faces are unreadable at 18 px.
+   - The glyph stays in the 18 px hero name chips and the small corner
+     badges on talent and train rewards. Faces are unreadable at 18 px.

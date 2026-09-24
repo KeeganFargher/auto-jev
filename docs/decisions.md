@@ -3051,3 +3051,48 @@ asked for sound effects and voice lines everywhere.
   - 16 voice lines played with no overlap except intended interrupts.
 - **Removed:** `attack-swing.mp3`, `hit-impact.mp3`, `spell-cast.mp3`,
   `heal.mp3` and `missing_assets.md` entries 4, 14, 19, 20 and 23.
+
+## Main menu: your arena and three heroes behind it (2026-09-24)
+
+The user asked for a more interesting main menu background. It was a flat
+purple gradient with a faint floor grid, and three glowing hero glyphs
+stood in for key art.
+
+- **Your arena behind the menu.** The menu uses the same 3D stage as the
+  draft, placement and battles, dressed with your saved board theme, so a
+  pick under Board themes changes the menu too.
+  - Gorrak, Anvil and Cinder, the heroes with game models, stand on the
+    board right of the menu links, playing their idle loops.
+  - Like the draft lineup, they wait up to 1.5 s for their models, then
+    rise out of the board one after another.
+- **Camera** (`game/views/menu-view.ts`).
+  - A 12° shot is aimed at the three heroes and fitted right of the links
+    and above the Fight! button. It sways ±16° around them over 56 s.
+  - `BoardStage.setOrbit(radians)` turns the camera around the framed
+    target without refitting. The menu view resets it on dispose.
+  - The draft found cove and frost horizons at 12°. Aimed at the heroes,
+    all four themes still show props and sky across the whole sway.
+- **Readability.** An `is-menu` scrim on the battle layer darkens the left
+  under the links, the top, and the bottom under Fight!, with a soft
+  vignette. It works like the draft's `is-drafting` scrim.
+- **Reduced motion.** The camera holds still, and the heroes appear in
+  place instead of rising, as in the teleport view.
+- **Leaving the menu.** Any match screen disposes the menu view, and the
+  stage returns to the usual board framing. Fight! glides from the menu
+  shot into the draft on the same arena.
+  - The menu also clears the reward screen's `is-dimmed` blur. Losing the
+    connection during rewards leaves it on, which never showed while the
+    menu hid the layer.
+- **Removed:** the menu's hero glyph emblems (`menuEmblem` and
+  `.menu-art*`) and `missing_assets.md` entry 6, the menu key art. The
+  live heroes stand in that spot now.
+- **Verified** in headless Chromium with software WebGL.
+  - All four themes at 1440×900, with the camera pinned at both ends of
+    the sway. The cove at 1280×720, 1920×1080, 1024×768 and 2560×1080.
+  - Menu → Play online → Leave three times: live WebGL buffers, textures
+    and programs returned to the same counts on every menu visit.
+  - Fight! into the draft, Board themes → Frostpeak → Menu, and Battle
+    lab and back, with no console errors.
+  - With reduced motion, the framing at 5 s and 45 s matched.
+  - Lint, typecheck and the client build pass. The main chunk grew by
+    0.3 KB gzipped, and the hero models were already preloaded.
