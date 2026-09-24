@@ -3089,6 +3089,11 @@ and the server's deadline fallback drafts at random.
   selection, so sending it twice is harmless. Checked in the browser by
   dropping two selection frames and forcing a reconnect: before, the timer
   committed the server's older team; after, the one on screen.
+- **The timer's lock-in plays `draft-lock`, like Confirm,** when the
+  player had picked all three heroes and hadn't confirmed. It plays on
+  the first render after the draft, since the lock-in happens on the
+  server. A partial selection filled by the server plays nothing, and
+  after Confirm it doesn't play again.
 - `PROTOCOL_VERSION` is 4: a new intent and a new view field.
 - **Verified.**
   - Three new server tests: a selection committed at the deadline, a

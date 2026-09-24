@@ -706,6 +706,10 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     return view.you.ready || draftSubmittedEpoch === view.phaseEpoch;
   }
 
+  function draftLockedByTimer(view: PlayerView): boolean {
+    return draftView !== null && draftSubmittedEpoch !== lastRenderedEpoch && draftSelection.length === view.rules.draftPicks;
+  }
+
   function toggleDraftPick(offerId: string): void {
     const activeSession = session;
     const view = activeSession?.getView() ?? null;
@@ -1403,6 +1407,10 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
 
     if (view.phase !== "draft" || view.you.eliminated) {
+      if (draftLockedByTimer(view)) {
+        audio.play("draft-lock");
+      }
+
       hideDraft();
     }
 
