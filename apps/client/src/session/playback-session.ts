@@ -1,11 +1,12 @@
 import { TICK_SECONDS, type BattleEvent, type BattleRecording } from "@jev-game/game";
-import type { BattleLabSession, LabScenarioKind } from "./types.js";
+import type { BattleLabSession, LabScenarioKind, LabTeams } from "./types.js";
 
 const MAX_STEPS_PER_FRAME = 10;
 
 export function createPlaybackSession(
   recording: BattleRecording,
   scenario: LabScenarioKind,
+  teams: LabTeams,
 ): BattleLabSession {
   let frameIndex = 0;
   let isRunning = false;
@@ -59,7 +60,7 @@ export function createPlaybackSession(
     peekSnapshot() {
       const frame = recording.frames[frameIndex]!;
 
-      return { seed: recording.seed, scenario, snapshot: frame.snapshot };
+      return { seed: recording.seed, scenario, teams, snapshot: frame.snapshot };
     },
 
     getRecording() {

@@ -1,101 +1,145 @@
+import "@fontsource/lilita-one/400.css";
+import "@fontsource/barlow-condensed/600.css";
+import "@fontsource/barlow-condensed/700.css";
 import "./style.css";
-import { createLocalBattleLabSession } from "./session/local-session.js";
-import { createPlaybackSession } from "./session/playback-session.js";
-import { createBattleLabScene, type BattleLabScene } from "./game/scenes/battle-lab-scene.js";
-import { parseScenario, serializeScenario, type LabScenario } from "./dev/scenario-editor.js";
-import type { BattleLabSession, LabScenarioKind, TeamAUpgradeIdsByHero } from "./session/types.js";
+import type { BattleLab } from "./game/scenes/battle-lab.js";
+import { createMatchScene, type MatchScene } from "./game/scenes/match-scene.js";
+import type { EnvironmentLabScene } from "./game/scenes/environment-lab-scene.js";
+import type { ModelLabScene } from "./game/scenes/model-lab-scene.js";
+import { ENVIRONMENT_HASH, MODEL_LAB_HASH } from "./game/scenes/lab-routes.js";
+import { audio } from "./audio/engine.js";
+import { models } from "./models/library.js";
+import { mountSettingsWindow } from "./hud/settings/settings-window.js";
+import { createAudioTab } from "./hud/settings/audio-tab.js";
+
+mountSettingsWindow(document.body, [createAudioTab(audio.settings)]);
+
+void audio.preload("boot");
+
+document.addEventListener("click", (event) => {
+  if (event.target instanceof Element && event.target.closest("button, .menu-link, .pill-button") !== null) {
+    audio.play("ui-click");
+  }
+});
+
+if (import.meta.env.DEV) {
+  Object.assign(window, { jevAudio: audio, jevModels: models });
+}
 
 const canvasRoot = document.getElementById("lab-canvas-root")!;
 
 const hudRoot = document.getElementById("lab-hud")!;
 
-const statusEl = document.getElementById("lab-status")!;
+const matchRoot = document.getElementById("match-root")!;
 
-const scenarioText = document.querySelector<HTMLTextAreaElement>("#lab-scenario-text")!;
+const envRoot = document.getElementById("env-root")!;
 
-const exportButton = document.getElementById("lab-scenario-export")!;
+const modelsRoot = document.getElementById("models-root")!;
 
-const importButton = document.getElementById("lab-scenario-import")!;
+let battleLab: BattleLab | null = null;
 
-const errorEl = document.getElementById("lab-scenario-error")!;
+let activeMatchScene: MatchScene | null = null;
 
-let activeSession: BattleLabSession = createLocalBattleLabSession(1);
+let activeEnvironmentLab: EnvironmentLabScene | null = null;
 
-let activeScene: BattleLabScene | null = null;
+let activeModelLab: ModelLabScene | null = null;
 
-let activeIsReplay = false;
+let modeRequest = 0;
 
-function mount(session: BattleLabSession, isReplay: boolean): void {
-  activeScene?.dispose();
+const JOIN_PREFIX = "#join/";
 
-  if (session !== activeSession) {
-    activeSession.dispose();
-  }
+async function applyMode(): Promise<void> {
+  modeRequest += 1;
+  const request = modeRequest;
+  const joinRoomId = location.hash.startsWith(JOIN_PREFIX) ? location.hash.slice(JOIN_PREFIX.length) : null;
+  const isMatch = location.hash === "#match" || joinRoomId !== null;
+  const isEnvironment = location.hash === ENVIRONMENT_HASH || location.hash.startsWith(`${ENVIRONMENT_HASH}/`);
+  const isModels = location.hash === MODEL_LAB_HASH || location.hash.startsWith(`${MODEL_LAB_HASH}/`);
 
-  activeSession = session;
-  activeIsReplay = isReplay;
-  activeScene = createBattleLabScene(
-    canvasRoot,
-    hudRoot,
-    statusEl,
-    activeSession,
-    handleReplay,
-    handleReset,
-    isReplay,
-  );
-}
+  canvasRoot.hidden = isMatch || isEnvironment || isModels;
+  hudRoot.hidden = isMatch || isEnvironment || isModels;
+  matchRoot.hidden = !isMatch;
+  envRoot.hidden = !isEnvironment;
+  modelsRoot.hidden = !isModels;
 
-function handleReplay(): void {
-  const recording = activeSession.getRecording();
+  if (isModels) {
+    battleLab?.hide();
+    activeMatchScene?.dispose();
+    activeMatchScene = null;
+    activeEnvironmentLab?.dispose();
+    activeEnvironmentLab = null;
+    const modelId = location.hash.slice(MODEL_LAB_HASH.length + 1) || null;
+    const { createModelLabScene } = await import("./game/scenes/model-lab-scene.js");
 
-  if (recording === null) {
-    return;
-  }
+    if (request !== modeRequest) {
+      return;
+    }
 
-  const { scenario } = activeSession.peekSnapshot();
-  mount(createPlaybackSession(recording, scenario), true);
-}
-
-function handleReset(
-  seed: number,
-  scenario?: LabScenarioKind,
-  teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero,
-): void {
-  if (activeIsReplay) {
-    mount(
-      createLocalBattleLabSession(
-        seed,
-        scenario ?? activeSession.peekSnapshot().scenario,
-        teamAUpgradeIdsByHero,
-      ),
-      false,
-    );
+    if (activeModelLab === null) {
+      activeModelLab = createModelLabScene(modelsRoot, modelId);
+    } else {
+      activeModelLab.show(modelId);
+    }
 
     return;
   }
 
-  activeSession.reset(seed, scenario, teamAUpgradeIdsByHero);
-}
+  activeModelLab?.dispose();
+  activeModelLab = null;
 
-mount(activeSession, false);
+  if (isEnvironment) {
+    battleLab?.hide();
+    activeMatchScene?.dispose();
+    activeMatchScene = null;
+    const themeId = location.hash.slice(ENVIRONMENT_HASH.length + 1) || null;
+    const { createEnvironmentLabScene } = await import("./game/scenes/environment-lab-scene.js");
 
-function currentScenario(): LabScenario {
-  const { seed, scenario } = activeSession.peekSnapshot();
+    if (request !== modeRequest) {
+      return;
+    }
 
-  return { version: 2, seed, scenario };
-}
+    if (activeEnvironmentLab === null) {
+      activeEnvironmentLab = createEnvironmentLabScene(envRoot, themeId);
+    } else {
+      activeEnvironmentLab.show(themeId);
+    }
 
-exportButton.addEventListener("click", () => {
-  errorEl.textContent = "";
-  scenarioText.value = serializeScenario(currentScenario());
-});
-
-importButton.addEventListener("click", () => {
-  try {
-    const scenario = parseScenario(scenarioText.value);
-    errorEl.textContent = "";
-    mount(createLocalBattleLabSession(scenario.seed, scenario.scenario), false);
-  } catch (error) {
-    errorEl.textContent = error instanceof Error ? error.message : "invalid scenario";
+    return;
   }
-});
+
+  activeEnvironmentLab?.dispose();
+  activeEnvironmentLab = null;
+
+  if (isMatch) {
+    battleLab?.hide();
+
+    if (joinRoomId !== null) {
+      history.replaceState(null, "", "#match");
+    }
+
+    if (activeMatchScene === null) {
+      activeMatchScene = createMatchScene(matchRoot, { joinRoomId });
+    } else if (joinRoomId !== null) {
+      activeMatchScene.joinRoom(joinRoomId);
+    }
+
+    return;
+  }
+
+  activeMatchScene?.dispose();
+  activeMatchScene = null;
+  const { createBattleLab } = await import("./game/scenes/battle-lab.js");
+
+  if (request !== modeRequest) {
+    return;
+  }
+
+  battleLab ??= createBattleLab(canvasRoot, hudRoot);
+  battleLab.show();
+}
+
+window.addEventListener("hashchange", applyMode);
+
+void applyMode();
+
+void models.preload("heroes");

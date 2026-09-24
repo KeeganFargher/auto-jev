@@ -1,0 +1,150 @@
+import type { AbilityDefinition, HeroDefinition, UpgradeDefinition } from "@jev-game/game";
+
+export const spiteBolt: AbilityDefinition = {
+  id: "spite-bolt",
+  name: "Spite Bolt",
+  cooldownTicks: 55,
+  targetPolicy: "nearest-enemy",
+  range: 35,
+  effects: [{ kind: "damage", amount: 48, maxAmount: 59 }],
+  tags: ["projectile", "target"],
+};
+
+export const sharedFate: AbilityDefinition = {
+  id: "shared-fate",
+  name: "Shared Fate",
+  description: "Binds up to 3 nearby enemies for 5 s. 35% of the damage any bound enemy takes echoes to the others.",
+  cooldownTicks: 30,
+  manaCost: 70,
+  targetPolicy: "densest-enemy-cluster",
+  range: 50,
+  area: { kind: "circle", center: "target", radiusUnits: 25 },
+  maxTargets: 3,
+  effects: [{ kind: "bind", fraction: 0.35, durationTicks: 150 }],
+  canCrit: false,
+  tags: ["area", "link"],
+};
+
+export const hex: AbilityDefinition = {
+  id: "hex",
+  name: "Hex",
+  description: "Turns the enemy with the most mana into a harmless critter for 1.5 s and leaves it Disoriented.",
+  cooldownTicks: 420,
+  targetPolicy: "highest-mana-enemy",
+  range: 45,
+  effects: [
+    { kind: "control", control: "hexed", durationTicks: 45 },
+    { kind: "apply-condition", condition: "disoriented" },
+  ],
+  tags: ["target"],
+};
+
+export const hexbinder: HeroDefinition = {
+  id: "hexbinder",
+  name: "Moira",
+  title: "Ties your fates together",
+  school: "arcana",
+  archetype: "blight",
+  appliesCondition: "disoriented",
+  maxHp: 1500,
+  armor: 0.05,
+  moveSpeedUnitsPerSecond: 17,
+  critChance: 0.05,
+  manaPerAttack: 21,
+  basicAttackId: spiteBolt.id,
+  abilityIds: [sharedFate.id, hex.id],
+  passives: [{ kind: "siphon", manaPerDamage: 0.05 }],
+};
+
+export const hexbinderAbilities: AbilityDefinition[] = [spiteBolt, sharedFate, hex];
+
+const T1 = ["hexbinder-wider-net", "hexbinder-cruel-hex"];
+
+const T2 = ["hexbinder-death-knell", "hexbinder-hex-bolt"];
+
+export const hexbinderTalents: UpgradeDefinition[] = [
+  {
+    id: "hexbinder-wider-net",
+    name: "Wider Net",
+    description: "Shared Fate binds 4.",
+    category: "talent",
+    heroId: hexbinder.id,
+    tier: 1,
+    path: "left",
+    maxStacks: 1,
+    excludesUpgradeIds: ["hexbinder-cruel-hex"],
+    statModifiers: [],
+    abilityChanges: [{ abilityId: sharedFate.id, setMaxTargets: 4 }],
+  },
+  {
+    id: "hexbinder-cruel-hex",
+    name: "Cruel Hex",
+    description: "Hexed enemies take 25% more damage.",
+    category: "talent",
+    heroId: hexbinder.id,
+    tier: 1,
+    path: "right",
+    maxStacks: 1,
+    excludesUpgradeIds: ["hexbinder-wider-net"],
+    statModifiers: [],
+    grantsPassives: [{ kind: "cruel-hex", damageTakenBonus: 0.25 }],
+  },
+  {
+    id: "hexbinder-death-knell",
+    name: "Death Knell",
+    description: "When a bound enemy dies, the others take 20% of its max HP.",
+    category: "talent",
+    heroId: hexbinder.id,
+    tier: 2,
+    path: "left",
+    maxStacks: 1,
+    requiresAnyOfUpgradeIds: T1,
+    excludesUpgradeIds: ["hexbinder-hex-bolt"],
+    unlocksRuneSocket: true,
+    statModifiers: [],
+    grantsPassives: [{ kind: "death-knell", maxHpFraction: 0.2 }],
+  },
+  {
+    id: "hexbinder-hex-bolt",
+    name: "Hex Bolt",
+    description: "Hex also hits one enemy near its target.",
+    category: "talent",
+    heroId: hexbinder.id,
+    tier: 2,
+    path: "right",
+    maxStacks: 1,
+    requiresAnyOfUpgradeIds: T1,
+    excludesUpgradeIds: ["hexbinder-death-knell"],
+    unlocksRuneSocket: true,
+    statModifiers: [],
+    abilityChanges: [{ abilityId: hex.id, setArea: { kind: "circle", center: "target", radiusUnits: 20 }, setMaxTargets: 2 }],
+  },
+  {
+    id: "hexbinder-ill-omen",
+    name: "Ill Omen",
+    description: "Bound enemies share 60% of their damage, and the bond lasts 7 s.",
+    category: "talent",
+    heroId: hexbinder.id,
+    tier: 3,
+    path: "left",
+    maxStacks: 1,
+    requiresAnyOfUpgradeIds: T2,
+    excludesUpgradeIds: ["hexbinder-mass-hex"],
+    statModifiers: [],
+    abilityChanges: [{ abilityId: sharedFate.id, setEffects: [{ kind: "bind", fraction: 0.6, durationTicks: 210 }] }],
+  },
+  {
+    id: "hexbinder-mass-hex",
+    name: "Mass Hex",
+    description: "Hex hits every enemy within 2.5 cells of its target.",
+    category: "talent",
+    heroId: hexbinder.id,
+    tier: 3,
+    path: "right",
+    maxStacks: 1,
+    requiresAnyOfUpgradeIds: T2,
+    excludesUpgradeIds: ["hexbinder-ill-omen"],
+    statModifiers: [],
+    abilityChanges: [{ abilityId: hex.id, setArea: { kind: "circle", center: "target", radiusUnits: 25 }, setMaxTargets: 8 }],
+  },
+];

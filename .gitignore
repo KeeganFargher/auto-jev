@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+reports/
+
+*.blend[0-9]*
+*.blend@
+__pycache__/
+.DS_Store

@@ -2,16 +2,16 @@
   "name": "@jev-game/server",
   "version": "0.1.0",
   "private": true,
-  "description": "The Colyseus multiplayer server. Server-only — the browser client lives in apps/client.",
+  "description": "The Colyseus multiplayer server. Server-only \u2014 the browser client lives in apps/client.",
   "license": "UNLICENSED",
   "author": "",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --include '../../packages/**/dist/**/*.js' src/index.ts",
+    "dev": "PORT=2567 tsx watch --include '../../packages/**/dist/**/*.js' src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "mocha --import=tsx \"test/**/*.test.ts\" --timeout 15000",
+    "test": "pnpm --filter \"@jev-game/server^...\" --if-present build && mocha --import=tsx test/Arena.test.ts --timeout 15000 --exit && mocha --import=tsx test/match.test.ts --timeout 60000 --exit",
     "loadtest": "tsx loadtest/example.ts --room arena --numClients 2"
   },
   "dependencies": {
@@ -23,11 +23,15 @@
     "@colyseus/loadtest": "^0.18.1",
     "@colyseus/sdk": "^0.18.1",
     "@colyseus/testing": "^0.18.5",
+    "@jev-game/jev": "workspace:*",
+    "@jev-game/protocol": "workspace:*",
+    "@jev-game/run": "workspace:*",
     "@types/mocha": "^10.0.1",
     "@types/node": "^22.13.13",
     "mocha": "^11.7.5",
     "tsx": "^4.21.0",
-    "typescript": "^5.0.4"
+    "typescript": "^5.0.4",
+    "ws": "^8.18.0"
   },
   "engines": {
     "node": ">= 22.0.0"

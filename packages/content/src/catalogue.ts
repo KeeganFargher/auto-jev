@@ -1,30 +1,63 @@
-import type { Catalogue } from "@jev-game/game";
-import { bruiser } from "./heroes/bruiser.js";
-import { ranger } from "./heroes/ranger.js";
-import { support } from "./heroes/support.js";
-import { strike } from "./abilities/strike.js";
-import { bolt } from "./abilities/bolt.js";
-import { mend } from "./abilities/mend.js";
-import { flatArena } from "./arenas/flat-arena.js";
-import { mendShield } from "./reactions/mend-shield.js";
-import { moreMaxHp } from "./upgrades/more-max-hp.js";
-import { fasterAttacks } from "./upgrades/faster-attacks.js";
-import { extraLightningBounce } from "./upgrades/extra-lightning-bounce.js";
-import { healingThatAlsoShields } from "./upgrades/healing-that-also-shields.js";
-import { strongerShield } from "./upgrades/stronger-shield.js";
-import { bonusDamageVsSlowed } from "./upgrades/bonus-damage-vs-slowed.js";
+import type { AbilityDefinition, Catalogue, HeroDefinition, UpgradeDefinition } from "@jev-game/game";
+import { boardArena } from "./arenas/board-arena.js";
+import { bulwark, bulwarkAbilities, bulwarkTalents } from "./roster/bulwark.js";
+import { oathkeeper, oathkeeperAbilities, oathkeeperTalents } from "./roster/oathkeeper.js";
+import { ravager, ravagerAbilities, ravagerTalents } from "./roster/ravager.js";
+import { duskblade, duskbladeAbilities, duskbladeTalents } from "./roster/duskblade.js";
+import { pyromancer, pyromancerAbilities, pyromancerTalents } from "./roster/pyromancer.js";
+import { frostweaver, frostweaverAbilities, frostweaverTalents } from "./roster/frostweaver.js";
+import { hexbinder, hexbinderAbilities, hexbinderTalents } from "./roster/hexbinder.js";
+import { blightmother, blightmotherAbilities, blightmotherTalents } from "./roster/blightmother.js";
+import { bonecaller, bonecallerAbilities, bonecallerSummons, bonecallerTalents } from "./roster/bonecaller.js";
+import { clockwright, clockwrightAbilities, clockwrightSummons, clockwrightTalents } from "./roster/clockwright.js";
+import { itemAbilities, items } from "./pieces/items.js";
+import { runes } from "./pieces/runes.js";
 
-export const catalogue: Catalogue = {
-  heroes: { [bruiser.id]: bruiser, [ranger.id]: ranger, [support.id]: support },
-  abilities: { [strike.id]: strike, [bolt.id]: bolt, [mend.id]: mend },
-  arenas: { [flatArena.id]: flatArena },
-  upgrades: {
-    [moreMaxHp.id]: moreMaxHp,
-    [fasterAttacks.id]: fasterAttacks,
-    [extraLightningBounce.id]: extraLightningBounce,
-    [healingThatAlsoShields.id]: healingThatAlsoShields,
-    [strongerShield.id]: strongerShield,
-    [bonusDamageVsSlowed.id]: bonusDamageVsSlowed,
-  },
-  reactions: { [mendShield.id]: mendShield },
+const rosterHeroes: HeroDefinition[] = [
+  bulwark,
+  oathkeeper,
+  ravager,
+  duskblade,
+  pyromancer,
+  frostweaver,
+  hexbinder,
+  blightmother,
+  bonecaller,
+  clockwright,
+  ...bonecallerSummons,
+  ...clockwrightSummons,
+];
+
+const rosterAbilities: AbilityDefinition[] = [
+  ...bulwarkAbilities,
+  ...oathkeeperAbilities,
+  ...ravagerAbilities,
+  ...duskbladeAbilities,
+  ...pyromancerAbilities,
+  ...frostweaverAbilities,
+  ...hexbinderAbilities,
+  ...blightmotherAbilities,
+  ...bonecallerAbilities,
+  ...clockwrightAbilities,
+  ...itemAbilities,
+];
+
+const rosterTalents: UpgradeDefinition[] = [
+  ...bulwarkTalents,
+  ...oathkeeperTalents,
+  ...ravagerTalents,
+  ...duskbladeTalents,
+  ...pyromancerTalents,
+  ...frostweaverTalents,
+  ...hexbinderTalents,
+  ...blightmotherTalents,
+  ...bonecallerTalents,
+  ...clockwrightTalents,
+];
+
+export const gameCatalogue: Catalogue = {
+  heroes: Object.fromEntries(rosterHeroes.map((hero) => [hero.id, hero])),
+  abilities: Object.fromEntries(rosterAbilities.map((ability) => [ability.id, ability])),
+  arenas: { [boardArena.id]: boardArena },
+  upgrades: Object.fromEntries([...rosterTalents, ...items, ...runes].map((upgrade) => [upgrade.id, upgrade])),
 };

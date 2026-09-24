@@ -8,7 +8,9 @@ import {
   LobbyRoom,
 } from "colyseus";
 
+import { MATCH_ROOM_NAME } from "@jev-game/protocol";
 import { Arena } from "./rooms/arena.js";
+import { MatchRoom } from "./rooms/match-room.js";
 
 const server = defineServer({
   /**
@@ -16,6 +18,7 @@ const server = defineServer({
    */
   rooms: {
     arena: defineRoom(Arena).enableRealtimeListing(),
+    [MATCH_ROOM_NAME]: defineRoom(MatchRoom),
     lobby: defineRoom(LobbyRoom),
   },
 

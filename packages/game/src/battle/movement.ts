@@ -14,7 +14,7 @@ export function proposeMovement(
   arenaWidth: number,
   arenaHeight: number,
 ): MovementProposal {
-  if (target === null) {
+  if (target === null || unit.control !== null) {
     return { unitId: unit.unitId, position: unit.position };
   }
 

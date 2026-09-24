@@ -37,11 +37,60 @@ function describe(event: BattleEvent): string {
     case "status-expired":
       return `${event.unitId}'s ${event.status} expired`;
 
+    case "condition-applied":
+      return `${event.targetUnitId} is ${event.condition}`;
+
+    case "combo-detonated":
+      return `${event.combo.toUpperCase()}! ${event.sourceUnitId} detonated ${event.targetUnitId}'s ${event.condition} for ${event.bonusDamage} extra`;
+
+    case "status-applied":
+      return `${event.targetUnitId} is ${event.status}${event.stacks === undefined ? "" : ` x${event.stacks}`}`;
+
+    case "unit-moved":
+      return `${event.unitId} ${event.reason === "blink" ? "blinked" : "was knocked back"}`;
+
+    case "impact-scheduled":
+      return `${event.sourceUnitId}'s ${event.abilityId} is coming down`;
+
+    case "impact-landed":
+      return `${event.abilityId} landed`;
+
+    case "zone-created":
+      return `${event.sourceUnitId} left ${event.abilityId} on the ground`;
+
+    case "zone-expired":
+      return `a zone faded`;
+
+    case "attack-evaded":
+      return `${event.targetUnitId} dodged ${event.sourceUnitId}`;
+
+    case "revived":
+      return `${event.unitId} came back with ${event.hp} HP`;
+
+    case "unit-spawned":
+      return `${event.summonerUnitId} raised a ${event.heroId}`;
+
+    case "unit-dismissed":
+      return `${event.unitId} was dismissed`;
+
+    case "passive-triggered":
+      return `${event.unitId}: ${event.passive}`;
+
+    case "hp-paid":
+      return `${event.unitId} paid ${event.amount} HP (${event.reason})`;
+
     case "death":
       return `${event.unitId} died`;
 
-    case "battle-ended":
-      return `battle ended (${JSON.stringify(event.result)})`;
+    case "battle-ended": {
+      const { result } = event;
+
+      if (result.kind === "win") {
+        return `battle over, ${result.winningTeamId} wins`;
+      }
+
+      return `battle over, ${result.kind} (${result.reason})`;
+    }
 
     default: {
       const exhaustive: never = event;

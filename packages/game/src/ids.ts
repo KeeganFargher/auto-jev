@@ -6,8 +6,6 @@ export type ArenaDefinitionId = string;
 
 export type UpgradeDefinitionId = string;
 
-export type ReactionDefinitionId = string;
-
 export type UnitId = string;
 
 export type TeamId = string;

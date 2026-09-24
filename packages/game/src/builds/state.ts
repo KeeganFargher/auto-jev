@@ -11,6 +11,9 @@ export interface HeroBuild {
   buildId: string;
   heroId: HeroDefinitionId;
   upgrades: HeroBuildUpgradeSelection[];
+  itemIds?: UpgradeDefinitionId[];
+  runeIds?: UpgradeDefinitionId[];
+  extraRuneSockets?: number;
 }
 
 export function createHeroBuild(
@@ -26,4 +29,26 @@ export function createHeroBuild(
   }
 
   return build;
+}
+
+export function withEquipment(
+  build: HeroBuild,
+  itemIds: readonly UpgradeDefinitionId[],
+  runeIds: readonly UpgradeDefinitionId[],
+): HeroBuild {
+  const equipped: HeroBuild = { ...build };
+
+  if (itemIds.length > 0) {
+    equipped.itemIds = [...itemIds];
+  } else {
+    delete equipped.itemIds;
+  }
+
+  if (runeIds.length > 0) {
+    equipped.runeIds = [...runeIds];
+  } else {
+    delete equipped.runeIds;
+  }
+
+  return equipped;
 }

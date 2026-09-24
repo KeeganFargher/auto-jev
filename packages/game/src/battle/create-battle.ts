@@ -1,9 +1,15 @@
 import type { ArenaDefinitionId, TeamId, UnitId } from "../ids.js";
-import type { Catalogue } from "../definitions.js";
+import type { Catalogue, HeroDefinition } from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
-import type { BattleState, UnitState } from "./state.js";
+import type { BattleState, TeamComboTiers, UnitMemory, UnitState } from "./state.js";
 import type { HeroBuild } from "../builds/state.js";
-import { compileBuild } from "../builds/compile-build.js";
+import { compileBuild, type CompiledUnitStats } from "../builds/compile-build.js";
+import {
+  ATTUNEMENT_ARCANA_MANA_GAIN,
+  ATTUNEMENT_CUNNING_CRIT_CHANCE,
+  ATTUNEMENT_MIGHT_MAX_HP,
+  compileTeamTraits,
+} from "../builds/traits.js";
 import { createRng, nextInt, type RngState } from "../random/rng.js";
 import { DEFAULT_TICK_LIMIT } from "../constants.js";
 
@@ -41,6 +47,139 @@ function initialAbilityCooldowns(abilityIds: readonly string[]) {
   }
 
   return cooldowns;
+}
+
+export function emptyUnitMemory(): UnitMemory {
+  return {
+    firedThresholds: [],
+    slowHistory: {},
+    grudgeStacks: 0,
+    retributionPool: 0,
+    retributionEndsAtTick: 0,
+    damageSinceRetaliate: 0,
+    firstHitTargets: [],
+    basicAttackCounts: {},
+    revived: false,
+    signatureCasts: 0,
+    refillUsed: false,
+    souls: 0,
+    lastRitesUsed: 0,
+    summonsRaised: 0,
+    openerFired: false,
+    lastWordUsed: false,
+    mirrorUsed: false,
+    sentinelUsed: false,
+    tandemReadyTick: 0,
+  };
+}
+
+export function createUnitState(
+  unitId: UnitId,
+  teamId: TeamId,
+  build: HeroBuild,
+  spawn: Vector2,
+  hero: HeroDefinition,
+  compiled: CompiledUnitStats,
+  summonerUnitId: UnitId | null,
+): UnitState {
+  const memory = emptyUnitMemory();
+
+  for (const passive of compiled.passives) {
+    if (passive.kind === "soul-well") {
+      memory.souls += passive.souls;
+    }
+  }
+
+  return {
+    unitId,
+    heroId: build.heroId,
+    build,
+    teamId,
+    position: { x: spawn.x, y: spawn.y },
+    hp: compiled.maxHp,
+    maxHp: compiled.maxHp,
+    moveSpeedUnitsPerSecond: compiled.moveSpeedUnitsPerSecond,
+    targetUnitId: null,
+    abilityCooldowns: initialAbilityCooldowns([...hero.abilityIds, hero.basicAttackId]),
+    abilityCooldownDurations: compiled.abilityCooldownDurations,
+    shield: null,
+    slow: null,
+    alive: true,
+    damageDealt: 0,
+    school: compiled.school,
+    armor: compiled.armor,
+    critChance: compiled.critChance,
+    critMultiplier: compiled.critMultiplier,
+    damageMultiplier: compiled.damageMultiplier,
+    lifesteal: compiled.lifesteal,
+    slowStrengthBonus: compiled.slowStrengthBonus,
+    conditionDurationBonusTicks: compiled.conditionDurationBonusTicks,
+    dotDamageMultiplier: compiled.dotDamageMultiplier,
+    dotMaxStacksBonus: compiled.dotMaxStacksBonus,
+    mana: compiled.maxMana > 0 ? Math.min(compiled.maxMana, compiled.startingMana) : 0,
+    maxMana: compiled.maxMana,
+    manaPerAttack: compiled.manaPerAttack,
+    signatureAbilityId: compiled.signatureAbilityId,
+    abilities: compiled.abilities,
+    passives: compiled.passives,
+    condition: null,
+    control: null,
+    taunt: null,
+    invulnerableUntilTick: 0,
+    untargetableUntilTick: 0,
+    dots: [],
+    attackSpeedBonus: 0,
+    memory,
+    summonerUnitId,
+    link: null,
+    channel: null,
+  };
+}
+
+function applyAttunement(units: UnitState[], compiledByUnit: ReadonlyMap<UnitId, CompiledUnitStats>, catalogue: Catalogue): Record<TeamId, TeamComboTiers> {
+  const comboTiers: Record<TeamId, TeamComboTiers> = {};
+  const teamIds = [...new Set(units.map((unit) => unit.teamId))];
+
+  for (const teamId of teamIds) {
+    const teamUnits = units.filter((unit) => unit.teamId === teamId);
+    const compiled: CompiledUnitStats[] = [];
+
+    for (const unit of teamUnits) {
+      const stats = compiledByUnit.get(unit.unitId);
+
+      if (stats !== undefined) {
+        compiled.push(stats);
+      }
+    }
+
+    const traits = compileTeamTraits(compiled, catalogue);
+    const tiers: TeamComboTiers = { staggered: 0, brittle: 0, disoriented: 0 };
+
+    for (const combo of traits.combos) {
+      tiers[combo.condition] = combo.tier;
+    }
+
+    comboTiers[teamId] = tiers;
+
+    for (const attunement of traits.attunements) {
+      if (!attunement.active) {
+        continue;
+      }
+
+      for (const unit of teamUnits) {
+        if (attunement.school === "might") {
+          unit.maxHp = Math.round(unit.maxHp * (1 + ATTUNEMENT_MIGHT_MAX_HP));
+          unit.hp = unit.maxHp;
+        } else if (attunement.school === "arcana") {
+          unit.manaPerAttack *= 1 + ATTUNEMENT_ARCANA_MANA_GAIN;
+        } else {
+          unit.critChance = Math.min(1, unit.critChance + ATTUNEMENT_CUNNING_CRIT_CHANCE);
+        }
+      }
+    }
+  }
+
+  return comboTiers;
 }
 
 function shufflePriority(unitIds: readonly UnitId[], rng: RngState): UnitId[] {
@@ -83,6 +222,8 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
     throw new Error(`unknown arena id "${setup.arenaId}"`);
   }
 
+  const compiledByUnit = new Map<UnitId, CompiledUnitStats>();
+
   const units: UnitState[] = setup.units.map((unitSetup) => {
     const hero = catalogue.heroes[unitSetup.build.heroId];
 
@@ -109,28 +250,12 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
     }
 
     const compiled = compileBuild(unitSetup.build, catalogue);
+    compiledByUnit.set(unitSetup.unitId, compiled);
 
-    return {
-      unitId: unitSetup.unitId,
-      heroId: unitSetup.build.heroId,
-      build: unitSetup.build,
-      teamId: unitSetup.teamId,
-      position: { x: unitSetup.spawn.x, y: unitSetup.spawn.y },
-      hp: compiled.maxHp,
-      maxHp: compiled.maxHp,
-      moveSpeedUnitsPerSecond: compiled.moveSpeedUnitsPerSecond,
-      targetUnitId: null,
-      abilityCooldowns: initialAbilityCooldowns([...hero.abilityIds, hero.basicAttackId]),
-      abilityCooldownDurations: compiled.abilityCooldownDurations,
-      chainBounceBonus: compiled.chainBounceBonus,
-      slowedTargetBasicAttackDamageBonusFraction: compiled.slowedTargetBasicAttackDamageBonusFraction,
-      reactions: compiled.reactions,
-      shield: null,
-      slow: null,
-      alive: true,
-      damageDealt: 0,
-    };
+    return createUnitState(unitSetup.unitId, unitSetup.teamId, unitSetup.build, unitSetup.spawn, hero, compiled, null);
   });
+
+  const comboTiers = applyAttunement(units, compiledByUnit, catalogue);
 
   const rng = createRng(setup.seed);
 
@@ -146,6 +271,8 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
     arenaId: setup.arenaId,
     arenaWidth: arena.width,
     arenaHeight: arena.height,
+    arenaColumns: arena.columns,
+    arenaRows: arena.rows,
     tick: 0,
     tickLimit: setup.tickLimit ?? DEFAULT_TICK_LIMIT,
     units,
@@ -153,5 +280,10 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
     eventSequence: 0,
     result: null,
     resolutionPriority,
+    impacts: [],
+    zones: [],
+    echoes: [],
+    comboTiers,
+    nextEntityId: 1,
   };
 }

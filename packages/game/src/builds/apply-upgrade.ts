@@ -15,22 +15,23 @@ export function isUpgradeEligible(build: HeroBuild, upgrade: UpgradeDefinition):
     return false;
   }
 
-  if (upgrade.prerequisiteUpgradeIds !== undefined) {
-    for (const prerequisiteId of upgrade.prerequisiteUpgradeIds) {
-      if (currentStacks(build, prerequisiteId) <= 0) {
-        return false;
-      }
-    }
+  const requiresAnyOf = upgrade.requiresAnyOfUpgradeIds ?? [];
+
+  if (requiresAnyOf.length > 0 && !requiresAnyOf.some((id) => currentStacks(build, id) > 0)) {
+    return false;
+  }
+
+  if ((upgrade.excludesUpgradeIds ?? []).some((id) => currentStacks(build, id) > 0)) {
+    return false;
   }
 
   return true;
 }
 
-export function generateUpgradeOffers(
-  build: HeroBuild,
-  catalogue: Catalogue,
-): UpgradeDefinition[] {
-  return Object.values(catalogue.upgrades).filter((upgrade) => isUpgradeEligible(build, upgrade));
+export function eligibleTalents(build: HeroBuild, catalogue: Catalogue, tier: number): UpgradeDefinition[] {
+  return Object.values(catalogue.upgrades).filter(
+    (upgrade) => upgrade.category === "talent" && upgrade.tier === tier && isUpgradeEligible(build, upgrade),
+  );
 }
 
 export function applyUpgrade(

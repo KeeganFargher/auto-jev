@@ -4,8 +4,72 @@
     {
       "name": "client",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "./apps/client", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "./apps/client",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "client-5180",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "./apps/client",
+        "exec",
+        "vite",
+        "--port",
+        "5180",
+        "--strictPort"
+      ],
+      "port": 5180
+    },
+    {
+      "name": "client-5181",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "./apps/client",
+        "exec",
+        "vite",
+        "--port",
+        "5181",
+        "--strictPort"
+      ],
+      "port": 5181
+    },
+    {
+      "name": "client-5182",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "./apps/client",
+        "exec",
+        "vite",
+        "--port",
+        "5182",
+        "--strictPort"
+      ],
+      "port": 5182
+    },
+    {
+      "name": "server",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && nvm use 24 >/dev/null && pnpm --filter ./apps/server exec tsx src/index.ts"
+      ],
+      "port": 2567
+    },
+    {
+      "name": "server-offline-jev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && nvm use 24 >/dev/null && JEV_PROVIDER=offline pnpm --filter ./apps/server exec tsx src/index.ts"
+      ],
+      "port": 2567
     }
   ]
 }

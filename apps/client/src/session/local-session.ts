@@ -9,38 +9,57 @@ import {
   type BattleState,
 } from "@jev-game/game";
 import {
-  catalogue,
+  gameCatalogue as catalogue,
+  createCustomLabSetup,
   createDuelSetup,
   createThreeVersusThreeSetup,
+  THREE_VERSUS_THREE_TEAM_A,
+  THREE_VERSUS_THREE_TEAM_B,
   validateCatalogue,
 } from "@jev-game/content";
-import type { BattleLabSession, LabScenarioKind, TeamAUpgradeIdsByHero } from "./types.js";
+import type { BattleLabSession, LabScenarioKind, LabTeams, TeamAUpgradeIdsByHero } from "./types.js";
 
 const MAX_STEPS_PER_FRAME = 10;
+
+export const DEFAULT_LAB_TEAMS: LabTeams = { a: THREE_VERSUS_THREE_TEAM_A, b: THREE_VERSUS_THREE_TEAM_B };
 
 function buildSetup(
   scenario: LabScenarioKind,
   seed: number,
   teamAUpgradeIdsByHero: TeamAUpgradeIdsByHero,
+  teams: LabTeams,
 ): BattleSetup {
-  if (scenario === "duel") {
-    return createDuelSetup(seed, teamAUpgradeIdsByHero);
-  }
+  switch (scenario) {
+    case "duel":
+      return createDuelSetup(seed, teamAUpgradeIdsByHero);
 
-  return createThreeVersusThreeSetup(seed, teamAUpgradeIdsByHero);
+    case "three-vs-three":
+      return createThreeVersusThreeSetup(seed, teamAUpgradeIdsByHero);
+
+    case "custom":
+      return createCustomLabSetup(seed, teams.a, teams.b, teamAUpgradeIdsByHero);
+
+    default: {
+      const exhaustive: never = scenario;
+
+      return exhaustive;
+    }
+  }
 }
 
 export function createLocalBattleLabSession(
   initialSeed: number,
   initialScenario: LabScenarioKind = "three-vs-three",
   initialUpgrades: TeamAUpgradeIdsByHero = new Map(),
+  initialTeams: LabTeams = DEFAULT_LAB_TEAMS,
 ): BattleLabSession {
   validateCatalogue(catalogue);
 
   let seed = initialSeed;
   let scenario = initialScenario;
   let teamAUpgradeIdsByHero = initialUpgrades;
-  let state: BattleState = createBattle(buildSetup(scenario, seed, teamAUpgradeIdsByHero), catalogue);
+  let teams = initialTeams;
+  let state: BattleState = createBattle(buildSetup(scenario, seed, teamAUpgradeIdsByHero, teams), catalogue);
   let isRunning = false;
   let speedMultiplier = 1;
   let accumulatedSeconds = 0;
@@ -92,7 +111,7 @@ export function createLocalBattleLabSession(
     },
 
     peekSnapshot() {
-      return { seed, scenario, snapshot: getBattleSnapshot(state) };
+      return { seed, scenario, teams, snapshot: getBattleSnapshot(state) };
     },
 
     getRecording() {
@@ -137,11 +156,12 @@ export function createLocalBattleLabSession(
       notify();
     },
 
-    reset(newSeed, newScenario, newTeamAUpgradeIdsByHero) {
+    reset(newSeed, newScenario, newTeamAUpgradeIdsByHero, newTeams) {
       seed = newSeed;
       scenario = newScenario ?? scenario;
       teamAUpgradeIdsByHero = newTeamAUpgradeIdsByHero ?? teamAUpgradeIdsByHero;
-      state = createBattle(buildSetup(scenario, seed, teamAUpgradeIdsByHero), catalogue);
+      teams = newTeams ?? teams;
+      state = createBattle(buildSetup(scenario, seed, teamAUpgradeIdsByHero, teams), catalogue);
       isRunning = false;
       accumulatedSeconds = 0;
       behindBySteps = 0;

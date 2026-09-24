@@ -1,13 +1,19 @@
 import type { BattleResult } from "@jev-game/game";
 import { createBattleView } from "../views/battle-view.js";
+import type { BoardStage, ViewportInsets } from "../views/board-stage.js";
 import { createEventLogView } from "../../hud/event-log.js";
 import { createUnitInspectorView } from "../../hud/unit-inspector.js";
 import { createBattleControlsView } from "../../hud/battle-controls.js";
-import type { BattleLabSession, LabScenarioKind, TeamAUpgradeIdsByHero } from "../../session/types.js";
+import type { BattleLabSession, LabScenarioKind, LabTeams, TeamAUpgradeIdsByHero } from "../../session/types.js";
+import { audio } from "../../audio/engine.js";
 
 export interface BattleLabScene {
   dispose(): void;
 }
+
+const LAB_FRIENDLY_TEAM_ID = "A";
+
+const LAB_HUD_INSETS: ViewportInsets = { left: 16, right: 16, top: 56, bottom: 88 };
 
 function describeResult(result: BattleResult | null): string {
   if (result === null) {
@@ -26,14 +32,16 @@ function describeResult(result: BattleResult | null): string {
 }
 
 export function createBattleLabScene(
-  canvasRoot: HTMLElement,
+  stage: BoardStage,
   hudRoot: HTMLElement,
   statusEl: HTMLElement,
   session: BattleLabSession,
   onReplay: () => void,
-  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero) => void,
+  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero, teams?: LabTeams) => void,
   isReplay: boolean,
 ): BattleLabScene {
+  void audio.preload("battle");
+
   const barRoot = hudRoot.querySelector<HTMLElement>("#lab-bar")!;
   const unitRoot = hudRoot.querySelector<HTMLElement>("#lab-unit")!;
   const feedRoot = hudRoot.querySelector<HTMLElement>("#lab-feed")!;
@@ -47,16 +55,16 @@ export function createBattleLabScene(
     render();
   }
 
-  const initialSnapshot = session.getView().snapshot;
+  const battleView = createBattleView(stage, {
+    friendlyTeamId: LAB_FRIENDLY_TEAM_ID,
+    viewSide: "south",
+    insets: LAB_HUD_INSETS,
+    targetLines: "all",
+    showUnitIds: true,
+    onSelectUnit: handleSelect,
+  });
 
-  const battleView = createBattleView(
-    canvasRoot,
-    initialSnapshot.arenaWidth,
-    initialSnapshot.arenaHeight,
-    handleSelect,
-  );
-
-  const inspector = createUnitInspectorView(unitRoot);
+  const inspector = createUnitInspectorView(unitRoot, LAB_FRIENDLY_TEAM_ID);
   const eventLog = createEventLogView(feedRoot);
   const controls = createBattleControlsView(barRoot, tuningRoot, upgradesRoot, session, onReplay, onReset);
 

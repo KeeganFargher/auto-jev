@@ -23,6 +23,11 @@
   "dependencies": {
     "@colyseus/playground": "^0.18.3",
     "@colyseus/schema": "^5.0.14",
+    "@jev-game/content": "workspace:*",
+    "@jev-game/game": "workspace:*",
+    "@jev-game/jev": "workspace:*",
+    "@jev-game/protocol": "workspace:*",
+    "@jev-game/run": "workspace:*",
     "@jev-game/shared": "workspace:*",
     "colyseus": "^0.18.2",
     "express": "^5.2.1"

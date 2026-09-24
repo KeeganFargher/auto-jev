@@ -1,151 +1,1168 @@
-import { distance, type BattleEvent, type BattleSnapshot, type UnitState } from "@jev-game/game";
-import { createArenaView } from "./arena-view.js";
 import {
-  DAMAGE_CUE_COLOR,
-  HEAL_CUE_COLOR,
-  SHIELD_CUE_COLOR,
-  drawCastCue,
-  drawTargetLine,
-  drawUnit,
-} from "./unit-view.js";
-
-const CLICK_TOLERANCE_PIXELS = 14;
-
-const CAST_CUE_TICKS = 10;
+  AdditiveBlending,
+  BufferGeometry,
+  DynamicDrawUsage,
+  Float32BufferAttribute,
+  IcosahedronGeometry,
+  Line,
+  LineBasicMaterial,
+  LineDashedMaterial,
+  LineLoop,
+  LineSegments,
+  Mesh,
+  MeshBasicMaterial,
+  OctahedronGeometry,
+  RingGeometry,
+  SphereGeometry,
+  Vector3,
+  type Object3D,
+} from "three";
+import { CONDITION_DURATION_TICKS, type BattleEvent, type BattleSnapshot, type BoardGrid, type ComboKind, type ConditionKind, type DamageDealtEvent, type UnitState } from "@jev-game/game";
+import { abilityDefinition, heroDefinition } from "../catalogues.js";
+import { conditionIcon, statusIcon } from "../../hud/icons.js";
+import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
+import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
+import { playBattleCue } from "../fx/battle-sounds.js";
 
 export interface BattleView {
   update(snapshot: BattleSnapshot, selectedUnitId: string | null, latestEvents: readonly BattleEvent[]): void;
   dispose(): void;
 }
 
-interface RecentCastCue {
-  targetUnitId: string;
-  tick: number;
-  color: string;
+export type TargetLineMode = "all" | "selected";
+
+export interface BattleViewOptions {
+  friendlyTeamId: string;
+  viewSide: ViewSide;
+  insets: ViewportInsets;
+  targetLines: TargetLineMode;
+  showUnitIds: boolean;
+  onSelectUnit: (unitId: string) => void;
 }
 
-function colorForEffectEvent(event: BattleEvent): string | null {
-  if (event.kind === "damage-dealt") {
-    return DAMAGE_CUE_COLOR;
-  }
+const FRIENDLY_COLOR = "#4ea1ff";
 
-  if (event.kind === "healing-done") {
-    return HEAL_CUE_COLOR;
-  }
+const ENEMY_COLOR = "#ff6b6b";
 
-  if (event.kind === "shield-applied") {
-    return SHIELD_CUE_COLOR;
-  }
+const SELECTION_COLOR = "#e2bd5c";
 
-  return null;
+const BOLT_COLOR = "#67e8f9";
+
+const SPARK_COLOR = "#ffd08a";
+
+const HEAL_COLOR = "#4ade80";
+
+const SHIELD_COLOR = "#60a5fa";
+
+const FROST_COLOR = "#67e8f9";
+
+const POSITION_SMOOTHING = 18;
+
+const YAW_SMOOTHING = 12;
+
+const SNAP_DISTANCE_UNITS = 20;
+
+const MOVING_UNITS_PER_SECOND = 3;
+
+const TICK_JUMP_FOR_SNAP = 20;
+
+const PICK_RADIUS_PIXELS = 44;
+
+const PLATE_GAP_UNITS = 1.8;
+
+const CHEST_FRACTION = 0.55;
+
+const PROJECTILE_SECONDS = 0.16;
+
+const ARC_SECONDS = 0.22;
+
+const SPARK_SECONDS = 0.22;
+
+const HEAL_SECONDS = 0.8;
+
+const HEAL_MOTES = 6;
+
+const FLOAT_NUMBER_MILLISECONDS = 900;
+
+const HP_SEGMENT_STEPS = [25, 50, 100, 250, 500, 1000];
+
+const MAX_HP_SEGMENTS = 12;
+
+const RANGED_ATTACK_CELLS = 1.5;
+
+const RANGE_RING_POINTS = 72;
+
+const MAX_TARGET_LINES = 32;
+
+const CONDITION_COLORS: Readonly<Record<ConditionKind, string>> = {
+  staggered: "#ffa928",
+  brittle: "#9fe8ff",
+  disoriented: "#b58cff",
+};
+
+const COMBO_CONDITION: Readonly<Record<ComboKind, ConditionKind>> = {
+  overload: "staggered",
+  shatter: "brittle",
+  crush: "disoriented",
+};
+
+const IMPACT_COLOR = "#ff8a4c";
+
+const SPIN_RADIANS_PER_SECOND = 16;
+
+const HEXED_SCALE = 0.55;
+
+const SPAWN_COLOR = "#9fe0d0";
+
+function zoneColor(abilityId: string): string {
+  switch (abilityId) {
+    case "plague-cloud":
+      return "#8fd14f";
+
+    case "consecrate":
+      return "#f2d27a";
+
+    case "glacial-lance":
+      return "#9fe8ff";
+
+    default:
+      return IMPACT_COLOR;
+  }
 }
 
-export function createBattleView(
-  container: HTMLElement,
-  arenaWidthUnits: number,
-  arenaHeightUnits: number,
-  onSelectUnit: (unitId: string) => void,
-): BattleView {
-  let latestSnapshot: BattleSnapshot | null = null;
-  let latestSelectedUnitId: string | null = null;
-  let recentCastCues: RecentCastCue[] = [];
+const COMBO_BURST_SECONDS = 0.55;
 
-  function render(): void {
-    if (latestSnapshot === null) {
-      return;
-    }
+const BIG_HIT_FRACTION = 0.2;
 
-    const transform = arena.getTransform();
-    arena.drawFloor();
+interface GroundMarker {
+  mesh: Mesh<RingGeometry, MeshBasicMaterial>;
+  seen: boolean;
+}
 
-    for (const unit of latestSnapshot.units) {
-      if (!unit.alive || unit.targetUnitId === null) {
-        continue;
-      }
+interface UnitRecord {
+  unitId: string;
+  figure: HeroFigure;
+  position: Vector3;
+  destination: Vector3;
+  yaw: number;
+  state: UnitState;
+  plate: HTMLElement;
+  plateHp: HTMLElement;
+  plateShield: HTMLElement;
+  plateMana: HTMLElement | null;
+  plateCondition: HTMLElement;
+  plateStatus: HTMLElement;
+  conditionKey: string;
+  statusKey: string;
+  bubble: Mesh<SphereGeometry, MeshBasicMaterial>;
+  frost: Mesh<RingGeometry, MeshBasicMaterial>;
+  conditionRing: Mesh<RingGeometry, MeshBasicMaterial>;
+}
 
-      const target = latestSnapshot.units.find(
-        (candidate) => candidate.unitId === unit.targetUnitId,
-      );
+interface TransientEffect {
+  objects: Object3D[];
+  age: number;
+  duration: number;
+  step: (progress: number) => void;
+  onDone: (() => void) | null;
+}
 
-      if (target === undefined || !target.alive) {
-        continue;
-      }
+function angleToward(fromX: number, fromZ: number, toX: number, toZ: number): number {
+  return Math.atan2(toX - fromX, toZ - fromZ);
+}
 
-      drawTargetLine(arena.ctx, unit, target, transform);
-    }
+function approachAngle(current: number, target: number, amount: number): number {
+  let delta = target - current;
 
-    for (const unit of latestSnapshot.units) {
-      drawUnit(arena.ctx, unit, unit.unitId === latestSelectedUnitId, transform);
-    }
-
-    for (const cue of recentCastCues) {
-      const target = latestSnapshot.units.find((candidate) => candidate.unitId === cue.targetUnitId);
-
-      if (target === undefined) {
-        continue;
-      }
-
-      const age = latestSnapshot.tick - cue.tick;
-      drawCastCue(arena.ctx, target.position, cue.color, 1 - age / CAST_CUE_TICKS, transform);
-    }
+  while (delta > Math.PI) {
+    delta -= Math.PI * 2;
   }
 
-  const arena = createArenaView(container, arenaWidthUnits, arenaHeightUnits, render);
-
-  function handleClick(event: MouseEvent): void {
-    if (latestSnapshot === null) {
-      return;
-    }
-
-    const rect = arena.canvas.getBoundingClientRect();
-    const transform = arena.getTransform();
-
-    const worldPoint = transform.canvasToWorld({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
-
-    let closest: UnitState | null = null;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    for (const unit of latestSnapshot.units) {
-      const candidateDistance = distance(unit.position, worldPoint);
-
-      if (candidateDistance < closestDistance) {
-        closest = unit;
-        closestDistance = candidateDistance;
-      }
-    }
-
-    const toleranceWorldUnits = CLICK_TOLERANCE_PIXELS / transform.scale;
-
-    if (closest !== null && closestDistance <= toleranceWorldUnits) {
-      onSelectUnit(closest.unitId);
-    }
+  while (delta < -Math.PI) {
+    delta += Math.PI * 2;
   }
 
-  arena.canvas.addEventListener("click", handleClick);
+  return current + delta * amount;
+}
 
+function basicAttackRange(heroId: string): number {
+  const hero = heroDefinition(heroId);
+
+  return hero === undefined ? 0 : (abilityDefinition(hero.basicAttackId)?.range ?? 0);
+}
+
+export function snapshotGrid(snapshot: BattleSnapshot): BoardGrid {
   return {
-    update(snapshot, selectedUnitId, latestEvents) {
-      latestSnapshot = snapshot;
-      latestSelectedUnitId = selectedUnitId;
+    width: snapshot.arenaWidth,
+    height: snapshot.arenaHeight,
+    columns: snapshot.arenaColumns,
+    rows: snapshot.arenaRows,
+  };
+}
 
-      for (const event of latestEvents) {
-        const color = colorForEffectEvent(event);
+function hpPerSegment(maxHp: number): number {
+  for (const step of HP_SEGMENT_STEPS) {
+    if (maxHp / step <= MAX_HP_SEGMENTS) {
+      return step;
+    }
+  }
 
-        if (color !== null && "targetUnitId" in event) {
-          recentCastCues.push({ targetUnitId: event.targetUnitId, tick: event.tick, color });
+  return maxHp / MAX_HP_SEGMENTS;
+}
+
+function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean): HTMLElement {
+  const plate = document.createElement("div");
+  plate.className = `unit-plate ${isFriendly ? "is-friendly" : "is-enemy"}`;
+
+  const maxHp = Math.max(1, unit.maxHp);
+  const bar = document.createElement("div");
+  bar.className = "unit-plate-bar";
+  bar.style.setProperty("--segment-width", `${(hpPerSegment(maxHp) / maxHp) * 100}%`);
+
+  const hp = document.createElement("div");
+  hp.className = "unit-plate-hp";
+
+  const shield = document.createElement("div");
+  shield.className = "unit-plate-shield";
+
+  bar.append(hp, shield);
+
+  const condition = document.createElement("div");
+  condition.className = "unit-plate-condition";
+  condition.hidden = true;
+
+  const status = document.createElement("div");
+  status.className = "unit-plate-status";
+
+  plate.append(condition, status, bar);
+
+  if (unit.maxMana > 0) {
+    const mana = document.createElement("div");
+    mana.className = "unit-plate-mana";
+    const fill = document.createElement("div");
+    fill.className = "unit-plate-mana-fill";
+    mana.append(fill);
+    plate.append(mana);
+  }
+
+  if (showUnitId) {
+    const label = document.createElement("div");
+    label.className = "unit-plate-label";
+    label.textContent = unit.unitId;
+    plate.append(label);
+  }
+
+  return plate;
+}
+
+export function createBattleView(stage: BoardStage, options: BattleViewOptions): BattleView {
+  const records = new Map<string, UnitRecord>();
+  const effects: TransientEffect[] = [];
+  const chainTargets = new Map<number, string>();
+
+  const bubbleGeometry = new SphereGeometry(6.4, 20, 14);
+  const frostGeometry = new RingGeometry(4.9, 5.8, 32);
+  const sparkGeometry = new OctahedronGeometry(1, 0);
+  const boltGeometry = new OctahedronGeometry(0.7, 0);
+  const moteGeometry = new IcosahedronGeometry(0.45, 0);
+  const selectionGeometry = new RingGeometry(5.2, 6.1, 40);
+
+  const selectionRing = new Mesh(
+    selectionGeometry,
+    new MeshBasicMaterial({ color: SELECTION_COLOR, transparent: true, opacity: 0.95, depthWrite: false }),
+  );
+
+  selectionRing.rotation.x = -Math.PI / 2;
+  selectionRing.visible = false;
+
+  const rangeRing = new LineLoop(
+    new BufferGeometry(),
+    new LineDashedMaterial({ color: SELECTION_COLOR, dashSize: 1.6, gapSize: 1.2, transparent: true, opacity: 0.7 }),
+  );
+
+  rangeRing.visible = false;
+
+  const targetLineGeometry = new BufferGeometry();
+  const targetLinePositions = new Float32BufferAttribute(new Float32Array(MAX_TARGET_LINES * 6), 3);
+  targetLinePositions.setUsage(DynamicDrawUsage);
+  targetLineGeometry.setAttribute("position", targetLinePositions);
+
+  const targetLines = new LineSegments(
+    targetLineGeometry,
+    new LineDashedMaterial({ color: "#ffffff", dashSize: 1.2, gapSize: 1, transparent: true, opacity: 0.35 }),
+  );
+
+  stage.scene.add(selectionRing, rangeRing, targetLines);
+
+  let snapshot: BattleSnapshot | null = null;
+  const groundMarkers = new Map<string, GroundMarker>();
+  let selectedUnitId: string | null = null;
+  let rangeRingRadius = -1;
+  let lastTick = -1;
+
+  function chestOf(record: UnitRecord): Vector3 {
+    return record.position.clone().setY(record.figure.height * CHEST_FRACTION);
+  }
+
+  function addEffect(effect: TransientEffect): void {
+    for (const object of effect.objects) {
+      stage.scene.add(object);
+    }
+
+    effects.push(effect);
+    effect.step(0);
+  }
+
+  function disposeEffectObjects(effect: TransientEffect): void {
+    for (const object of effect.objects) {
+      object.removeFromParent();
+
+      if (object instanceof Mesh || object instanceof Line) {
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+
+        for (const surface of materials) {
+          surface.dispose();
+        }
+
+        if (object.geometry !== sparkGeometry && object.geometry !== boltGeometry && object.geometry !== moteGeometry) {
+          object.geometry.dispose();
         }
       }
+    }
+  }
 
-      recentCastCues = recentCastCues.filter((cue) => snapshot.tick - cue.tick < CAST_CUE_TICKS);
-      render();
+  function floatNumber(record: UnitRecord, text: string, kind: string): HTMLElement | null {
+    const point = stage.toScreen(record.position.clone().setY(record.figure.height + PLATE_GAP_UNITS));
+
+    if (point === null) {
+      return null;
+    }
+
+    const element = document.createElement("div");
+    element.className = `float-number is-${kind}`;
+    element.textContent = text;
+    element.style.left = `${point.x + (Math.random() - 0.5) * 18}px`;
+    element.style.top = `${point.y - 12}px`;
+    stage.overlay.append(element);
+    window.setTimeout(() => element.remove(), FLOAT_NUMBER_MILLISECONDS);
+
+    return element;
+  }
+
+  function spark(record: UnitRecord): void {
+    const mesh = new Mesh(
+      sparkGeometry,
+      new MeshBasicMaterial({ color: SPARK_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    const center = chestOf(record);
+
+    addEffect({
+      objects: [mesh],
+      age: 0,
+      duration: SPARK_SECONDS,
+      onDone: null,
+      step(progress) {
+        mesh.position.copy(center);
+        mesh.scale.setScalar(0.6 + progress * 2.6);
+        mesh.rotation.y = progress * 2;
+        mesh.material.opacity = 1 - progress;
+      },
+    });
+  }
+
+  function landHit(event: DamageDealtEvent): void {
+    const record = records.get(event.targetUnitId);
+
+    if (record === undefined) {
+      return;
+    }
+
+    const { amount, shieldAbsorbed: absorbed } = event;
+
+    if (event.dot === undefined) {
+      record.figure.trigger("hit");
+      spark(record);
+      playBattleCue("hit", panOf(record));
+    }
+
+    const total = amount + absorbed;
+    const big = total >= record.state.maxHp * BIG_HIT_FRACTION;
+
+    if (amount > 0) {
+      let kind = event.dot === undefined ? "damage" : `dot is-${event.dot}`;
+
+      if (event.reaction === true && event.dot === undefined) {
+        kind = "damage is-echo";
+      }
+
+      if (event.combo !== undefined) {
+        kind = "damage is-combo";
+      } else if (event.crit === true) {
+        kind = big ? "damage is-crit is-huge" : "damage is-crit";
+      } else if (big) {
+        kind = "damage is-big";
+      }
+
+      const element = floatNumber(record, String(amount), kind);
+
+      if (element !== null && event.combo !== undefined) {
+        element.dataset.condition = COMBO_CONDITION[event.combo];
+      }
+    }
+
+    if (absorbed > 0) {
+      floatNumber(record, String(absorbed), "absorbed");
+    }
+  }
+
+  function groundRing(x: number, z: number, inner: number, outer: number, color: string, opacity: number): Mesh<RingGeometry, MeshBasicMaterial> {
+    const mesh = new Mesh(
+      new RingGeometry(inner, outer, 40),
+      new MeshBasicMaterial({ color, transparent: true, opacity, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.18, z);
+
+    return mesh;
+  }
+
+  function comboBurst(targetId: string, combo: ComboKind): void {
+    const record = records.get(targetId);
+
+    if (record === undefined) {
+      return;
+    }
+
+    const condition = COMBO_CONDITION[combo];
+    const ring = groundRing(record.position.x, record.position.z, 1.5, 3, CONDITION_COLORS[condition], 0.9);
+
+    const flash = new Mesh(
+      sparkGeometry,
+      new MeshBasicMaterial({ color: CONDITION_COLORS[condition], transparent: true, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    const center = chestOf(record);
+
+    addEffect({
+      objects: [ring, flash],
+      age: 0,
+      duration: COMBO_BURST_SECONDS,
+      onDone: null,
+      step(progress) {
+        ring.scale.setScalar(1 + progress * 3.5);
+        ring.material.opacity = 0.9 * (1 - progress);
+        flash.position.copy(center);
+        flash.scale.setScalar(1.5 + progress * 5);
+        flash.rotation.y = progress * 4;
+        flash.material.opacity = 1 - progress;
+      },
+    });
+
+    const label = floatNumber(record, `${combo.toUpperCase()}!`, "combo-label");
+
+    if (label !== null) {
+      label.dataset.condition = condition;
+    }
+  }
+
+  function impactFlash(x: number, z: number, radius: number, color: string): void {
+    const ring = groundRing(x, z, Math.max(0.5, radius * 0.2), Math.max(1, radius), color, 0.95);
+
+    addEffect({
+      objects: [ring],
+      age: 0,
+      duration: COMBO_BURST_SECONDS,
+      onDone: null,
+      step(progress) {
+        ring.scale.setScalar(1 + progress * 0.6);
+        ring.material.opacity = 0.95 * (1 - progress);
+      },
+    });
+  }
+
+  function projectile(sourceId: string, targetId: string, onDone: () => void): void {
+    const source = records.get(sourceId);
+    const target = records.get(targetId);
+
+    if (source === undefined || target === undefined) {
+      onDone();
+
+      return;
+    }
+
+    const mesh = new Mesh(
+      boltGeometry,
+      new MeshBasicMaterial({ color: BOLT_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    mesh.scale.set(0.8, 0.8, 3.2);
+    const start = chestOf(source);
+
+    addEffect({
+      objects: [mesh],
+      age: 0,
+      duration: PROJECTILE_SECONDS,
+      onDone,
+      step(progress) {
+        const end = chestOf(target);
+        mesh.position.lerpVectors(start, end, progress);
+        mesh.lookAt(end);
+      },
+    });
+  }
+
+  function arc(fromId: string, toId: string, onDone: () => void): void {
+    const from = records.get(fromId);
+    const to = records.get(toId);
+
+    if (from === undefined || to === undefined) {
+      onDone();
+
+      return;
+    }
+
+    const start = chestOf(from);
+    const end = chestOf(to);
+    const points: number[] = [];
+    const segments = 7;
+
+    for (let index = 0; index <= segments; index += 1) {
+      const point = start.clone().lerp(end, index / segments);
+      const jitter = index === 0 || index === segments ? 0 : 1.1;
+      points.push(point.x + (Math.random() - 0.5) * jitter, point.y + (Math.random() - 0.5) * jitter, point.z);
+    }
+
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(points, 3));
+
+    const line = new Line(
+      geometry,
+      new LineBasicMaterial({ color: BOLT_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    let landed = false;
+
+    addEffect({
+      objects: [line],
+      age: 0,
+      duration: ARC_SECONDS,
+      onDone: null,
+      step(progress) {
+        line.material.opacity = 1 - progress;
+
+        if (!landed && progress >= 0.3) {
+          landed = true;
+          onDone();
+        }
+      },
+    });
+  }
+
+  function healBurst(record: UnitRecord, amount: number): void {
+    const motes: Mesh<IcosahedronGeometry, MeshBasicMaterial>[] = [];
+
+    for (let index = 0; index < HEAL_MOTES; index += 1) {
+      motes.push(
+        new Mesh(
+          moteGeometry,
+          new MeshBasicMaterial({ color: HEAL_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+        ),
+      );
+    }
+
+    addEffect({
+      objects: motes,
+      age: 0,
+      duration: HEAL_SECONDS,
+      onDone: null,
+      step(progress) {
+        motes.forEach((mote, index) => {
+          const angle = (index / HEAL_MOTES) * Math.PI * 2 + progress * 3;
+          const radius = 2.6 - progress;
+          mote.position.set(
+            record.position.x + Math.cos(angle) * radius,
+            1 + progress * record.figure.height,
+            record.position.z + Math.sin(angle) * radius,
+          );
+          mote.material.opacity = 1 - progress;
+        });
+      },
+    });
+
+    floatNumber(record, `+${amount}`, "heal");
+    playBattleCue("heal", panOf(record));
+  }
+
+  function panOf(record: UnitRecord): number | undefined {
+    const point = stage.toScreen(record.position);
+    const width = stage.canvas.clientWidth;
+
+    return point === null || width === 0 ? undefined : (point.x / width) * 2 - 1;
+  }
+
+  function isRangedAbility(abilityId: string): boolean {
+    const ability = abilityDefinition(abilityId);
+    const grid = snapshot === null ? null : snapshotGrid(snapshot);
+    const cell = grid === null ? 10 : grid.width / grid.columns;
+
+    return ability !== undefined && ability.range > cell * RANGED_ATTACK_CELLS;
+  }
+
+  function handleEvent(event: BattleEvent): void {
+    if (event.kind === "cast") {
+      const record = records.get(event.sourceUnitId);
+
+      if (record === undefined) {
+        return;
+      }
+
+      const melee = event.isBasicAttack && !isRangedAbility(event.abilityId);
+      record.figure.trigger(melee ? "attack" : "cast");
+      playBattleCue(melee ? "swing" : "cast", panOf(record));
+
+      return;
+    }
+
+    if (event.kind === "combo-detonated") {
+      comboBurst(event.targetUnitId, event.combo);
+
+      return;
+    }
+
+    if (event.kind === "unit-spawned") {
+      const center = stage.toScene(event.position, 0);
+      impactFlash(center.x, center.z, 8, SPAWN_COLOR);
+
+      return;
+    }
+
+    if (event.kind === "impact-landed") {
+      const center = stage.toScene(event.center, 0);
+      impactFlash(center.x, center.z, event.radiusUnits, IMPACT_COLOR);
+
+      return;
+    }
+
+    if (event.kind === "damage-dealt") {
+      const land = (): void => landHit(event);
+
+      if (event.dot !== undefined || event.reaction === true || !isRangedAbility(event.abilityId)) {
+        land();
+
+        return;
+      }
+
+      const previousTarget = chainTargets.get(event.causeSequence);
+      chainTargets.set(event.causeSequence, event.targetUnitId);
+
+      if (previousTarget === undefined) {
+        projectile(event.sourceUnitId, event.targetUnitId, land);
+      } else {
+        arc(previousTarget, event.targetUnitId, land);
+      }
+
+      return;
+    }
+
+    if (event.kind === "healing-done") {
+      const record = records.get(event.targetUnitId);
+
+      if (record !== undefined) {
+        healBurst(record, event.amount);
+      }
+
+      return;
+    }
+
+    if (event.kind === "hp-paid") {
+      const record = records.get(event.unitId);
+
+      if (record !== undefined) {
+        floatNumber(record, String(event.amount), "paid");
+      }
+
+      return;
+    }
+
+    if (event.kind === "death") {
+      const record = records.get(event.unitId);
+
+      if (record !== undefined) {
+        record.figure.setDead(true);
+        playBattleCue("death", panOf(record));
+      }
+    }
+  }
+
+  function createRecord(unit: UnitState): UnitRecord {
+    const isFriendly = unit.teamId === options.friendlyTeamId;
+    const figure = createHeroFigure(unit.heroId);
+    figure.setTeamColor(isFriendly ? FRIENDLY_COLOR : ENEMY_COLOR);
+    stage.scene.add(figure.root);
+
+    const bubble = new Mesh(
+      bubbleGeometry,
+      new MeshBasicMaterial({ color: SHIELD_COLOR, transparent: true, opacity: 0.22, depthWrite: false }),
+    );
+
+    bubble.visible = false;
+
+    const frost = new Mesh(
+      frostGeometry,
+      new MeshBasicMaterial({ color: FROST_COLOR, transparent: true, opacity: 0.45, depthWrite: false }),
+    );
+
+    frost.rotation.x = -Math.PI / 2;
+    frost.visible = false;
+
+    const conditionRing = new Mesh(
+      frostGeometry,
+      new MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.7, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    conditionRing.rotation.x = -Math.PI / 2;
+    conditionRing.visible = false;
+    stage.scene.add(bubble, frost, conditionRing);
+
+    const plate = createPlate(unit, isFriendly, options.showUnitIds);
+    stage.overlay.append(plate);
+
+    const position = stage.toScene(unit.position, 0);
+    const initialYaw = options.viewSide === "south" ? Math.PI : 0;
+    const facingYaw = isFriendly ? initialYaw : initialYaw + Math.PI;
+
+    return {
+      unitId: unit.unitId,
+      figure,
+      position,
+      destination: position.clone(),
+      yaw: facingYaw,
+      state: unit,
+      plate,
+      plateHp: plate.querySelector<HTMLElement>(".unit-plate-hp")!,
+      plateShield: plate.querySelector<HTMLElement>(".unit-plate-shield")!,
+      plateMana: plate.querySelector<HTMLElement>(".unit-plate-mana-fill"),
+      plateCondition: plate.querySelector<HTMLElement>(".unit-plate-condition")!,
+      plateStatus: plate.querySelector<HTMLElement>(".unit-plate-status")!,
+      conditionKey: "",
+      statusKey: "",
+      bubble,
+      frost,
+      conditionRing,
+    };
+  }
+
+  function removeRecord(record: UnitRecord): void {
+    record.figure.dispose();
+    record.bubble.removeFromParent();
+    record.bubble.material.dispose();
+    record.frost.removeFromParent();
+    record.frost.material.dispose();
+    record.conditionRing.removeFromParent();
+    record.conditionRing.material.dispose();
+    record.plate.remove();
+  }
+
+  function syncRecords(next: BattleSnapshot, snapAll: boolean): void {
+    const present = new Set<string>();
+
+    for (const unit of next.units) {
+      present.add(unit.unitId);
+      let record = records.get(unit.unitId);
+
+      if (record === undefined) {
+        record = createRecord(unit);
+        records.set(unit.unitId, record);
+      }
+
+      record.state = unit;
+      record.destination = stage.toScene(unit.position, 0);
+
+      if (snapAll || record.destination.distanceTo(record.position) > SNAP_DISTANCE_UNITS) {
+        record.position.copy(record.destination);
+      }
+
+      if (snapAll && unit.alive) {
+        record.figure.setDead(false);
+      }
+
+      if (!unit.alive) {
+        record.figure.setDead(true);
+      }
+
+      const hpFraction = Math.max(0, unit.hp / Math.max(1, unit.maxHp));
+      const shieldFraction = unit.shield === null ? 0 : Math.min(1, unit.shield.amount / Math.max(1, unit.maxHp));
+      record.plateHp.style.width = `${hpFraction * 100}%`;
+      record.plateShield.style.width = `${shieldFraction * 100}%`;
+      record.plate.hidden = !unit.alive;
+      record.bubble.visible = unit.alive && unit.shield !== null;
+      record.frost.visible = unit.alive && unit.slow !== null && unit.condition === null;
+      syncPlateExtras(record, unit, next.tick);
+    }
+
+    for (const [unitId, record] of records) {
+      if (!present.has(unitId)) {
+        removeRecord(record);
+        records.delete(unitId);
+      }
+    }
+  }
+
+  function syncPlateExtras(record: UnitRecord, unit: UnitState, tick: number): void {
+    if (record.plateMana !== null) {
+      record.plateMana.style.width = `${Math.min(100, (unit.mana / Math.max(1, unit.maxMana)) * 100)}%`;
+      record.plateMana.parentElement?.classList.toggle("is-full", unit.mana >= unit.maxMana);
+    }
+
+    const condition = unit.alive ? unit.condition : null;
+    const conditionKey = condition === null ? "" : condition.condition;
+
+    if (conditionKey !== record.conditionKey) {
+      record.conditionKey = conditionKey;
+      record.plateCondition.hidden = condition === null;
+      record.plateCondition.replaceChildren(...(condition === null ? [] : [conditionIcon(condition.condition)]));
+
+      if (condition !== null) {
+        record.plateCondition.dataset.condition = condition.condition;
+        record.conditionRing.material.color.set(CONDITION_COLORS[condition.condition]);
+      }
+    }
+
+    if (condition !== null) {
+      const remaining = Math.max(0, Math.min(1, (condition.expiresAtTick - tick) / CONDITION_DURATION_TICKS));
+      record.plateCondition.style.setProperty("--remaining", String(remaining));
+    }
+
+    record.conditionRing.visible = condition !== null;
+
+    const statuses: { kind: string; buff: boolean; stacks: number }[] = [];
+
+    if (unit.alive && unit.control !== null) {
+      statuses.push({ kind: unit.control.control, buff: false, stacks: 0 });
+    }
+
+    if (unit.alive && unit.taunt !== null) {
+      statuses.push({ kind: "taunted", buff: false, stacks: 0 });
+    }
+
+    if (unit.alive) {
+      for (const dot of unit.dots) {
+        statuses.push({ kind: dot.dot, buff: false, stacks: dot.stacks });
+      }
+    }
+
+    if (unit.alive && unit.invulnerableUntilTick !== 0) {
+      statuses.push({ kind: "invulnerable", buff: true, stacks: 0 });
+    }
+
+    if (unit.alive && unit.untargetableUntilTick !== 0) {
+      statuses.push({ kind: "untargetable", buff: true, stacks: 0 });
+    }
+
+    if (unit.alive && unit.link !== null) {
+      statuses.push({ kind: "linked", buff: false, stacks: 0 });
+    }
+
+    if (unit.alive && unit.channel !== null) {
+      statuses.push({ kind: "channeling", buff: true, stacks: 0 });
+    }
+
+    const statusKey = statuses.map((status) => `${status.kind}:${status.stacks}`).join("|");
+
+    if (statusKey === record.statusKey) {
+      return;
+    }
+
+    record.statusKey = statusKey;
+    record.plateStatus.replaceChildren(
+      ...statuses.map((status) => {
+        const chip = document.createElement("span");
+        chip.className = status.buff ? "status-chip is-buff" : "status-chip is-debuff";
+        chip.dataset.status = status.kind;
+        chip.append(statusIcon(status.kind));
+
+        if (status.stacks > 1) {
+          const stacks = document.createElement("span");
+          stacks.className = "status-stacks";
+          stacks.textContent = String(status.stacks);
+          chip.append(stacks);
+        }
+
+        return chip;
+      }),
+    );
+  }
+
+  function syncGroundMarkers(next: BattleSnapshot): void {
+    for (const marker of groundMarkers.values()) {
+      marker.seen = false;
+    }
+
+    for (const impact of next.impacts) {
+      const key = `impact-${impact.impactId}`;
+      let marker = groundMarkers.get(key);
+
+      if (marker === undefined) {
+        const center = stage.toScene(impact.center, 0);
+        const radius = impact.radiusUnits;
+        marker = { mesh: groundRing(center.x, center.z, radius * 0.86, radius, IMPACT_COLOR, 0.55), seen: true };
+        stage.scene.add(marker.mesh);
+        groundMarkers.set(key, marker);
+      }
+
+      marker.seen = true;
+      marker.mesh.material.opacity = 0.35 + 0.35 * Math.abs(Math.sin(next.tick / 3));
+    }
+
+    for (const zone of next.zones) {
+      const key = `zone-${zone.zoneId}`;
+      let marker = groundMarkers.get(key);
+
+      if (marker === undefined) {
+        const center = stage.toScene(zone.center, 0);
+        const radius = zone.radiusUnits;
+        marker = { mesh: groundRing(center.x, center.z, radius * 0.15, radius, zoneColor(zone.abilityId), 0.28), seen: true };
+        stage.scene.add(marker.mesh);
+        groundMarkers.set(key, marker);
+      }
+
+      marker.seen = true;
+    }
+
+    for (const [key, marker] of groundMarkers) {
+      if (!marker.seen) {
+        marker.mesh.removeFromParent();
+        marker.mesh.geometry.dispose();
+        marker.mesh.material.dispose();
+        groundMarkers.delete(key);
+      }
+    }
+  }
+
+  function updateSelection(): void {
+    const record = selectedUnitId === null ? undefined : records.get(selectedUnitId);
+
+    if (record === undefined || !record.state.alive) {
+      selectionRing.visible = false;
+      rangeRing.visible = false;
+
+      return;
+    }
+
+    selectionRing.visible = true;
+    selectionRing.position.set(record.position.x, 0.12, record.position.z);
+
+    const radius = basicAttackRange(record.state.heroId);
+
+    if (radius !== rangeRingRadius) {
+      rangeRingRadius = radius;
+      const points: number[] = [];
+
+      for (let index = 0; index < RANGE_RING_POINTS; index += 1) {
+        const angle = (index / RANGE_RING_POINTS) * Math.PI * 2;
+        points.push(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      }
+
+      rangeRing.geometry.setAttribute("position", new Float32BufferAttribute(points, 3));
+      rangeRing.computeLineDistances();
+    }
+
+    rangeRing.visible = radius > 0;
+    rangeRing.position.set(record.position.x, 0.15, record.position.z);
+  }
+
+  function updateTargetLines(): void {
+    let count = 0;
+
+    for (const record of records.values()) {
+      const { state } = record;
+      const eligible = options.targetLines === "all" || state.unitId === selectedUnitId;
+
+      if (!eligible || !state.alive || state.targetUnitId === null) {
+        continue;
+      }
+
+      const target = records.get(state.targetUnitId);
+
+      if (target === undefined || !target.state.alive) {
+        continue;
+      }
+
+      if (count >= MAX_TARGET_LINES) {
+        break;
+      }
+
+      targetLinePositions.setXYZ(count * 2, record.position.x, 0.3, record.position.z);
+      targetLinePositions.setXYZ(count * 2 + 1, target.position.x, 0.3, target.position.z);
+      count += 1;
+    }
+
+    targetLines.visible = count > 0;
+
+    if (count > 0) {
+      targetLinePositions.needsUpdate = true;
+      targetLineGeometry.setDrawRange(0, count * 2);
+      targetLines.computeLineDistances();
+    }
+  }
+
+  function stepRecords(deltaSeconds: number): void {
+    const blend = 1 - Math.exp(-POSITION_SMOOTHING * deltaSeconds);
+    const turn = 1 - Math.exp(-YAW_SMOOTHING * deltaSeconds);
+
+    for (const record of records.values()) {
+      const before = record.position.clone();
+      record.position.lerp(record.destination, blend);
+      const speed = deltaSeconds > 0 ? before.distanceTo(record.position) / deltaSeconds : 0;
+      const moving = record.state.alive && speed > MOVING_UNITS_PER_SECOND;
+
+      const target = record.state.targetUnitId === null ? undefined : records.get(record.state.targetUnitId);
+
+      if (record.state.alive && record.state.channel !== null) {
+        record.yaw += deltaSeconds * SPIN_RADIANS_PER_SECOND;
+      } else if (record.state.alive && target !== undefined && target.state.alive) {
+        const desired = angleToward(record.position.x, record.position.z, target.position.x, target.position.z);
+        record.yaw = approachAngle(record.yaw, desired, turn);
+      } else if (moving) {
+        const desired = angleToward(before.x, before.z, record.position.x, record.position.z);
+        record.yaw = approachAngle(record.yaw, desired, turn);
+      }
+
+      record.figure.setMoving(moving);
+      record.figure.setChanneling(record.state.alive && record.state.channel !== null);
+      record.figure.root.position.copy(record.position);
+      record.figure.root.rotation.y = record.yaw;
+      record.figure.root.scale.setScalar(record.state.alive && record.state.control?.control === "hexed" ? HEXED_SCALE : 1);
+      record.figure.update(deltaSeconds);
+      record.bubble.position.set(record.position.x, record.figure.height * 0.5, record.position.z);
+      record.frost.position.set(record.position.x, 0.1, record.position.z);
+      record.conditionRing.position.set(record.position.x, 0.14, record.position.z);
+
+      const platePoint = stage.toScreen(record.position.clone().setY(record.figure.height + PLATE_GAP_UNITS));
+
+      if (platePoint !== null) {
+        record.plate.style.transform = `translate(${platePoint.x}px, ${platePoint.y}px) translate(-50%, -100%)`;
+      }
+    }
+  }
+
+  function stepEffects(deltaSeconds: number): void {
+    for (let index = effects.length - 1; index >= 0; index -= 1) {
+      const effect = effects[index]!;
+      effect.age += deltaSeconds;
+      const progress = Math.min(1, effect.age / effect.duration);
+      effect.step(progress);
+
+      if (progress >= 1) {
+        effects.splice(index, 1);
+        effect.onDone?.();
+        disposeEffectObjects(effect);
+      }
+    }
+  }
+
+  const stopFrames = stage.onFrame((deltaSeconds) => {
+    stepRecords(deltaSeconds);
+    stepEffects(deltaSeconds);
+    updateSelection();
+    updateTargetLines();
+  });
+
+  function handleClick(event: MouseEvent): void {
+    const rect = stage.canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+    let closest: UnitRecord | null = null;
+    let closestDistance = PICK_RADIUS_PIXELS;
+
+    for (const record of records.values()) {
+      const point = stage.toScreen(chestOf(record));
+
+      if (point === null) {
+        continue;
+      }
+
+      const distance = Math.hypot(point.x - clickX, point.y - clickY);
+
+      if (distance < closestDistance) {
+        closest = record;
+        closestDistance = distance;
+      }
+    }
+
+    if (closest !== null) {
+      options.onSelectUnit(closest.unitId);
+    }
+  }
+
+  stage.canvas.addEventListener("click", handleClick);
+
+  return {
+    update(next, nextSelectedUnitId, latestEvents) {
+      stage.showBoard(snapshotGrid(next), options.viewSide, options.insets);
+
+      const snapAll = snapshot === null || next.tick < lastTick || next.tick - lastTick > TICK_JUMP_FOR_SNAP;
+      snapshot = next;
+      selectedUnitId = nextSelectedUnitId;
+      lastTick = next.tick;
+
+      if (snapAll) {
+        chainTargets.clear();
+      }
+
+      syncRecords(next, snapAll);
+      syncGroundMarkers(next);
+
+      if (snapAll) {
+        return;
+      }
+
+      for (const event of latestEvents) {
+        handleEvent(event);
+      }
     },
 
     dispose() {
-      arena.canvas.removeEventListener("click", handleClick);
-      arena.dispose();
+      stopFrames();
+      stage.canvas.removeEventListener("click", handleClick);
+
+      for (const effect of effects) {
+        disposeEffectObjects(effect);
+      }
+
+      effects.length = 0;
+
+      for (const record of records.values()) {
+        removeRecord(record);
+      }
+
+      records.clear();
+
+      for (const marker of groundMarkers.values()) {
+        marker.mesh.removeFromParent();
+        marker.mesh.geometry.dispose();
+        marker.mesh.material.dispose();
+      }
+
+      groundMarkers.clear();
+      selectionRing.removeFromParent();
+      selectionRing.material.dispose();
+      rangeRing.removeFromParent();
+      rangeRing.geometry.dispose();
+      rangeRing.material.dispose();
+      targetLines.removeFromParent();
+      targetLineGeometry.dispose();
+      targetLines.material.dispose();
+
+      for (const geometry of [bubbleGeometry, frostGeometry, sparkGeometry, boltGeometry, moteGeometry, selectionGeometry]) {
+        geometry.dispose();
+      }
+
+      for (const element of stage.overlay.querySelectorAll(".float-number")) {
+        element.remove();
+      }
     },
   };
 }

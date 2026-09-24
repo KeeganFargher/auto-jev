@@ -643,6 +643,878 @@ some being an obvious always-take — has not been evaluated by a human yet.
 ### Next concrete task
 
 Phase 5: a complete local lobby run (pick a team and upgrades, eight-seat
-lobby against seven baseline bots). Per the plan, wait for the discovery
-session above (and its review) before starting it, the same gate that was
-explicitly waived for both Phase 3 and Phase 4 so far.
+lobby against seven baseline bots). Started, engine slice only — see below.
+
+## Phase 6 — Run mixed human and bot lobbies online — DONE (prototype)
+
+Started on explicit instruction after the board track. Rationale for
+every choice, including the one deliberate departure from the plan
+(battles resolved at the lock and replayed by clients, not stepped at
+30 Hz), is in `docs/decisions.md` ("Phase 6: online mixed lobbies").
+
+### What works now
+
+- `pnpm --filter ./apps/server dev` (or the `server` launch config) runs
+  the Colyseus server on port 2567 (`PORT` overrides it). Verified on
+  Node 20.19: a Node 20 SDK client joined, hosted, started and received
+  its draft view. In the client menu, **Play online**
+  joins an open lobby or creates one; the lobby shows all eight seats,
+  an invite link (`#join/<roomId>`), and a **Start** button for the
+  host. Bots fill every seat nobody took.
+- New `packages/protocol`: zod schemas for everything a client sends
+  (`command`, `start`, `sync`, join options) and types for what the
+  server sends (`view`, `ack`).
+- `MatchRoom` (`packages/server-runtime/src/rooms/`): seat registry,
+  command handler with remembered acknowledgements, server-owned
+  deadlines with human fallbacks, a round hold that paces replays,
+  reconnect grace, forfeits.
+- Client: `session/online-session.ts` implements the same
+  `MatchSession` interface as the local game, so the whole match screen
+  (draft, placement, round replays, rail, upgrades) works unchanged
+  online. New states: lobby, "waiting for the other players",
+  "Eliminated · spectating", and a reconnecting / connection-lost
+  banner. Your seat survives a page refresh.
+- Run engine additions: `forfeitSeat`, `decideFallbackCommand` /
+  `runFallbackCommands`, shared pacing constants, `you.ready` in the
+  player view, and the shared-placement rule for simultaneous
+  knockouts.
+
+### Verified, not assumed
+
+`apps/server/test/match.test.ts` (run with `pnpm --filter ./apps/server
+test`; passes on Node 20.19 and 24.5 — the test supplies a WebSocket from
+`ws` when Node has none; each test file runs in its own mocha process
+because Colyseus can't boot twice in one), all passing:
+
+- Two simultaneous joins get different seats; the first is host; bots
+  hold the other six.
+- After start, joining by ID is refused and matchmaking opens a fresh
+  room. Only the host can start.
+- Each human sees only their own offers; drafting another seat's offers
+  is rejected (`unknown-offer`); another seat's public entry has exactly
+  the five public fields. Other seats' builds and formations become
+  visible only in battle setups, which exist from battle start.
+- A duplicate command ID returns the original acknowledgement; stale
+  epoch and stale revision are rejected; malformed messages (a string
+  where offer IDs go, an invented `win-battle` intent, a smuggled
+  `playerId`) are dropped by the schema and change nothing, and the
+  sender stays connected.
+- A dropped connection reconnects into the same seat with its drafted
+  team intact.
+- A seat whose grace runs out is forfeited, is left out of the next
+  round's pairings, and is eliminated (health 0) at the next settlement.
+- A host who drops in the lobby hands the role on at once; the new host
+  can start.
+- Twenty placement changes by one player send no view to the other.
+- Two humans and six bots play to the end; both clients agree on every
+  seat's health, eliminations, winners and every round's pairings.
+- Eight humans fill every seat of one run; a ninth is turned away.
+- Live: two browsers (one of them the user's) plus a scripted SDK
+  player joined one lobby and played a full match together; every
+  phase used the server's timing (30 s draft, 15 s preparing and
+  upgrade) and the match finished with a winner on every client.
+- Live, in the browser: a page reload resumes the same seat in the same
+  room (the browser's unload counts as a drop, so the 30 s grace
+  applies); a round replay starts from the server's clock and the
+  upgrade countdown picks up the server's remaining time; leaving
+  clears the saved seat; the local match still plays as before.
+
+Measurements (four simultaneous three-versus-three battles per round,
+test timings sped up; in-process test server on an M-series Mac):
+
+| Measure | Observed |
+| --- | --- |
+| Resolving a round's four battles | 2.2–4.7 ms |
+| `view` message per client | 3.3 KB typical, 7.7 KB largest |
+| Heap growth over one full match | +2–6 MB across runs (garbage-collection noise dominates) |
+| Two full rooms at once | +1.4–4.7 MB heap across runs, 2.2–4.6 ms per round resolve each |
+
+These are observations from one machine, not a capacity claim.
+
+### Known gaps
+
+- The local game still has no draft timer (online has 30 s).
+- A tab in the background stops animating; online, its replay snaps
+  forward to the server's clock when it comes back (more than 1 s
+  behind), so it can't eat into the next deadline.
+- There is no in-match "leave" button; closing the tab forfeits after
+  the 30 s grace. The finished and eliminated screens have one.
+- Persistence: a server restart ends every match (by design for now).
+- Bots are predictable to a modified client that brute-forces the run
+  seed from public battle seeds (see "Phase 6 review pass" in
+  `docs/decisions.md`).
+- A duplicated browser tab copies the saved seat and takes it over.
+
+## Board and renderer track — IN PROGRESS
+
+A detour between Phase 5 and Phase 6, on user instruction: an 8×8
+Underlords-style board where you place your heroes, and a Three.js
+renderer with an angled camera. Plan and stages:
+`docs/board-and-renderer-plan.md`; rationale and before/after
+measurements: `docs/decisions.md` ("Board grid, placement and a
+Three.js renderer").
+
+- **Done:** the grid board and formations in the engine and run
+  (`packages/game/src/board/cells.ts`, `packages/content/src/formations.ts`,
+  the `place-heroes` command, setups built at battle start, bots placing
+  then readying).
+- **Done:** a Three.js renderer (`apps/client/src/game/views/board-stage.ts`,
+  `battle-view.ts`, `hero-figures.ts`) replacing the 2D canvas in both
+  the lab and matches: angled camera on the watched player's side, a
+  tiled 8×8 board with brass corners, placeholder miniatures per hero,
+  floating health and shield bars, damage and heal numbers,
+  projectiles and chain arcs, shield bubbles, slow rings, death sink,
+  click to inspect with a range ring. `arena-view.ts` and `unit-view.ts`
+  are gone.
+- **Done:** placement (`formation-view.ts`): during `preparing` your
+  heroes stand on your half and you drag them between cells; the
+  battle starts from that formation.
+- **Done (2026-09-23):** the model pipeline (`docs/models.md`). Blender
+  sources live in `art/models/` under Git LFS, and `pnpm models:build`
+  exports them with meshopt compression and checks the contract. The
+  client loads models in the background without blocking the first
+  screen. `createHeroFigure` returns a model-backed figure, or a
+  placeholder that swaps itself for the model when the load finishes. The `#models` lab shows clips
+  and crowd stress stats. Anvil is the first real model in battles.
+
+### Verified, not assumed
+
+- Before/after battle outcomes for the board change (table in
+  `docs/decisions.md`).
+- Lab: select a unit (gold ring, range ring, inspector), run to a mutual
+  wipeout, reset — all six heroes back with their bars.
+- Match: draft → drag a hero → battle starts from the dragged cell;
+  5 rounds with 40 player switches, one canvas, six bars per battle, no
+  errors; the camera turns to whichever player is watched.
+- Placement: dropping onto a teammate swaps the two; dropping onto the
+  enemy half snaps the hero back.
+- Lab on the board: duel and three-vs-three scenarios, reset and replay
+  (2 and 6 health bars respectively, no errors).
+- `pnpm simulate` on the board, seed 1: duel 272 ticks,
+  three-vs-three 413, three-bruisers 484, all mutual wipeouts with
+  mirror-exact damage. **Tick counts quoted in the Phase 2–4 sections
+  (297 / 379 / 392 and the damage breakdowns) were measured on the old
+  100×60 arena and no longer reproduce.**
+- `pnpm -r typecheck`, `pnpm lint`, `pnpm build` clean (bundle-size
+  advisory only).
+- Models (2026-09-23): `pnpm models:build` exported Anvil, the crate and
+  the barrel with 0 errors and 0 warnings. A three-vs-three lab battle
+  ran to the end with Anvil's model and no console errors. All eight
+  clip states (idle, run, attack, cast, hit, death, sunk, revived) were
+  captured in `#models`. The ×32 leak test reported no leak
+  (geometries 213 → 213, textures 35 → 35).
+
+### Known gaps
+
+- Anvil and Gorrak have real models; every other hero is still a
+  placeholder shape. Gorrak's whirlwind plays his `channel` clip and a
+  code-drawn cyclone.
+- A seat with a bye can't rearrange that round (it already counts as
+  ready).
+- The 15-second preparing timer now also covers placement.
+- Hits show on the engine's tick; swings and projectiles don't start
+  early yet.
+
+## Phase 5 — Create a complete local lobby run — IN PROGRESS
+
+Started on explicit instruction. This entry covers the headless engine
+plus a playable client UI on top of it. Still open: a real formation
+choice, a real heuristic bot, and two items awaiting a user decision (a
+draft-screen timer, watching other battles) — see "Deliberately
+deferred" and "Awaiting a decision" below, and `docs/decisions.md` for
+the full rationale behind each design choice. Replay is out of scope on
+user instruction.
+
+### What works now
+
+- New package `packages/run`: `RunState`/`PlayerSeat`/`RoundState`/
+  `RoundBattle` types, a pure `createPairings(activePlayerIds, history,
+  pairingSeed)` (deterministic circle-method round-robin for an
+  unchanged roster, ranked perfect-matching fallback with bye handling
+  once eliminations change the roster), `applyCommand` (four command
+  kinds: `commit-draft`, `commit-upgrade`, `skip-upgrade`,
+  `confirm-ready`, validated in a fixed order — actor, phase, decision
+  revision, one-decision-per-phase, then offer legality — and returning
+  a structured rejection reason instead of throwing), private per-seat
+  hero and upgrade offer generation, per-round battle orchestration
+  (`enterBattlePhase`/`settleRound`), and seeded random-bot controllers.
+- `getPlayerView(state, playerId)`: the one projection both the human
+  UI and the bots read. It carries your own builds, revision and
+  private offers. Its `players` map has only public fields (name,
+  controller kind, health, eliminated) for every other seat, so a pick
+  made mid-upgrade-phase can't leak, and it never includes other seats'
+  offers or the run seed. Opponent builds *are* visible through
+  `currentRound.battles[*].setup` once the battle starts — deliberately,
+  since the plan treats locked battle state as public. (Setups used to
+  be created on entering `preparing`; since the board track they are
+  built at battle start and are `null` while players place heroes.) Neither the client nor
+  `decideBotCommand` reads raw `RunState` any more.
+- `pumpRun(state, catalogue)` drives every automatic phase transition
+  (`lobby → draft`, `battle → round-result`, `round-result → upgrade`)
+  until blocked on a player command or the match is `finished`;
+  `runBotCommands` submits every non-human seat's decision for the
+  current phase in one pass.
+- Four independent seed streams (`derivePairingSeed`, `deriveBattleSeed`,
+  `deriveOfferSeed`, `deriveControllerSeed`), all derived from the run
+  seed plus a purpose/scope tuple — no shared RNG stream between
+  simultaneous battles or between seats' offer/bot randomness.
+- A playable client UI (`apps/client`, reachable at `#match`; `#lab` or
+  any other hash stays on the battle lab). It's styled after Dota
+  Underlords (see `docs/decisions.md`'s "HUD restyle" entry). There's a
+  main menu (brush-stroke title, a "Battle lab" link, and a "FIGHT!"
+  button), then one persistent match layout:
+  - a player rail on the left: every seat with a seat-coloured portrait,
+    name and heart count; you outlined gold, this round's opponent red;
+    eliminated seats greyed with an "OUT" tag.
+  - a stone round plate top-right: round, phase, and the countdown as
+    its big number.
+  - your team's tiles on the right: a role icon and one lit pip per
+    upgrade stack.
+  - phase content in the centre: 5 hero cards to draft 3, a versus
+    screen, result banners, upgrade cards grouped per hero.
+  - one round action button bottom-right: Confirm, Ready, Continue or
+    Menu.
+
+  `MatchSession` (`apps/client/src/session/match-session.ts`) wraps the
+  engine and auto-resolves bot turns and automatic phases after every
+  human action.
+- The loop is: menu → draft → **a 15-second Ready countdown that
+  auto-confirms if you don't click** → **you automatically watch your own
+  battle play out**, full-screen, with the HUD layered on top as in the
+  reference screenshot. The round plate counts the battle's time limit
+  down in real seconds (about 23 at 2× playback); any fight still going
+  at 0 is a draw (the engine's existing `timeout` rule, now spelled out
+  as "time ran out"). When every fight has ended, the plate shows
+  "Round over 3·2·1" and the game moves on by itself, with no Continue
+  button → a Victory/Defeat/Draw banner → the upgrade window (same 15s
+  timer; it auto-picks the first offer or skips) → next round with a
+  different pairing → ... → finished → back to menu. Watching is
+  the default path, not an opt-in button. If you're eliminated, you
+  still watch the battle that eliminated you, then land on a crimson
+  "Eliminated — Round N · lost to Bot X" banner with the run's winner.
+  There is no "Watch again": your battle plays once, automatically,
+  before its result screen. The lab is reachable from the menu only.
+- **Watching other players' battles.** All of a round's battles play on
+  one shared clock (`apps/client/src/session/round-playback.ts`). While
+  the round plays, the player rail stays on screen and every seat that
+  fought is clickable. Clicking one switches the board to their battle
+  at the same moment, from their side: they're blue and their opponent
+  red, and the header reads "BOT 4 vs BOT 7". Each seat shows LIVE until
+  its battle ends, then WON, LOST or DRAW. Hearts show the pre-round
+  value until that seat's own battle ends, so the rail never spoils a
+  fight you haven't watched. On a bye you start on another battle. Seats
+  aren't clickable outside the round view, in particular not while
+  preparing, since the next round's setups already exist and simulating
+  one would reveal its result. If you're eliminated, the session keeps
+  that whole round (every battle plus the seats as they stood), so you
+  can still browse it even though the rest of the match resolves
+  instantly.
+  Mid-match there is deliberately no lab link, because leaving `#match`
+  discards the run.
+
+### Verified, not assumed
+
+- **The pairing schedule is exactly correct, checked directly, before
+  anything was built on top of it (per the plan's own explicit
+  ordering).** An 8-player, 7-round schedule covers all 28 possible pairs
+  exactly once with zero repeats, for two different seeds. A 6-player,
+  5-round schedule covers all 15 pairs exactly once. A shrinking roster
+  (8→7→5→3→2 across successive rounds) gives the bye to a *different*
+  player each time one was needed. A 10-round bye simulation on a
+  5-player roster produces a perfectly even 2-byes-each distribution
+  with zero consecutive repeats.
+- **A full 8-bot match runs end to end with no human input**, through
+  every phase (`lobby → draft → preparing → battle → round-result →
+  upgrade → ...`), to a single-winner `finished` state. Round 1 produces
+  exactly 4 battles covering all 8 players with no bye, matching the
+  acceptance check verbatim.
+- **Re-running the same run seed produces bit-for-bit identical
+  results** — same winner(s), same final run-health distribution for
+  every seat, confirming the four independent seed streams don't
+  desync bot decisions or battle outcomes between two otherwise-identical
+  runs.
+- **The round cap and shared-win rules both fire correctly**: a
+  round-cap of 2 forces `finished` after exactly 2 rounds with every seat
+  still at full health *sharing* the win (a real three-way tie observed,
+  not just a theoretical code path).
+- **A 2-player roster** (the final-duel case, no pairing algorithm
+  needed) and **a 5-player roster** (odd every round, exercises the bye
+  path every single round) both complete correctly to a single winner.
+- **A simulation failure aborts the whole match, not just one battle** —
+  `settleRound` checks every battle in the round for a `failure` result
+  before applying any health change; confirmed by construction and
+  documented in `docs/decisions.md` (not separately battle-tested here,
+  since no shipped content can currently produce a battle failure — see
+  Phase 4's own reaction-budget-exceeded discussion for why).
+- **The client UI was exercised live in the browser, not just read.** A
+  full human draft, a resolved round-1 battle against a correctly-paired
+  opponent, an on-demand replay (real tick-by-tick playback, working unit
+  selection, a live event feed), an upgrade pick that correctly gated
+  `stronger-shield` behind `healing-that-also-shields`, four full rounds
+  including a loss, a win, and a bot's elimination rendering correctly in
+  the standings strip, and zero repeated opponents across those four
+  rounds. Two real bugs were found this way and fixed — see
+  `docs/decisions.md`'s "Phase 5 (client slice)" entry: bots being asked
+  to re-decide an already-committed upgrade pick (crashed on an uncaught
+  exception; fixed both at the root — `runBotCommands` now skips
+  already-ready seats — and defensively — `applyCommitUpgrade` now
+  returns a rejection instead of throwing), and a CSS specificity bug
+  where `.match-root`'s own `display: flex` silently defeated the
+  `hidden` attribute when switching back to the lab.
+- **The rebuilt "watch your battle, then a real timer" loop was verified
+  live across three rounds**, including deliberately letting the
+  upgrade timer run out completely unattended and confirming the run
+  advanced on its own to a fresh, unrepeated opponent — not just checking
+  that the timer element renders. A draw and a win were both confirmed to
+  leave both sides' run-health unchanged. Found two more real bugs doing
+  this, both invisible to the original text-summary flow: a dead
+  "Continue" button when no upgrades are offered (there was no command
+  for "I have nothing to pick, advance me" — added `skip-upgrade`), and a
+  bot that runs out of eligible upgrades could have stalled the *entire
+  match* forever, not just its own turn (`runBotCommands` treated "bot
+  has nothing to submit" as fine, but nothing was actually submitted, so
+  that seat could never read as ready). See `docs/decisions.md`'s "Phase
+  5 (client slice, round 2)" entry.
+- **A real Retina-display bug (camera appearing to cut off units almost
+  immediately) was reported, reproduced by reasoning + a targeted DOM
+  check (not by eye — this dev environment's browser pane is dpr-1), and
+  fixed.** The battle-watch canvas was missing the CSS rule that locks
+  its displayed size to its container regardless of the higher-resolution
+  pixel buffer `arena-view.ts` allocates for crisp rendering; without it,
+  a `devicePixelRatio: 2` screen renders the canvas at literally double
+  its container's size with nothing to clip it, so only the top-left
+  quarter of the arena is ever visible. See `docs/decisions.md`'s "Phase
+  5 (client slice, round 3)" entry.
+- **The preparing ("Ready") screen now has the same 15-second visible,
+  auto-confirming countdown as the upgrade screen**, closing the "a
+  stalled human cannot hold the round forever" acceptance check for the
+  phase that previously had no deadline at all (bots always ready
+  instantly, so only the human seat could block it). Verified live:
+  reached a fresh round, took no action, and watched the countdown expire
+  and advance straight into the battle-watch overlay unattended.
+
+### Deliberately deferred (see `docs/decisions.md` for why)
+
+- **Engine-level, server-authoritative deadlines.** Both the upgrade and
+  preparing screens now have a real, working 15-second countdown that
+  forces a decision, but it's a client-side convenience scoped to the
+  human's own local browser session — there's still no shared-clock,
+  multi-session deadline concept at the `RunState`/engine level, which is
+  what the plan means for online play. `readyThresholdByPlayer` remains
+  the hook for building that properly, whenever Phase 6's room-owned
+  clock exists.
+- **A real formation choice during `preparing`** — currently a pure
+  readiness gate with a fixed default spawn layout, not a player choice.
+- **A real heuristic bot** — `heuristic-bot` is currently identical in
+  behaviour to `random-bot`.
+
+### Awaiting a decision
+
+Both were plan items that went unbuilt *and* unrecorded until the
+Phase 5 review pass below surfaced them.
+
+- **A timer on the draft screen.** Preparing and upgrade have one; draft
+  doesn't, so a human can sit on it indefinitely. Locally that only
+  blocks the human themselves (bots draft instantly). The plan wants a
+  deadline here too, with a longer window than later rounds.
+- ~~Watching other battles~~ built on user instruction, see "What
+  works now". Still not built: a standalone round overview outside the
+  battle view (who's playing whom before the round starts, "Round N of
+  8").
+
+### Explicitly out of scope, on user instruction
+
+- **A replay system.** The plan lists "replaying a saved run" as a Phase
+  5 acceptance check, but the user does not want one — dropped from this
+  project's scope entirely, not just still-unbuilt. Nothing records a
+  `RunCommand` sequence, and nothing should.
+
+### Phase 5 review pass
+
+An Opus review before Phase 6 confirmed five real defects, each by probe
+script or live browser run rather than by reading; all fixed and
+re-verified. Full rationale in `docs/decisions.md`. Summary:
+
+- **You never saw the battle that eliminated you** (42 of 44 eliminated
+  runs in a 60-seed probe). Once eliminated, the human stops blocking any
+  barrier, so the session resolved the rest of the match in one call and
+  the final state held only the last round — Ready went straight to
+  "Match finished, Winner: bot-3". `MatchSession` now remembers your most
+  recent resolved battle; it auto-plays, and a new eliminated screen
+  names the round and opponent. Verified live: eliminated in round 4,
+  watched that battle, landed on "You were eliminated — Round 4: You
+  lost to Bot 3", "Watch again" replayed it.
+- **"Watch again" cost you your upgrade.** The countdown kept running
+  behind the replay overlay and auto-picked for you. The timer now
+  pauses when the overlay opens and resumes with the same remaining
+  time, keyed by `phaseEpoch`. Verified live: 10s before a 17s rewatch,
+  10s after, still on the upgrade screen; it then expired normally.
+  *Superseded:* the "Watch again" button was later removed on user
+  instruction, and this timer pause with it.
+- **The engine accepted one draft offer three times** (three bruisers
+  from one offer). Now rejected as `duplicate-offer`.
+- **The engine accepted a second decision in the same phase** — with a
+  second human still deciding, the first could take two upgrades in one
+  round. Now rejected as `already-decided`. Both this and the previous
+  item were unreachable through the UI but would have been reachable by
+  any Phase 6 client.
+- **`getPlayerView` didn't exist** (plan step 4) — see "What works now".
+- Polish: opponents and winners show display names ("Bot 5", not
+  `bot-5`), and upgrade cards say which copy of a duplicated hero they
+  apply to ("bruiser #1" / "bruiser #2").
+- **Both teams drew in the same purple in match battles.** Unit colour
+  keyed off team IDs literally named `"A"`/`"B"`, but match teams are
+  player IDs (`"you"`, `"bot-4"`), so every unit fell through to a
+  fallback colour, and the inspector showed every unit as blue.
+  `createBattleView` and `createUnitInspectorView` now take a
+  `friendlyTeamId`: your side is blue and everyone else red, whichever
+  side of the arena you spawn on. The lab passes `"A"`, so it looks
+  exactly as before. Verified live in both modes, including clicking a
+  red enemy and a blue friendly unit in the inspector.
+- **Regression check:** a 75-run fingerprint (8-bot and 5-bot all-bot
+  matches, plus a scripted-human match, 25 seeds each) captured before
+  any change was byte-identical after, so routing the bots through
+  `getPlayerView` and the new command checks changed no legal outcome.
+- **A bye seat's preparing screen no longer offers Ready or a timer.**
+  A bye seat has no readiness threshold, so it already reads as ready
+  and `already-decided` would reject its Ready — a dead button. Not
+  reachable locally (a 200-seed, 7-seat probe passed through 163 human
+  byes and never left the human on that screen, since bots ready
+  instantly), but a second human deciding in Phase 6 would strand a bye
+  seat there. It now just says it's waiting for the other battles.
+
+### Known gaps
+
+- `computeWinners` returns no winners if every survivor is eliminated
+  in the same settlement, where the plan says those seats share the
+  final placement. Unreachable under the current rules: every battle has
+  at most one loser and draws cost nothing, so someone always survives a
+  round. It becomes reachable if a draw ever costs health.
+- `MatchSession.settle` caps its loop at 100 steps and stops silently
+  if it ever hits that. The longest real path (the human eliminated in
+  round 1, bots finishing an 8-round match) needs about 16 steps.
+
+### Commands used to verify this phase (so far)
+
+```
+pnpm -r typecheck
+pnpm lint
+pnpm build
+pnpm --filter @jev-game/client dev   # + open /#match in the browser:
+                                      #   draft, ready, watch battle, upgrade,
+                                      #   across several rounds; #lab still works
+```
+
+Headless engine verification was done with throwaway probe scripts
+(written, run, then deleted, per established practice) — `packages/run`
+itself has no `pnpm simulate`-style entry point since there's no
+scenario-file concept at the run level; the client is the entry point.
+
+### Next concrete task
+
+Superseded: Phase 6 is built (see its section above). It kept battles
+resolving at the lock instead of stepping them on a room clock; the
+reasoning is in `docs/decisions.md`. The draft-timer question is still
+open for the local game.
+
+## Heroes, combos and builds — first slice — BUILT (awaiting review)
+
+### What works now
+
+- **Heroes:** Bulwark, Frostweaver, Duskblade and Pyromancer, with
+  signatures, utilities, passives and six talents each.
+- **Pieces:** 15 items and 6 runes.
+- **Combos and traits:** Staggered, Brittle and Disoriented, with Overload,
+  Shatter and Crush, Tier II and attunement.
+- **The run:** a reward phase on the fixed round track, with items (3
+  slots plus a stash), rune sockets, tiered talents, recruit or train,
+  loser bonus offers and surprise rarities. Bots and deadline fallbacks
+  answer every decision. The rules default to health 13 and max loss 3, the
+  user's choice on 2026-09-23.
+- **Protocol v2** carries `choose-offer`, `move-item`, `socket-rune` and
+  `discard-item`.
+- **Client:** the trait strip, the loadout rail (only heroes that can
+  take the selected piece light up), reward cards with combo gain chips,
+  and figures for the new heroes.
+- **Battle presentation:** a mana bar, a condition badge with a countdown
+  ring, a buff/debuff status row, condition rings, crit, combo and DoT
+  numbers, combo callouts and bursts, and Meteor's landing and burn
+  zones.
+- **`pnpm survey`:** a headless balance survey. It runs sanity, teams,
+  pieces and full-run tiers, and writes its report to `reports/survey/`.
+
+### Verified, not assumed
+
+- **15 legacy event digests are byte-identical** to the baseline taken
+  before any engine change.
+- **Browser (local match against 7 bots):**
+  - draft, preparing, battle and rewards all work;
+  - an item was taken into the stash and equipped;
+  - Chain was dimmed on Bulwark and lit on Duskblade and Frostweaver,
+    then socketed on Duskblade.
+- **One observed fight** produced:
+  - 3 OVERLOAD!, 6 CRUSH! and 4 SHATTER! callouts;
+  - 16 crit numbers and 15 condition badges (all three conditions);
+  - status chips for knocked-down, frozen, taunted and untargetable.
+- **Burn stacks** showed as a "3" on the chip in an earlier fight.
+- **Online, against a real server:** lobby, draft, preparing, battle,
+  rewards and the round 2 talent milestone all worked.
+  - `choose-offer` put the picks in the stash, `socket-rune` put Chain
+    on Frostweaver (Pyromancer was dimmed), and `move-item` put
+    Whetstone on Pyromancer.
+  - The fight showed 36 burn numbers (10, 20 and 30 as stacks built),
+    Shatter callouts, burn, frozen, invulnerable and untargetable chips,
+    and Meteor's burning ground.
+  - No server errors.
+- **Survey (quick, 20 seeds, 200 runs):**
+  - hero win rates 46.9–52.7%;
+  - fight median 26.0 s, 90th percentile 44.3 s;
+  - all 200 runs finish (median 14 rounds);
+  - eliminations at a median of round 9.
+
+### Known gaps
+
+- The other six heroes and their primitives (summons, links, poison,
+  heal over time).
+- Scouting the next opponent.
+- First-slice scenarios in the battle lab.
+- Art and audio from `missing_assets.md` 11–14.
+- At narrow widths (about 720 px), the battle feed overlaps the board's
+  right edge, and the stash controls overlap the reward cards. It's fine
+  at desktop width.
+- Survey flags to know about: bare-team compositions decide a lot, Aegis
+  on Duskblade is +21.7, and 2.8% of fights time out.
+- **Dead units' plates now hide.** `.unit-plate[hidden]` had no
+  `display: none`, so dead units' plates stayed on screen. This is
+  visible in the lab as well as in matches.
+
+### Commands used to verify
+
+```
+pnpm lint
+pnpm -r typecheck
+pnpm --filter @jev-game/client typecheck
+pnpm typecheck:scripts
+pnpm build
+pnpm --filter @jev-game/server test
+npx tsx scripts/simulate.ts <duel|three-vs-three|three-bruisers> <1|2|3|7|42>
+pnpm survey --seeds 20 --runs 200
+```
+
+## Tempo, reward screen, cleanup and review — 2026-09-23
+
+### What changed
+
+- **Slower, weightier fights.**
+  - Replays now run at 1× instead of 2×.
+  - Attacks are 1.4× slower and hit 1.4× harder; walking is about 0.7×.
+  - Everything tied to attack cadence was rescaled with them.
+- **An Underlords-style reward screen.** One decision at a time over the
+  visible, dimmed board, with big round icons in rarity rings, rarity or
+  tier tags, large names, and a timer bar. The team rail uses the same
+  per-item glyphs.
+- **No backwards compatibility.**
+  - The placeholder heroes and every engine path that existed only for
+    them are deleted (see `docs/decisions.md`).
+  - The lab and `simulate.ts` run the new heroes.
+  - The lab's Tuning panel lists talents by tier.
+- **Review fixes:** 15 defects fixed from two review agents, listed in
+  `docs/decisions.md`.
+- **The survey's hero flag now uses one-swap win rates.**
+- **Art requests** for item, rune and talent icons and hero portraits
+  were `missing_assets.md` 15–18. All have since been delivered; see
+  `docs/icons.md`.
+
+### Verified, not assumed
+
+- **In the browser (local match):**
+  - the new reward steps (item, rune, talent tiers) walk through one at
+    a time;
+  - the timer bar doesn't restart between steps;
+  - the fallback took the first offer when time ran out;
+  - it lays out correctly at 1024×768 and 1440×900;
+  - the rune rows show which heroes each rune fits.
+- **At 1× replay speed:** the round clock falls 10 s in 10 real seconds,
+  and the whole board produced 2.6 hit numbers per second, most of them
+  60–90.
+- **Lab:** the new 3v3 plays. The Tuning panel's tier locks and
+  untick cascade work.
+- **Review probes re-run after the fixes:**
+  - Interpose's share and the Shatter shards are no longer
+    double-scaled;
+  - Echo retargets away from an untargetable unit;
+  - there's no second zone on an echoed Meteor;
+  - no DoT ticks after a revive;
+  - Challenge shields only for taunts that landed;
+  - triple items are rejected;
+  - Primer fits only Bulwark and Pyromancer.
+- **New determinism baseline:** duel and three-vs-three over seeds 1, 2,
+  3, 7 and 42, recorded twice, identical.
+- **Gate:**
+  - `pnpm lint` passes;
+  - the client and scripts typecheck;
+  - `pnpm build` succeeds;
+  - server tests pass (2 + 13).
+
+### Known gaps
+
+- **Balance can't be judged on four heroes.** Duskblade is the only
+  Cunning hero, so any team with it wins 84% against the one team
+  without it. The fix is the other six heroes, not stat tuning.
+- **Two review findings wait on the user:** builds are visible to every
+  client after each round, and the run seed can be brute-forced.
+- **Glyphs stand in for icon art** until `missing_assets.md` 15–18 is
+  delivered.
+- **The narrow-width overlaps** noted earlier are unchanged.
+
+### Commands
+
+```
+pnpm lint
+pnpm build
+pnpm --filter @jev-game/client typecheck
+pnpm typecheck:scripts
+pnpm --filter @jev-game/server test
+npx tsx scripts/simulate.ts <duel|three-vs-three> <seed>
+pnpm survey --seeds 20 --runs 200
+```
+
+## All ten heroes, names and lore — 2026-09-23
+
+### What works now
+
+- **Ten playable heroes** with Dota-style names, each with a basic
+  attack, a signature, a utility, a passive and six talents:
+  - **Anvil, Morrow, Gorrak** (Might);
+  - **Vesper, Nettle, Brassjack** (Cunning);
+  - **Cinder, Rime, Moira, Sexton** (Arcana).
+- **Three summons:** thralls and the Bone Golem (Sexton), and turrets
+  (Brassjack).
+- **New engine features:**
+  - summons, links (Shared Fate) and channels (Whirlwind);
+  - ally heals and healing ground;
+  - Last Rites, Hex, and poison that Disorients at 4 stacks;
+  - Withering, Bloodlust, Overclock and Cleave;
+  - new targeting policies, and stacking summon buffs.
+- **One of each hero per team:** the draft offers distinct heroes, and
+  recruit offers skip heroes you already have.
+- **`docs/lore.md`:** the world, how the heroes fit together, and their
+  stories and voices.
+- **Battle view:**
+  - Whirlwind spins the figure, and Hexed units shrink;
+  - linked and channeling status chips;
+  - plague green and hallowed gold ground;
+  - a burst when a summon appears;
+  - small, muted echo numbers.
+
+### Verified, not assumed
+
+- **New features before new content:** the duel and 3v3 lab pair
+  replayed byte-identically to the baseline.
+- **400-fight stress probe** (random different-hero teams, random talent
+  paths): 0 crashes. Every mechanic fired: summons, dismissals, links and
+  echoes, Hex, channels, poison Disorients, Last Rites, Martyrdom,
+  harvest golems, Cleave, Death Knell. Median fight 25.8 s, 2.25%
+  timeouts.
+- **Server tests pass** (2 + 13) with the ten-hero catalogue and distinct
+  offers.
+- **Light survey** (4 seeds, 58k battles, 100 runs):
+  - 100 of 100 runs finish, none stall, no failures;
+  - fights: 29.5 s median, 3.2% timeouts;
+  - one-swap after the Morrow sanity fix: Morrow 77%, Nettle 74%, Cinder
+    66%, Rime, Anvil, Gorrak and Vesper 48–51%, Brassjack 36%, Sexton
+    35%, Moira 15%.
+- **The lab pair still replays identically** after all the new
+  features and fixes.
+
+### Known gaps
+
+- **No balance work yet,** by request. Numbers are scaled first passes.
+- **Figures and glyphs** for the six new heroes and the summons are
+  placeholders; the art is requested in `missing_assets.md` 8 and 18.
+- **Capstone simplifications** are listed in the design doc's §18.
+
+
+## Phase 7 — Integrate independent Jev players — IN PROGRESS
+
+### What works now
+
+- **`packages/jev`** (server-only; lint bars `apps/client` from importing
+  it):
+  - `provider/`: the TypeSafe transport (`@typesafe-ai/sdk`, no retries,
+    5 s timeout), zod answer validation, a labelled offline stub, a
+    concurrency limiter (default 4), and settings from the environment
+    (`TYPESAFE_API_KEY`, `JEV_MODEL`, `JEV_TIMEOUT_MS`, `JEV_CONCURRENCY`,
+    `JEV_PROVIDER=offline`).
+  - `observations/`: the game rules, combo rules, round, health,
+    standing, team with talents, items and runes, stash, current
+    synergies, the last three results, and opponents' health. A question
+    measured 2.9 to 3.4 KB, roughly 750 to 850 tokens.
+  - `decisions/`: draft picks (one question per pick, each seeing the
+    earlier picks and what the new hero would light) and reward choices
+    (every legal offer and hero placement, previewed with `applyCommand`).
+  - `decision-record.ts`: per-decision records (seat, epoch, revision,
+    model, options, choice, probabilities, confidence, latency, tokens,
+    fallback reason) and a replay log of accepted commands.
+  - `driver.ts`: one job per seat, phase-deadline aborts, stale and
+    superseded rejection.
+- **`pnpm --filter @jev-game/jev probe`**: headless runs with N Jev seats
+  against baseline bots. It replays each run from its log and compares the
+  final state. `--provider offline|faults|typesafe`, `--jev-seats`,
+  `--runs`, `--offline-delay-ms`, `--draft-seconds`, `--reward-seconds`,
+  `--records out.jsonl`, `--show-question`.
+
+### Verified, not assumed
+
+- **Offline, 1 Jev seat, 3 runs:** all finish; 100 decisions, 100
+  provider calls, 0 stale; every replay identical with 0 provider calls.
+- **Offline, 7 seats, 2 runs:** peak concurrency 4 of 4; 389 decisions,
+  0 stale; replays identical.
+- **Injected faults through the real SDK** (HTTP 500, 429, malformed
+  body, unknown option, hang past the timeout): each lands in its own
+  fallback reason (`http-error`, `rate-limited`, `invalid-response`,
+  `unknown-option`, `timeout`); every run finishes; replays identical.
+- **Slow provider past tight deadlines** (400 ms answers, 1 s draft,
+  0.5 s reward): 146 `deadline` fallbacks and 7 `superseded` draft jobs,
+  none applied late; the run finishes; replay identical.
+- `pnpm lint`, the workspace typecheck and the server tests (2 + 13) pass
+  on Node 20.19.
+
+### Wired into play (2026-09-23)
+
+- **"Fight!" plays against Jev through the server.** It opens a solo
+  match room (`{ solo: true }`): the room is private, starts as soon as
+  you join, and fills the other seven seats with `"jev"` seats. "Play
+  online" still opens the shared lobby, and Jev fills the empty seats
+  there too. The in-browser match (`createMatchSession`) is deleted.
+- **Seat names show what's actually playing:** "Jev N" with a key,
+  "Stub N" with `JEV_PROVIDER=offline`, and "Bot N" (baseline bots) when
+  neither is set. The server logs which one it's using at the first match.
+- **The room runs the driver.** It syncs after every state change and
+  applies outcomes with stale checks. A rejected or empty outcome falls
+  back for that seat straight away instead of waiting for the deadline.
+  Deadline fallbacks still cover every seat. Decision records are kept on
+  the room (`jevRecords`), and fallbacks are logged as `[jev] ... fell
+  back: <reason>`.
+- **"Thinking" tag:** the room publishes each seat's `thinking` flag, and
+  the player rail tags a seat "Thinking" while its question is out.
+- **Skip ends the shared hold.** When your replay ends or you press Skip,
+  the client sends `watched`. The room ends the round-result hold once
+  every connected human has watched that epoch. Solo Skip now reaches
+  rewards in about 1 s instead of about 35 s. Online, the hold still waits
+  for everyone.
+- `PROTOCOL_VERSION` is 3, because the lobby schema gained `thinking`,
+  join options gained `solo`, and there's the new `watched` message.
+- **Verified:**
+  - A new server test plays a solo room with seven offline-stub seats to
+    the end: 200 decisions, 184 answered, 15 deadline fallbacks at the
+    test's 0.3 s reward window.
+  - All 17 server tests (2 + 15) pass on Node 20.19, including a hold
+    test: solo ends the hold right after `watched`, and with two humans it
+    waits for the second.
+  - In the browser, Skip reached rewards in 1.1 s.
+  - In the browser (offline stub), "Fight!" went through draft, preparing,
+    a battle, the round result, and item and rune rewards, with no
+    fallbacks logged.
+
+### Real Jev, through Cloudflare (2026-09-23)
+
+- **Transport:** the user's account runs Jev on Cloudflare Workers AI.
+  `provider/cloudflare.ts` posts `{ model: "typesafe/jev", input: { state,
+  questions } }` to `/accounts/{id}/ai/run`. The model has to go in the
+  body; `/ai/run/typesafe/jev` returns "No route for that URI". The answer
+  comes back wrapped as `result.result`, validated with zod.
+- **Settings:** `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` live in
+  `apps/server/.env.development` (gitignored). A `TYPESAFE_API_KEY` wins if
+  both are set; `JEV_PROVIDER=typesafe|cloudflare|offline` forces one.
+- **One Jev seat vs seven baseline bots, one full run:**
+  - 40 decisions, all answered by jev-1.13.0, no fallbacks;
+  - latency: median 0.54 s, 95th percentile 3.1 s, max 3.5 s;
+  - about 1,350 input tokens per question;
+  - the replay was identical from the log alone;
+  - it drafted Anvil, Cinder, Morrow (two Staggered setters and an Arcana
+    detonator, which lights Overload), then recruited Sexton (a second
+    Arcana detonator). Median confidence 0.40.
+- **In the browser, with seven real Jev seats:** "Fight!" showed "Jev 2" to
+  "Jev 8"; every seat showed "Thinking" in the draft and in the rewards;
+  play reached rewards; the server logged no fallbacks.
+- **Cloudflare fault injection** (`--provider faults-cloudflare`): HTTP
+  500, 429, malformed body, unknown option and a hang each map to their
+  own fallback reason.
+
+### Not done yet
+
+- **"Fight!" needs the game server running** (`pnpm dev` starts both).
+  With it down you get the usual "Couldn't reach the game server" notice.
+- **No evaluation against baseline yet** (paired seeds and side swaps,
+  per the plan). One real run is an anecdote, not a result.
+- **Cloudflare pricing and rate limits for `typesafe/jev` are unknown.**
+  TypeSafe's own list price is $0.042 per million input tokens, but the
+  Cloudflare route may be billed differently.
+- **Formation stays on the baseline policy.**
+- **Fault-mode records** use the model name `fault-injection`, so they
+  can't be mistaken for real Jev answers.
+- **Solo play uses the online timers:** 30 s draft, 25 s preparing, 20 s
+  rewards and 35 s milestone rewards. Jev seats need deadlines either way;
+  whether a solo human should get longer or no timers is the user's call.
+- **Decision records live only in memory** (`MatchRoom.jevRecords`) and
+  are lost when the room closes.
+- **Room-level replay isn't checked;** only the probe checks replays.
+
+## Runes, items and the lab — 2026-09-23
+
+### What works now
+
+- **19 runes and 27 items,** the whole of design §5 and §6. New:
+  - **Runes:** Fork, Twincast, Split, Empower, Linger, Opener, Last Word,
+    Tandem, Resonance, Haste, Overcharge, and Primer: Brittle and
+    Disoriented.
+  - **Items:** Sparkflint, Venom Vial, Sentinel Ward, Blight Ward, Soul
+    Lantern, Prism of Three, Crown of Echoes, Blood Contract, Heart of the
+    Swarm, Obsidian Mirror, and the cursed Soulbound Blade and Glass Idol.
+  - The table and every simplification are in design doc §19.
+- **Engine hooks:**
+  - Fork branches along rays from the first enemy hit (`unitsInRay`).
+  - Twincast draws RNG only when the rune is present.
+  - Opener staggers by unit.
+  - Last Word casts from the corpse (`fromCorpse`).
+  - Tandem has a per-unit cooldown.
+  - Resonance and Prism widen detonation.
+  - Mirror re-casts the ability with the holder as the source.
+  - Sentinel Ward springs on blink moves.
+  - Heart of the Swarm hands items to summons.
+  - HP payments emit `hp-paid`.
+- **Cursed items:** shown with a violet ring and a "Cursed" tag on the
+  reward and loadout panels.
+- **Battle lab:** a "custom teams" scenario (1 to 5 of all ten heroes a
+  side), and team A picks items and runes as well as talents.
+- **Icons:** placeholder glyphs for the new pieces at first. The
+  painted icons have since been delivered; see `docs/icons.md`.
+
+### Verified, not assumed
+
+- The lab pair (duel and three-vs-three, seeds 1, 2, 3, 7, 42) matches
+  `determinism-baseline` exactly.
+- Every rune changes the fight on every hero it fits, and every new item
+  does for every hero tried.
+- 600 random fights with every piece in the pool: 0 failures, at most 3
+  triggered casts in a tick.
+- The five §7 builds fire in scripted fights (counts in design doc §19).
+- A fight with most of the new mechanics replays identically across
+  processes.
+- **Browser:** a custom 3-v-5 lab fight with Fork, Split, Heart of the
+  Swarm and Obsidian Mirror equipped from the new picker ended on tick
+  561, the same tick as the headless replay of that setup. The Mirror
+  threw Plague Cloud back, Fork hit 10 times off 2 Lances, and all 6
+  thralls carried the Whetstone.
+- **Checks:** `pnpm -r typecheck` and scripts typecheck clean; lint clean
+  on every file this touched; server tests 2 and 15 passing.
+
+### Not done yet
+
+- **No balance pass.** Numbers are first guesses, checked for "does
+  something", not for strength.
+- **The survey's pieces tier needs sampling:** with ten heroes it was
+  already about a million matchups. With every piece it is 1.87 million
+  (15 million battles at 4 seeds). See `docs/decisions.md`.
+- **Icon art** for the 25 new pieces.

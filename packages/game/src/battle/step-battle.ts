@@ -1,15 +1,27 @@
 import type { UnitId } from "../ids.js";
 import type { BattleState, UnitState } from "./state.js";
-import type { BattleEvent } from "./events.js";
+import type { BattleEvent, CastEvent } from "./events.js";
 import type { BattleResult } from "./result.js";
 import type { Catalogue } from "../definitions.js";
 import { resolveTarget } from "./targeting.js";
 import { proposeMovement } from "./movement.js";
 import { getEngageRange, proposeAction, type ActionProposal } from "./abilities.js";
-import { applyEffect } from "./effects.js";
-import { resolveChainDamage } from "./chain.js";
-import { expireShield, expireSlow } from "./statuses.js";
-import { processReactionQueue, type ReactionJob } from "./reactions.js";
+import { expireShield, expireSlow, expireTimedStatuses } from "./statuses.js";
+import {
+  CAST_FLAGS,
+  applyDeferredMoves,
+  applySpawns,
+  attackSpeedBonusFor,
+  createResolutionContext,
+  findPassive,
+  isEvaded,
+  manaGainMultiplier,
+  payHp,
+  reflectSignature,
+  resolveCast,
+  type ResolutionContext,
+} from "./combat.js";
+import { processTimedEffects, processTriggeredCasts } from "./timed.js";
 
 export interface BattleStep {
   tick: number;
@@ -28,7 +40,7 @@ function livingUnitsByTeam(units: readonly UnitState[]): Map<string, UnitState[]
   const teams = new Map<string, UnitState[]>();
 
   for (const unit of units) {
-    if (!unit.alive) {
+    if (!unit.alive || unit.summonerUnitId !== null) {
       continue;
     }
 
@@ -52,6 +64,20 @@ function collectDamageDealt(units: readonly UnitState[]): Record<UnitId, number>
   }
 
   return damageDealt;
+}
+
+function payForSignature(ctx: ResolutionContext, unit: UnitState, manaCost: number, overchargeHpCost: number): void {
+  const contract = findPassive(unit, "blood-contract");
+
+  if (contract === null) {
+    unit.mana = Math.max(0, unit.mana - manaCost);
+  } else {
+    payHp(ctx, unit, unit.maxHp * contract.hpFraction, "blood-contract");
+  }
+
+  if (overchargeHpCost > 0) {
+    payHp(ctx, unit, unit.hp * overchargeHpCost, "overcharge");
+  }
 }
 
 function isCorruptUnitState(unit: UnitState): boolean {
@@ -114,6 +140,7 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
   state.tick += 1;
 
   const events: BattleEvent[] = [];
+  const ctx = createResolutionContext(state, events, () => nextSequence(state), catalogue);
 
   const eligible = state.units.filter((unit) => unit.alive);
 
@@ -140,11 +167,21 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
   }
 
   for (const unit of eligible) {
+    for (const status of expireTimedStatuses(unit, state.tick)) {
+      events.push({ kind: "status-expired", tick: state.tick, sequence: nextSequence(state), unitId: unit.unitId, status });
+    }
+  }
+
+  processTimedEffects(ctx);
+
+  const acting = state.units.filter((unit) => unit.alive);
+
+  for (const unit of acting) {
     const target = resolveTarget(unit, state.units);
     unit.targetUnitId = target === null ? null : target.unitId;
   }
 
-  const movementProposals = eligible.map((unit) => {
+  const movementProposals = acting.map((unit) => {
     const target =
       unit.targetUnitId === null
         ? null
@@ -169,19 +206,32 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
 
   const actionProposals: ActionProposal[] = [];
 
-  for (const unit of eligible) {
+  for (const unit of acting) {
     const proposal = proposeAction(unit, state.units, state.tick, catalogue);
 
     if (proposal === null) {
       continue;
     }
 
-    const cooldownDuration =
+    const ability = unit.abilities[proposal.abilityId] ?? catalogue.abilities[proposal.abilityId];
+
+    let cooldownDuration =
       unit.abilityCooldownDurations[proposal.abilityId] ??
       catalogue.abilities[proposal.abilityId]?.cooldownTicks ??
       0;
 
+    const speedBonus = proposal.isBasicAttack ? attackSpeedBonusFor(state, unit) : 0;
+
+    if (speedBonus > 0) {
+      cooldownDuration = Math.max(1, Math.round(cooldownDuration / (1 + speedBonus)));
+    }
+
     unit.abilityCooldowns[proposal.abilityId] = state.tick + cooldownDuration;
+
+    if (ability?.manaCost !== undefined) {
+      payForSignature(ctx, unit, ability.manaCost, unit.abilities[proposal.abilityId]?.runes.overchargeHpCost ?? 0);
+    }
+
     actionProposals.push(proposal);
   }
 
@@ -194,12 +244,10 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
     return rankA - rankB;
   });
 
-  const reactionQueue: ReactionJob[] = [];
-
   for (const proposal of actionProposals) {
     const source = state.units.find((candidate) => candidate.unitId === proposal.sourceUnitId);
     const target = state.units.find((candidate) => candidate.unitId === proposal.targetUnitId);
-    const ability = catalogue.abilities[proposal.abilityId];
+    const ability = source?.abilities[proposal.abilityId];
 
     if (ability === undefined || source === undefined) {
       continue;
@@ -219,7 +267,9 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
     }
 
     const castSequence = nextSequence(state);
-    events.push({
+    const isSignature = ability.manaCost !== undefined;
+
+    const castEvent: CastEvent = {
       kind: "cast",
       tick: state.tick,
       sequence: castSequence,
@@ -227,159 +277,56 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
       abilityId: proposal.abilityId,
       targetUnitId: proposal.targetUnitId,
       isBasicAttack: proposal.isBasicAttack,
-    });
+    };
 
-    for (const effect of ability.effects) {
-      if (!target.alive) {
-        break;
-      }
-
-      if (effect.kind === "chain-damage") {
-        const bonusBounces = source.chainBounceBonus[proposal.abilityId] ?? 0;
-        const hits = resolveChainDamage(effect, source, target, state.units, bonusBounces);
-
-        for (const hit of hits) {
-          source.damageDealt += hit.hpLost;
-
-          events.push({
-            kind: "damage-dealt",
-            tick: state.tick,
-            sequence: nextSequence(state),
-            causeSequence: castSequence,
-            sourceUnitId: proposal.sourceUnitId,
-            targetUnitId: hit.targetUnitId,
-            abilityId: proposal.abilityId,
-            amount: hit.hpLost,
-            shieldAbsorbed: hit.shieldAbsorbed,
-          });
-
-          if (hit.targetUnitId !== target.unitId) {
-            const hitUnit = state.units.find((candidate) => candidate.unitId === hit.targetUnitId);
-
-            if (hitUnit !== undefined && !hitUnit.alive) {
-              events.push({
-                kind: "death",
-                tick: state.tick,
-                sequence: nextSequence(state),
-                unitId: hitUnit.unitId,
-              });
-            }
-          }
-        }
-
-        continue;
-      }
-
-      const outcome = applyEffect(effect, source, target, state.tick, proposal.isBasicAttack);
-
-      switch (outcome.kind) {
-        case "damage": {
-          source.damageDealt += outcome.hpLost;
-
-          events.push({
-            kind: "damage-dealt",
-            tick: state.tick,
-            sequence: nextSequence(state),
-            causeSequence: castSequence,
-            sourceUnitId: proposal.sourceUnitId,
-            targetUnitId: proposal.targetUnitId,
-            abilityId: proposal.abilityId,
-            amount: outcome.hpLost,
-            shieldAbsorbed: outcome.shieldAbsorbed,
-          });
-
-          break;
-        }
-
-        case "heal": {
-          events.push({
-            kind: "healing-done",
-            tick: state.tick,
-            sequence: nextSequence(state),
-            causeSequence: castSequence,
-            sourceUnitId: proposal.sourceUnitId,
-            targetUnitId: proposal.targetUnitId,
-            abilityId: proposal.abilityId,
-            amount: outcome.amountHealed,
-          });
-
-          for (const reaction of source.reactions) {
-            if (reaction.trigger === "after-heal-effect") {
-              reactionQueue.push({
-                rootActionSequence: castSequence,
-                depth: 1,
-                reaction,
-                sourceUnitId: source.unitId,
-                targetUnitId: target.unitId,
-              });
-            }
-          }
-
-          break;
-        }
-
-        case "shield": {
-          events.push({
-            kind: "shield-applied",
-            tick: state.tick,
-            sequence: nextSequence(state),
-            causeSequence: castSequence,
-            sourceUnitId: proposal.sourceUnitId,
-            targetUnitId: proposal.targetUnitId,
-            abilityId: proposal.abilityId,
-            amount: outcome.amount,
-            expiresAtTick: outcome.expiresAtTick,
-          });
-
-          break;
-        }
-
-        case "slow": {
-          events.push({
-            kind: "slow-applied",
-            tick: state.tick,
-            sequence: nextSequence(state),
-            causeSequence: castSequence,
-            sourceUnitId: proposal.sourceUnitId,
-            targetUnitId: proposal.targetUnitId,
-            abilityId: proposal.abilityId,
-            speedMultiplier: outcome.speedMultiplier,
-            expiresAtTick: outcome.expiresAtTick,
-          });
-
-          break;
-        }
-
-        default: {
-          const exhaustive: never = outcome;
-
-          void exhaustive;
-        }
-      }
+    if (isSignature) {
+      castEvent.signature = true;
     }
 
-    if (!target.alive) {
-      events.push({
-        kind: "death",
-        tick: state.tick,
-        sequence: nextSequence(state),
-        unitId: target.unitId,
-      });
+    events.push(castEvent);
+
+    if (proposal.isBasicAttack && source.maxMana > 0) {
+      source.mana = Math.min(source.maxMana, source.mana + source.manaPerAttack * manaGainMultiplier(state, source));
+    }
+
+    if (proposal.isBasicAttack && isEvaded(ctx, source, target, castSequence)) {
+      continue;
+    }
+
+    if (!isSignature || !reflectSignature(ctx, source, ability, target)) {
+      resolveCast(
+        ctx,
+        { source, ability, castSequence, isBasicAttack: proposal.isBasicAttack, scale: 1, flags: CAST_FLAGS },
+        target,
+      );
+    }
+
+    if (isSignature) {
+      source.memory.signatureCasts += 1;
+
+      if (findPassive(source, "refill-after-first-signature") !== null && !source.memory.refillUsed) {
+        source.memory.refillUsed = true;
+        source.mana = source.maxMana;
+        events.push({ kind: "passive-triggered", tick: state.tick, sequence: nextSequence(state), unitId: source.unitId, passive: "refill-after-first-signature" });
+      }
     }
   }
 
-  const reactionOutcome = processReactionQueue(reactionQueue, state, () => nextSequence(state));
-  events.push(...reactionOutcome.events);
+  applyDeferredMoves(ctx);
+
+  const budgetExceeded = processTriggeredCasts(ctx);
+  applyDeferredMoves(ctx);
+  applySpawns(ctx);
 
   let result: BattleResult | null;
 
-  if (reactionOutcome.budgetExceeded !== null) {
+  if (budgetExceeded !== null) {
     events.push({
       kind: "reaction-budget-exceeded",
       tick: state.tick,
       sequence: nextSequence(state),
-      rootActionSequence: reactionOutcome.budgetExceeded.rootActionSequence,
-      depthReached: reactionOutcome.budgetExceeded.depthReached,
+      rootActionSequence: budgetExceeded.rootActionSequence,
+      depthReached: budgetExceeded.depthReached,
     });
 
     result = {

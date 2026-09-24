@@ -1,62 +1,24 @@
-import { createHeroBuild, type BattleSetup, type HeroDefinitionId, type UnitSetup, type UpgradeDefinitionId } from "@jev-game/game";
-import { bruiser } from "../heroes/bruiser.js";
-import { ranger } from "../heroes/ranger.js";
-import { support } from "../heroes/support.js";
-import { flatArena } from "../arenas/flat-arena.js";
-import { catalogue } from "../catalogue.js";
+import type { BattleSetup, HeroDefinitionId } from "@jev-game/game";
+import { boardArena } from "../arenas/board-arena.js";
+import { bulwark } from "../roster/bulwark.js";
+import { duskblade } from "../roster/duskblade.js";
+import { frostweaver } from "../roster/frostweaver.js";
+import { pyromancer } from "../roster/pyromancer.js";
+import { teamUnits, type UpgradeIdsByHero } from "./lab-teams.js";
 
-function mirroredUnits(
-  teamId: string,
-  heroIds: readonly string[],
-  side: "left" | "right",
-  upgradeIdsByHero: ReadonlyMap<HeroDefinitionId, readonly UpgradeDefinitionId[]> = new Map(),
-): UnitSetup[] {
-  const frontX = side === "left" ? 15 : flatArena.width - 15;
-  const backX = side === "left" ? 5 : flatArena.width - 5;
+export const THREE_VERSUS_THREE_TEAM_A: readonly HeroDefinitionId[] = [bulwark.id, frostweaver.id, duskblade.id];
 
-  const spawns = [
-    { x: frontX, y: 30 },
-    { x: backX, y: 15 },
-    { x: backX, y: 45 },
-  ];
+export const THREE_VERSUS_THREE_TEAM_B: readonly HeroDefinitionId[] = [bulwark.id, pyromancer.id, duskblade.id];
 
-  return heroIds.map((heroId, index) => {
-    const unitId = `${teamId}-${index + 1}`;
-
-    return {
-      unitId,
-      teamId,
-      build: createHeroBuild(unitId, heroId, upgradeIdsByHero.get(heroId) ?? [], catalogue),
-      spawn: spawns[index]!,
-    };
-  });
-}
-
-export function createThreeVersusThreeSetup(
-  seed: number,
-  teamAUpgradeIdsByHero: ReadonlyMap<HeroDefinitionId, readonly UpgradeDefinitionId[]> = new Map(),
-): BattleSetup {
+export function createThreeVersusThreeSetup(seed: number, teamAUpgradeIdsByHero: UpgradeIdsByHero = new Map()): BattleSetup {
   return {
-    rulesetId: "three-vs-three-prototype",
+    rulesetId: "three-vs-three",
     rulesetVersion: 1,
     seed,
-    arenaId: flatArena.id,
+    arenaId: boardArena.id,
     units: [
-      ...mirroredUnits("A", [bruiser.id, ranger.id, support.id], "left", teamAUpgradeIdsByHero),
-      ...mirroredUnits("B", [bruiser.id, ranger.id, support.id], "right"),
-    ],
-  };
-}
-
-export function createThreeBruisersSetup(seed: number): BattleSetup {
-  return {
-    rulesetId: "three-bruisers-prototype",
-    rulesetVersion: 1,
-    seed,
-    arenaId: flatArena.id,
-    units: [
-      ...mirroredUnits("A", [bruiser.id, bruiser.id, bruiser.id], "left"),
-      ...mirroredUnits("B", [bruiser.id, bruiser.id, bruiser.id], "right"),
+      ...teamUnits("A", THREE_VERSUS_THREE_TEAM_A, "south", teamAUpgradeIdsByHero),
+      ...teamUnits("B", THREE_VERSUS_THREE_TEAM_B, "north"),
     ],
   };
 }

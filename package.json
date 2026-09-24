@@ -13,15 +13,26 @@
     "dev": "pnpm -r --if-present build && pnpm -r --parallel --if-present dev",
     "typecheck": "pnpm -r typecheck",
     "build": "pnpm -r --if-present build",
-    "lint": "oxlint",
+    "lint": "NODE_OPTIONS=--import=tsx oxlint",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "simulate": "tsx scripts/simulate.ts"
+    "simulate": "tsx scripts/simulate.ts",
+    "survey": "tsx scripts/balance-survey.ts",
+    "typecheck:scripts": "tsc -p scripts/tsconfig.json",
+    "models:new": "tsx scripts/models/new.ts",
+    "models:build": "tsx scripts/models/build.ts",
+    "models:check": "tsx scripts/models/check.ts",
+    "icons:build": "tsx scripts/icons/build.ts",
+    "icons:check": "tsx scripts/icons/check.ts"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
     "@jev-game/content": "workspace:*",
     "@jev-game/game": "workspace:*",
+    "@jev-game/run": "workspace:*",
     "@oxlint/plugins": "1.83.0",
+    "meshoptimizer": "^1.2.0",
     "oxfmt": "^0.68.0",
     "oxlint": "^1.83.0",
     "tsx": "^4.23.15"

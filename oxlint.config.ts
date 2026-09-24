@@ -29,6 +29,10 @@ export default defineConfig({
                 message:
                   'Import types only from "@jev-game/server-runtime/contract" — the package root pulls in server runtime code.',
               },
+              {
+                name: "@jev-game/jev",
+                message: "Jev runs on the server only; its provider credentials must never reach the browser bundle.",
+              },
             ],
             patterns: [
               {
@@ -107,6 +111,7 @@ export default defineConfig({
     },
   ],
   rules: {
+    curly: ["error", "all"],
     "oxc/no-accumulating-spread": "error",
     "anti-slop/no-array-filter-map": "error",
     "anti-slop/no-reduce-accumulator-copy": "error",

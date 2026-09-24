@@ -1,5 +1,7 @@
 import type { HeroDefinitionId } from "@jev-game/game";
-import type { BattleLabSession, LabScenarioKind, TeamAUpgradeIdsByHero } from "../session/types.js";
+import { DUEL_TEAM_A, gameCatalogue, MAX_LAB_TEAM_SIZE, THREE_VERSUS_THREE_TEAM_A } from "@jev-game/content";
+import type { BattleLabSession, LabScenarioKind, LabTeams, TeamAUpgradeIdsByHero } from "../session/types.js";
+import { heroName } from "../game/catalogues.js";
 import { createUpgradePickerView } from "./upgrade-picker.js";
 
 export interface BattleControlsView {
@@ -11,12 +13,87 @@ const SPEED_OPTIONS = [0.5, 1, 2, 4] as const;
 const SCENARIO_OPTIONS: readonly { value: LabScenarioKind; label: string }[] = [
   { value: "three-vs-three", label: "three vs three" },
   { value: "duel", label: "duel" },
+  { value: "custom", label: "custom teams" },
 ];
 
-const SCENARIO_TEAM_A_HEROES: Record<LabScenarioKind, readonly HeroDefinitionId[]> = {
-  "three-vs-three": ["bruiser", "ranger", "support"],
-  duel: ["bruiser"],
-};
+function teamAHeroes(scenario: LabScenarioKind, teams: LabTeams): readonly HeroDefinitionId[] {
+  switch (scenario) {
+    case "three-vs-three":
+      return THREE_VERSUS_THREE_TEAM_A;
+
+    case "duel":
+      return DUEL_TEAM_A;
+
+    case "custom":
+      return teams.a;
+
+    default: {
+      const exhaustive: never = scenario;
+
+      return exhaustive;
+    }
+  }
+}
+
+function playableHeroes(): HeroDefinitionId[] {
+  const heroIds: HeroDefinitionId[] = [];
+
+  for (const hero of Object.values(gameCatalogue.heroes)) {
+    if (hero.summon !== true) {
+      heroIds.push(hero.id);
+    }
+  }
+
+  return heroIds.sort((a, b) => heroName(a).localeCompare(heroName(b)));
+}
+
+function toggledTeam(team: readonly HeroDefinitionId[], heroId: HeroDefinitionId): HeroDefinitionId[] {
+  if (team.includes(heroId)) {
+    return team.length > 1 ? team.filter((member) => member !== heroId) : [...team];
+  }
+
+  return team.length < MAX_LAB_TEAM_SIZE ? [...team, heroId] : [...team];
+}
+
+function teamPicker(parent: HTMLElement, getTeams: () => LabTeams, setTeams: (teams: LabTeams) => void): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "hud-team-picker";
+  parent.appendChild(root);
+
+  function render(): void {
+    const teams = getTeams();
+    root.replaceChildren();
+
+    for (const side of ["a", "b"] as const) {
+      const row = document.createElement("div");
+      row.className = "hud-team-row";
+
+      const caption = document.createElement("span");
+      caption.className = "hud-team-caption";
+      caption.textContent = side === "a" ? "team A" : "team B";
+      row.append(caption);
+
+      for (const heroId of playableHeroes()) {
+        const chip = document.createElement("button");
+        chip.className = "hud-chip";
+        chip.textContent = heroName(heroId);
+        chip.classList.toggle("is-active", teams[side].includes(heroId));
+        chip.addEventListener("click", () => {
+          const current = getTeams();
+          setTeams({ ...current, [side]: toggledTeam(current[side], heroId) });
+          render();
+        });
+        row.append(chip);
+      }
+
+      root.append(row);
+    }
+  }
+
+  render();
+
+  return root;
+}
 
 function isScenarioKind(value: string): value is LabScenarioKind {
   return SCENARIO_OPTIONS.some((option) => option.value === value);
@@ -89,7 +166,7 @@ export function createBattleControlsView(
   upgradesContainer: HTMLElement,
   session: BattleLabSession,
   onReplay: () => void,
-  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero) => void,
+  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero, teams?: LabTeams) => void,
 ): BattleControlsView {
   const playButton = iconButton(barContainer, "▶", "Play");
   const pauseButton = iconButton(barContainer, "‖", "Pause");
@@ -133,15 +210,30 @@ export function createBattleControlsView(
   const initial = session.peekSnapshot();
   const seedInput = numberField(fields, "seed", initial.seed);
   const scenarioSelect = scenarioField(fields, initial.scenario);
+  let teams: LabTeams = initial.teams;
+  let scenario: LabScenarioKind = initial.scenario;
 
   const upgradePicker = createUpgradePickerView(upgradesContainer, () => {});
-  upgradePicker.render(SCENARIO_TEAM_A_HEROES[initial.scenario]);
+  upgradePicker.render(teamAHeroes(scenario, teams));
+
+  const pickerRoot = teamPicker(
+    tuningContainer,
+    () => teams,
+    (next) => {
+      teams = next;
+      upgradePicker.render(teamAHeroes(scenario, teams));
+    },
+  );
+
+  pickerRoot.hidden = scenario !== "custom";
 
   scenarioSelect.addEventListener("change", () => {
     const selected = scenarioSelect.value;
 
     if (isScenarioKind(selected)) {
-      upgradePicker.render(SCENARIO_TEAM_A_HEROES[selected]);
+      scenario = selected;
+      pickerRoot.hidden = scenario !== "custom";
+      upgradePicker.render(teamAHeroes(scenario, teams));
     }
   });
 
@@ -158,12 +250,7 @@ export function createBattleControlsView(
   });
 
   resetButton.addEventListener("click", () => {
-    const selected = scenarioSelect.value;
-    onReset(
-      Number(seedInput.value),
-      isScenarioKind(selected) ? selected : undefined,
-      upgradePicker.getSelection(),
-    );
+    onReset(Number(seedInput.value), scenario, upgradePicker.getSelection(), teams);
   });
 
   replayButton.addEventListener("click", onReplay);
@@ -177,6 +264,7 @@ export function createBattleControlsView(
       replayButton.remove();
       speedGroup.remove();
       fields.remove();
+      pickerRoot.remove();
       upgradePicker.dispose();
     },
   };

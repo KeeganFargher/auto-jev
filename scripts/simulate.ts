@@ -1,9 +1,8 @@
 import { recordBattle, type BattleSetup } from "@jev-game/game";
 import {
-  catalogue,
   createDuelSetup,
-  createThreeBruisersSetup,
   createThreeVersusThreeSetup,
+  gameCatalogue as catalogue,
   validateCatalogue,
 } from "@jev-game/content";
 
@@ -26,10 +25,6 @@ function buildSetup(scenario: string, seed: number): BattleSetup {
 
   if (scenario === "three-vs-three") {
     return createThreeVersusThreeSetup(seed);
-  }
-
-  if (scenario === "three-bruisers") {
-    return createThreeBruisersSetup(seed);
   }
 
   throw new Error(`unknown scenario "${scenario}"`);
