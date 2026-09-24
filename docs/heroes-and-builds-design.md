@@ -6,6 +6,10 @@ items and combos: a design doc first" note in
 `docs/board-and-renderer-plan.md`, stage 5. §12 parks the Jev
 personality idea, and §13 is a short check against the 8 kinds of fun.
 
+A redesign of the kits, runes (as gems), items and talents (as levels) is
+proposed in `docs/hero-redesign.md`. Until its slices land, this doc
+still describes what's built.
+
 The goal: runs that play out differently each time, builds that can get
 properly broken, and battles where the big moments come from heroes
 working together, not from bigger numbers.
