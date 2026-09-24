@@ -26,6 +26,7 @@ import type { BoardGrid, Vector2 } from "@jev-game/game";
 import { easeInOut } from "./easing.js";
 import { createParticleSystem, type ParticleSystem } from "./particles.js";
 import { applyShadowQuality } from "./shadow-quality.js";
+import { createStageGlow } from "./stage-glow.js";
 
 export interface ViewportInsets {
   left: number;
@@ -385,6 +386,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.info.autoReset = false;
 
   const canvas = renderer.domElement;
   canvas.classList.add("board-canvas");
@@ -399,6 +401,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   applyShadowQuality(renderer.shadowMap, lights.key.shadow, "soft");
   const ground = createGround(scene);
   const particles = createParticleSystem(scene);
+  const glow = createStageGlow(renderer, scene, camera);
   const raycaster = new Raycaster();
   const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
   const listeners = new Set<(deltaSeconds: number) => void>();
@@ -605,6 +608,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     viewportWidth = width;
     viewportHeight = height;
     renderer.setSize(width, height, false);
+    glow.setSize(width, height, renderer.getPixelRatio());
 
     return true;
   }
@@ -620,6 +624,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   fitCamera();
 
   function frame(now: number): void {
+    renderer.info.reset();
     const deltaSeconds = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
     stepGlide(deltaSeconds);
@@ -630,7 +635,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     }
 
     if (isVisible) {
-      renderer.render(scene, camera);
+      glow.render();
     }
 
     animationFrame = requestAnimationFrame(frame);
@@ -775,6 +780,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       }
 
       particles.dispose();
+      glow.dispose();
       ground.geometry.dispose();
       ground.material.map?.dispose();
       ground.material.dispose();
