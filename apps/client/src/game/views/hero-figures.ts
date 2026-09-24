@@ -20,7 +20,6 @@ import { isModelId, type ModelId } from "../../models/catalogue.js";
 import { models, type LoadedModel } from "../../models/library.js";
 import {
   ATTACK_SECONDS,
-  BASE_HEIGHT,
   CAST_SECONDS,
   CHEST_FRACTION,
   DEAD_COLOR,
@@ -109,7 +108,7 @@ function part(
 }
 
 function point(x: number, y: number, z: number): Vector3 {
-  return new Vector3(x, BASE_HEIGHT + y, z);
+  return new Vector3(x, y, z);
 }
 
 function span(mesh: Mesh, from: Vector3, to: Vector3): Mesh {
@@ -156,23 +155,23 @@ function buildBulwark(builder: PartBuilder): FigureParts {
   const steel = material(builder, STEEL, 0.5);
   const team = material(builder, "#ffffff");
 
-  const torso = part(builder, new CapsuleGeometry(2.3, 1.9, 3, 8), plate, 0, BASE_HEIGHT + 3, 0);
+  const torso = part(builder, new CapsuleGeometry(2.3, 1.9, 3, 8), plate, 0, 3, 0);
   torso.scale.set(1.25, 1, 1.05);
-  part(builder, new SphereGeometry(1.35, 8, 6), steel, 0, BASE_HEIGHT + 6.9, 0);
-  part(builder, new BoxGeometry(2.1, 0.5, 0.4), bronze, 0, BASE_HEIGHT + 6.8, 1.15);
+  part(builder, new SphereGeometry(1.35, 8, 6), steel, 0, 6.9, 0);
+  part(builder, new BoxGeometry(2.1, 0.5, 0.4), bronze, 0, 6.8, 1.15);
 
   for (const direction of [-1, 1]) {
-    const pauldron = part(builder, new SphereGeometry(1.35, 7, 5), bronze, direction * 2.5, BASE_HEIGHT + 5.2, 0);
+    const pauldron = part(builder, new SphereGeometry(1.35, 7, 5), bronze, direction * 2.5, 5.2, 0);
     pauldron.scale.set(1.05, 0.7, 1.1);
   }
 
-  part(builder, new BoxGeometry(3.9, 5.6, 0.6), bronze, -0.4, BASE_HEIGHT + 3.4, 2.5);
-  part(builder, new BoxGeometry(1.2, 3.2, 0.7), steel, -0.4, BASE_HEIGHT + 3.6, 2.7);
+  part(builder, new BoxGeometry(3.9, 5.6, 0.6), bronze, -0.4, 3.4, 2.5);
+  part(builder, new BoxGeometry(1.2, 3.2, 0.7), steel, -0.4, 3.6, 2.7);
 
-  const belt = part(builder, new CylinderGeometry(2.4, 2.4, 0.7, 10), team, 0, BASE_HEIGHT + 2.3, 0);
+  const belt = part(builder, new CylinderGeometry(2.4, 2.4, 0.7, 10), team, 0, 2.3, 0);
   belt.scale.set(1.2, 1, 1.05);
 
-  return { body: builder.body, accentMaterials: [bronze], teamMaterials: [team], height: BASE_HEIGHT + 8.4 };
+  return { body: builder.body, accentMaterials: [bronze], teamMaterials: [team], height: 8.4 };
 }
 
 function buildFrostweaver(builder: PartBuilder): FigureParts {
@@ -183,17 +182,17 @@ function buildFrostweaver(builder: PartBuilder): FigureParts {
   const skin = material(builder, SKIN);
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1.1, 2.3, 5.6, 10), robe, 0, BASE_HEIGHT + 2.8, 0);
-  part(builder, new SphereGeometry(1.4, 8, 6), deep, 0, BASE_HEIGHT + 5.8, 0);
-  part(builder, new SphereGeometry(1.05, 8, 6), skin, 0, BASE_HEIGHT + 7.1, 0.15);
-  part(builder, new ConeGeometry(1.25, 1.6, 8), deep, 0, BASE_HEIGHT + 8.2, -0.1);
-  part(builder, new CylinderGeometry(0.16, 0.16, 7.6, 6), deep, 2.2, BASE_HEIGHT + 3.8, 0.4);
-  part(builder, new IcosahedronGeometry(0.9, 0), ice, 2.2, BASE_HEIGHT + 8.4, 0.4);
+  part(builder, new CylinderGeometry(1.1, 2.3, 5.6, 10), robe, 0, 2.8, 0);
+  part(builder, new SphereGeometry(1.4, 8, 6), deep, 0, 5.8, 0);
+  part(builder, new SphereGeometry(1.05, 8, 6), skin, 0, 7.1, 0.15);
+  part(builder, new ConeGeometry(1.25, 1.6, 8), deep, 0, 8.2, -0.1);
+  part(builder, new CylinderGeometry(0.16, 0.16, 7.6, 6), deep, 2.2, 3.8, 0.4);
+  part(builder, new IcosahedronGeometry(0.9, 0), ice, 2.2, 8.4, 0.4);
 
-  const sash = part(builder, new TorusGeometry(1.5, 0.3, 6, 10), team, 0, BASE_HEIGHT + 4.2, 0);
+  const sash = part(builder, new TorusGeometry(1.5, 0.3, 6, 10), team, 0, 4.2, 0);
   sash.rotation.x = Math.PI / 2;
 
-  return { body: builder.body, accentMaterials: [ice], teamMaterials: [team], height: BASE_HEIGHT + 9.2 };
+  return { body: builder.body, accentMaterials: [ice], teamMaterials: [team], height: 9.2 };
 }
 
 function buildDuskblade(builder: PartBuilder): FigureParts {
@@ -203,20 +202,20 @@ function buildDuskblade(builder: PartBuilder): FigureParts {
   const steel = material(builder, STEEL, 0.55);
   const team = material(builder, "#ffffff");
 
-  part(builder, new CapsuleGeometry(1.35, 3, 3, 8), cloak, 0, BASE_HEIGHT + 3.1, 0);
-  part(builder, new ConeGeometry(1.45, 2.8, 8), cloak, 0, BASE_HEIGHT + 7.3, 0);
-  part(builder, new SphereGeometry(0.55, 6, 5), violet, 0, BASE_HEIGHT + 6.9, 0.9);
+  part(builder, new CapsuleGeometry(1.35, 3, 3, 8), cloak, 0, 3.1, 0);
+  part(builder, new ConeGeometry(1.45, 2.8, 8), cloak, 0, 7.3, 0);
+  part(builder, new SphereGeometry(0.55, 6, 5), violet, 0, 6.9, 0.9);
 
   for (const direction of [-1, 1]) {
-    const blade = part(builder, new ConeGeometry(0.28, 3.2, 5), steel, direction * 1.9, BASE_HEIGHT + 3.4, 1.4);
+    const blade = part(builder, new ConeGeometry(0.28, 3.2, 5), steel, direction * 1.9, 3.4, 1.4);
     blade.rotation.x = Math.PI / 2.4;
-    part(builder, new BoxGeometry(0.9, 0.25, 0.25), violet, direction * 1.9, BASE_HEIGHT + 2.9, 0.3);
+    part(builder, new BoxGeometry(0.9, 0.25, 0.25), violet, direction * 1.9, 2.9, 0.3);
   }
 
-  const wrap = part(builder, new TorusGeometry(1.3, 0.3, 6, 10), team, 0, BASE_HEIGHT + 2.4, 0);
+  const wrap = part(builder, new TorusGeometry(1.3, 0.3, 6, 10), team, 0, 2.4, 0);
   wrap.rotation.x = Math.PI / 2;
 
-  return { body: builder.body, accentMaterials: [violet], teamMaterials: [team], height: BASE_HEIGHT + 8.7 };
+  return { body: builder.body, accentMaterials: [violet], teamMaterials: [team], height: 8.7 };
 }
 
 function buildPyromancer(builder: PartBuilder): FigureParts {
@@ -227,18 +226,18 @@ function buildPyromancer(builder: PartBuilder): FigureParts {
   const skin = material(builder, SKIN);
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1.2, 2.4, 5.4, 10), robe, 0, BASE_HEIGHT + 2.7, 0);
-  part(builder, new SphereGeometry(1.45, 8, 6), robe, 0, BASE_HEIGHT + 5.7, 0);
-  part(builder, new SphereGeometry(1.08, 8, 6), skin, 0, BASE_HEIGHT + 7, 0.15);
-  const hat = part(builder, new ConeGeometry(1.5, 3.4, 8), robe, 0, BASE_HEIGHT + 9, -0.2);
+  part(builder, new CylinderGeometry(1.2, 2.4, 5.4, 10), robe, 0, 2.7, 0);
+  part(builder, new SphereGeometry(1.45, 8, 6), robe, 0, 5.7, 0);
+  part(builder, new SphereGeometry(1.08, 8, 6), skin, 0, 7, 0.15);
+  const hat = part(builder, new ConeGeometry(1.5, 3.4, 8), robe, 0, 9, -0.2);
   hat.rotation.x = -0.15;
-  part(builder, new TorusGeometry(1.35, 0.22, 5, 10), gold, 0, BASE_HEIGHT + 7.6, -0.1).rotation.x = Math.PI / 2;
-  part(builder, new IcosahedronGeometry(0.95, 1), ember, 2.1, BASE_HEIGHT + 4.6, 1.2);
+  part(builder, new TorusGeometry(1.35, 0.22, 5, 10), gold, 0, 7.6, -0.1).rotation.x = Math.PI / 2;
+  part(builder, new IcosahedronGeometry(0.95, 1), ember, 2.1, 4.6, 1.2);
 
-  const sash = part(builder, new TorusGeometry(1.45, 0.3, 6, 10), team, 0, BASE_HEIGHT + 3.6, 0);
+  const sash = part(builder, new TorusGeometry(1.45, 0.3, 6, 10), team, 0, 3.6, 0);
   sash.rotation.x = Math.PI / 2;
 
-  return { body: builder.body, accentMaterials: [ember], teamMaterials: [team], height: BASE_HEIGHT + 10.4 };
+  return { body: builder.body, accentMaterials: [ember], teamMaterials: [team], height: 10.4 };
 }
 
 function buildOathkeeper(builder: PartBuilder): FigureParts {
@@ -250,25 +249,25 @@ function buildOathkeeper(builder: PartBuilder): FigureParts {
   const skin = material(builder, SKIN);
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1.5, 2.1, 3.2, 8), plate, 0, BASE_HEIGHT + 1.6, 0);
-  const torso = part(builder, new CapsuleGeometry(1.55, 1.3, 3, 8), plate, 0, BASE_HEIGHT + 4.4, 0);
+  part(builder, new CylinderGeometry(1.5, 2.1, 3.2, 8), plate, 0, 1.6, 0);
+  const torso = part(builder, new CapsuleGeometry(1.55, 1.3, 3, 8), plate, 0, 4.4, 0);
   torso.scale.set(1.15, 1, 0.95);
-  part(builder, new CylinderGeometry(1.64, 1.64, 0.45, 10), trim, 0, BASE_HEIGHT + 3.2, 0);
+  part(builder, new CylinderGeometry(1.64, 1.64, 0.45, 10), trim, 0, 3.2, 0);
 
   for (const direction of [-1, 1]) {
-    const pauldron = part(builder, new SphereGeometry(1.15, 7, 5), plate, direction * 1.9, BASE_HEIGHT + 5.9, 0);
+    const pauldron = part(builder, new SphereGeometry(1.15, 7, 5), plate, direction * 1.9, 5.9, 0);
     pauldron.scale.set(1.1, 0.72, 1.1);
-    const rim = part(builder, new TorusGeometry(1.12, 0.15, 4, 10), trim, direction * 1.9, BASE_HEIGHT + 5.45, 0);
+    const rim = part(builder, new TorusGeometry(1.12, 0.15, 4, 10), trim, direction * 1.9, 5.45, 0);
     rim.rotation.x = Math.PI / 2;
-    const tabard = part(builder, new BoxGeometry(1.3, 2.55, 0.2), team, 0, BASE_HEIGHT + 1.85, direction * 1.85);
+    const tabard = part(builder, new BoxGeometry(1.3, 2.55, 0.2), team, 0, 1.85, direction * 1.85);
     tabard.rotation.x = -direction * 0.2;
   }
 
-  part(builder, new SphereGeometry(0.92, 8, 6), skin, 0, BASE_HEIGHT + 7.3, 0.2);
-  part(builder, new SphereGeometry(1.02, 8, 6), plate, 0, BASE_HEIGHT + 7.45, -0.18);
-  const circlet = part(builder, new TorusGeometry(0.98, 0.12, 4, 12), trim, 0, BASE_HEIGHT + 7.75, 0.02);
+  part(builder, new SphereGeometry(0.92, 8, 6), skin, 0, 7.3, 0.2);
+  part(builder, new SphereGeometry(1.02, 8, 6), plate, 0, 7.45, -0.18);
+  const circlet = part(builder, new TorusGeometry(0.98, 0.12, 4, 12), trim, 0, 7.75, 0.02);
   circlet.rotation.x = Math.PI / 2;
-  part(builder, new TorusGeometry(1.35, 0.15, 6, 20), radiance, 0, BASE_HEIGHT + 7.6, -1.3);
+  part(builder, new TorusGeometry(1.35, 0.15, 6, 20), radiance, 0, 7.6, -1.3);
 
   for (let ray = 0; ray <= 6; ray += 1) {
     const angle = (Math.PI * ray) / 6;
@@ -277,13 +276,13 @@ function buildOathkeeper(builder: PartBuilder): FigureParts {
   }
 
   limb(builder, plate, point(1.9, 5.5, 0.3), point(2.38, 4.2, 1.2), 0.36);
-  part(builder, new SphereGeometry(0.45, 6, 5), plate, 2.38, BASE_HEIGHT + 4.2, 1.2);
-  const shaft = part(builder, new CylinderGeometry(0.17, 0.17, 7.6, 6), haft, 2.35, BASE_HEIGHT + 4, 1.2);
+  part(builder, new SphereGeometry(0.45, 6, 5), plate, 2.38, 4.2, 1.2);
+  const shaft = part(builder, new CylinderGeometry(0.17, 0.17, 7.6, 6), haft, 2.35, 4, 1.2);
   shaft.rotation.z = -0.15;
-  const head = part(builder, new BoxGeometry(2, 1.2, 1.2), radiance, 2.92, BASE_HEIGHT + 7.76, 1.2);
+  const head = part(builder, new BoxGeometry(2, 1.2, 1.2), radiance, 2.92, 7.76, 1.2);
   head.rotation.z = -0.15;
 
-  return { body: builder.body, accentMaterials: [radiance], teamMaterials: [team], height: BASE_HEIGHT + 9.7 };
+  return { body: builder.body, accentMaterials: [radiance], teamMaterials: [team], height: 9.7 };
 }
 
 function buildRavager(builder: PartBuilder): FigureParts {
@@ -297,34 +296,34 @@ function buildRavager(builder: PartBuilder): FigureParts {
   blood.emissive = new Color("#7a1712");
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1.6, 1.95, 2.4, 8), leather, 0, BASE_HEIGHT + 1.2, 0);
-  const torso = part(builder, new CapsuleGeometry(2.05, 1, 3, 8), hide, 0, BASE_HEIGHT + 4.3, 0.15);
+  part(builder, new CylinderGeometry(1.6, 1.95, 2.4, 8), leather, 0, 1.2, 0);
+  const torso = part(builder, new CapsuleGeometry(2.05, 1, 3, 8), hide, 0, 4.3, 0.15);
   torso.scale.set(1.3, 0.95, 1.05);
   torso.rotation.x = 0.28;
-  const wrap = part(builder, new TorusGeometry(1.75, 0.36, 6, 12), team, 0, BASE_HEIGHT + 2.45, 0);
+  const wrap = part(builder, new TorusGeometry(1.75, 0.36, 6, 12), team, 0, 2.45, 0);
   wrap.rotation.x = Math.PI / 2;
   wrap.scale.set(1.12, 1, 1);
-  const hump = part(builder, new IcosahedronGeometry(1.5, 1), fur, 0, BASE_HEIGHT + 6.1, -0.75);
+  const hump = part(builder, new IcosahedronGeometry(1.5, 1), fur, 0, 6.1, -0.75);
   hump.scale.set(1.3, 0.75, 1);
 
-  part(builder, new SphereGeometry(1, 8, 6), hide, 0, BASE_HEIGHT + 6.9, 1.55);
-  const helm = part(builder, new SphereGeometry(1.08, 8, 6), iron, 0, BASE_HEIGHT + 7.25, 1.4);
+  part(builder, new SphereGeometry(1, 8, 6), hide, 0, 6.9, 1.55);
+  const helm = part(builder, new SphereGeometry(1.08, 8, 6), iron, 0, 7.25, 1.4);
   helm.scale.set(1.05, 0.75, 1.05);
 
   for (const direction of [-1, 1]) {
-    const pelt = part(builder, new IcosahedronGeometry(1.2, 1), fur, direction * 1.75, BASE_HEIGHT + 6, 0.1);
+    const pelt = part(builder, new IcosahedronGeometry(1.2, 1), fur, direction * 1.75, 6, 0.1);
     pelt.scale.set(1.15, 0.8, 1.15);
-    part(builder, new SphereGeometry(0.14, 5, 4), blood, direction * 0.35, BASE_HEIGHT + 7, 2.42);
+    part(builder, new SphereGeometry(0.14, 5, 4), blood, direction * 0.35, 7, 2.42);
     spike(builder, ivory, point(direction * 0.7, 6.8, 1.6), point(direction * 1.7, 8.9, 2.3), 0.36);
     limb(builder, hide, point(direction * 2.3, 5.8, 0.5), point(direction * 2.9, 4.4, 1.6), 0.6);
     limb(builder, haft, point(direction * 2.95, 3.4, 1.75), point(direction * 3.15, 7, 2.15), 0.14);
 
     const edge = new CylinderGeometry(1.1, 1.1, 0.2, 6, 1, false, direction * (Math.PI / 2) - AXE_ARC / 2, AXE_ARC);
-    const blade = part(builder, edge, blood, direction * 3.1, BASE_HEIGHT + 6.2, 2.06);
+    const blade = part(builder, edge, blood, direction * 3.1, 6.2, 2.06);
     blade.rotation.x = Math.PI / 2;
   }
 
-  return { body: builder.body, accentMaterials: [blood], teamMaterials: [team], height: BASE_HEIGHT + 8.9 };
+  return { body: builder.body, accentMaterials: [blood], teamMaterials: [team], height: 8.9 };
 }
 
 function buildHexbinder(builder: PartBuilder): FigureParts {
@@ -335,19 +334,19 @@ function buildHexbinder(builder: PartBuilder): FigureParts {
   const skin = material(builder, SKIN);
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1, 2.2, 6.2, 10), robe, 0, BASE_HEIGHT + 3.1, 0);
-  part(builder, new SphereGeometry(1.3, 8, 6), shade, 0, BASE_HEIGHT + 6, 0);
-  part(builder, new SphereGeometry(0.9, 8, 6), skin, 0, BASE_HEIGHT + 7.3, 0.22);
-  const sash = part(builder, new TorusGeometry(1.52, 0.28, 6, 12), team, 0, BASE_HEIGHT + 3.7, 0);
+  part(builder, new CylinderGeometry(1, 2.2, 6.2, 10), robe, 0, 3.1, 0);
+  part(builder, new SphereGeometry(1.3, 8, 6), shade, 0, 6, 0);
+  part(builder, new SphereGeometry(0.9, 8, 6), skin, 0, 7.3, 0.22);
+  const sash = part(builder, new TorusGeometry(1.52, 0.28, 6, 12), team, 0, 3.7, 0);
   sash.rotation.x = Math.PI / 2;
-  const amulet = part(builder, new ConeGeometry(0.42, 0.75, 3), hex, 0, BASE_HEIGHT + 5.6, 1.3);
+  const amulet = part(builder, new ConeGeometry(0.42, 0.75, 3), hex, 0, 5.6, 1.3);
   amulet.rotation.y = Math.PI;
 
-  part(builder, new CylinderGeometry(2, 2, 0.14, 14), shade, 0, BASE_HEIGHT + 8.05, -0.05);
-  part(builder, new CylinderGeometry(0.32, 1.1, 2.2, 8), shade, 0, BASE_HEIGHT + 9.15, -0.05);
-  const band = part(builder, new TorusGeometry(1.02, 0.2, 5, 12), team, 0, BASE_HEIGHT + 8.35, -0.05);
+  part(builder, new CylinderGeometry(2, 2, 0.14, 14), shade, 0, 8.05, -0.05);
+  part(builder, new CylinderGeometry(0.32, 1.1, 2.2, 8), shade, 0, 9.15, -0.05);
+  const band = part(builder, new TorusGeometry(1.02, 0.2, 5, 12), team, 0, 8.35, -0.05);
   band.rotation.x = Math.PI / 2;
-  part(builder, new SphereGeometry(0.34, 6, 5), shade, 0, BASE_HEIGHT + 10.25, -0.05);
+  part(builder, new SphereGeometry(0.34, 6, 5), shade, 0, 10.25, -0.05);
   spike(builder, shade, point(0, 10.25, -0.05), point(0, 11.07, -1.19), 0.34);
 
   for (const direction of [-1, 1]) {
@@ -362,7 +361,7 @@ function buildHexbinder(builder: PartBuilder): FigureParts {
     limb(builder, hex, hand, point(0, 4.3, 2.2), 0.07);
   }
 
-  return { body: builder.body, accentMaterials: [hex], teamMaterials: [team], height: BASE_HEIGHT + 11 };
+  return { body: builder.body, accentMaterials: [hex], teamMaterials: [team], height: 11 };
 }
 
 function buildBlightmother(builder: PartBuilder): FigureParts {
@@ -375,10 +374,10 @@ function buildBlightmother(builder: PartBuilder): FigureParts {
   blight.emissive = new Color("#3f7d14");
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1.25, 2.7, 3.8, 10), skirt, 0, BASE_HEIGHT + 1.9, 0);
-  const sash = part(builder, new TorusGeometry(1.35, 0.28, 6, 12), team, 0, BASE_HEIGHT + 3.7, 0);
+  part(builder, new CylinderGeometry(1.25, 2.7, 3.8, 10), skirt, 0, 1.9, 0);
+  const sash = part(builder, new TorusGeometry(1.35, 0.28, 6, 12), team, 0, 3.7, 0);
   sash.rotation.x = Math.PI / 2;
-  const torso = part(builder, new CapsuleGeometry(1.25, 1.2, 3, 8), shawl, 0, BASE_HEIGHT + 5, 0.3);
+  const torso = part(builder, new CapsuleGeometry(1.25, 1.2, 3, 8), shawl, 0, 5, 0.3);
   torso.scale.set(1.15, 1, 1);
   torso.rotation.x = 0.5;
 
@@ -388,7 +387,7 @@ function buildBlightmother(builder: PartBuilder): FigureParts {
       new SphereGeometry(0.7, 6, 4),
       foliage,
       Math.sin(angle) * 1.25,
-      BASE_HEIGHT + 5.95,
+      5.95,
       0.78 + Math.cos(angle) * 1.25,
     );
 
@@ -396,27 +395,27 @@ function buildBlightmother(builder: PartBuilder): FigureParts {
     leaf.rotation.set(0.35, angle, 0, "YXZ");
   }
 
-  part(builder, new SphereGeometry(0.85, 8, 6), skin, 0, BASE_HEIGHT + 7.1, 1.65);
-  const kerchief = part(builder, new SphereGeometry(0.95, 8, 6), team, 0, BASE_HEIGHT + 7.35, 1.4);
+  part(builder, new SphereGeometry(0.85, 8, 6), skin, 0, 7.1, 1.65);
+  const kerchief = part(builder, new SphereGeometry(0.95, 8, 6), team, 0, 7.35, 1.4);
   kerchief.scale.set(1.05, 0.9, 1.05);
   spike(builder, skin, point(0, 7.12, 2.24), point(0, 6.78, 2.86), 0.18);
 
   for (const direction of [-1, 1]) {
-    part(builder, new SphereGeometry(0.11, 5, 4), blight, direction * 0.3, BASE_HEIGHT + 7.15, 2.4);
+    part(builder, new SphereGeometry(0.11, 5, 4), blight, direction * 0.3, 7.15, 2.4);
   }
 
   limb(builder, shawl, point(1.15, 5.75, 0.95), point(1.95, 5.3, 2.15), 0.3);
-  part(builder, new SphereGeometry(0.3, 6, 5), skin, 2, BASE_HEIGHT + 5.25, 2.25);
+  part(builder, new SphereGeometry(0.3, 6, 5), skin, 2, 5.25, 2.25);
   limb(builder, iron, point(2, 5, 2.25), point(2, 3.5, 2.25), 0.08);
-  part(builder, new ConeGeometry(0.62, 0.55, 8), iron, 2, BASE_HEIGHT + 3.2, 2.25);
-  part(builder, new SphereGeometry(0.75, 8, 6), iron, 2, BASE_HEIGHT + 2.45, 2.25);
-  const vent = part(builder, new TorusGeometry(0.72, 0.13, 5, 12), blight, 2, BASE_HEIGHT + 2.65, 2.25);
+  part(builder, new ConeGeometry(0.62, 0.55, 8), iron, 2, 3.2, 2.25);
+  part(builder, new SphereGeometry(0.75, 8, 6), iron, 2, 2.45, 2.25);
+  const vent = part(builder, new TorusGeometry(0.72, 0.13, 5, 12), blight, 2, 2.65, 2.25);
   vent.rotation.x = Math.PI / 2;
-  part(builder, new SphereGeometry(0.34, 7, 5), blight, 2.55, BASE_HEIGHT + 3.75, 2.4);
-  part(builder, new SphereGeometry(0.26, 7, 5), blight, 2.95, BASE_HEIGHT + 4.5, 2.3);
-  part(builder, new SphereGeometry(0.18, 6, 4), blight, 2.8, BASE_HEIGHT + 5.25, 2.15);
+  part(builder, new SphereGeometry(0.34, 7, 5), blight, 2.55, 3.75, 2.4);
+  part(builder, new SphereGeometry(0.26, 7, 5), blight, 2.95, 4.5, 2.3);
+  part(builder, new SphereGeometry(0.18, 6, 4), blight, 2.8, 5.25, 2.15);
 
-  return { body: builder.body, accentMaterials: [blight], teamMaterials: [team], height: BASE_HEIGHT + 8.3 };
+  return { body: builder.body, accentMaterials: [blight], teamMaterials: [team], height: 8.3 };
 }
 
 function buildBonecaller(builder: PartBuilder): FigureParts {
@@ -431,41 +430,41 @@ function buildBonecaller(builder: PartBuilder): FigureParts {
   soul.emissive = new Color("#2a8a78");
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1.25, 2.1, 5.2, 8), coat, 0, BASE_HEIGHT + 2.6, 0);
-  const shoulders = part(builder, new SphereGeometry(1.4, 8, 6), coat, 0, BASE_HEIGHT + 5.4, 0);
+  part(builder, new CylinderGeometry(1.25, 2.1, 5.2, 8), coat, 0, 2.6, 0);
+  const shoulders = part(builder, new SphereGeometry(1.4, 8, 6), coat, 0, 5.4, 0);
   shoulders.scale.set(1.15, 0.8, 1);
-  part(builder, new CylinderGeometry(1.5, 1.5, 0.35, 8), leather, 0, BASE_HEIGHT + 3.9, 0);
-  part(builder, new SphereGeometry(0.9, 8, 6), skin, 0, BASE_HEIGHT + 6.75, 0.15);
-  const scarf = part(builder, new TorusGeometry(0.9, 0.32, 6, 12), team, 0, BASE_HEIGHT + 6.2, 0.05);
+  part(builder, new CylinderGeometry(1.5, 1.5, 0.35, 8), leather, 0, 3.9, 0);
+  part(builder, new SphereGeometry(0.9, 8, 6), skin, 0, 6.75, 0.15);
+  const scarf = part(builder, new TorusGeometry(0.9, 0.32, 6, 12), team, 0, 6.2, 0.05);
   scarf.rotation.x = Math.PI / 2;
-  const tail = part(builder, new BoxGeometry(0.42, 1.5, 0.18), team, 0.45, BASE_HEIGHT + 5.3, 1.45);
+  const tail = part(builder, new BoxGeometry(0.42, 1.5, 0.18), team, 0.45, 5.3, 1.45);
   tail.rotation.x = -0.15;
-  part(builder, new CylinderGeometry(1.35, 1.35, 0.14, 12), felt, 0, BASE_HEIGHT + 7.4, 0.05);
-  part(builder, new CylinderGeometry(0.85, 0.8, 2.1, 10), felt, 0, BASE_HEIGHT + 8.5, 0.05);
-  part(builder, new CylinderGeometry(0.9, 0.9, 0.4, 10), team, 0, BASE_HEIGHT + 7.7, 0.05);
+  part(builder, new CylinderGeometry(1.35, 1.35, 0.14, 12), felt, 0, 7.4, 0.05);
+  part(builder, new CylinderGeometry(0.85, 0.8, 2.1, 10), felt, 0, 8.5, 0.05);
+  part(builder, new CylinderGeometry(0.9, 0.9, 0.4, 10), team, 0, 7.7, 0.05);
 
   for (const direction of [-1, 1]) {
-    part(builder, new SphereGeometry(0.13, 5, 4), soul, direction * 0.3, BASE_HEIGHT + 6.85, 0.97);
-    part(builder, new SphereGeometry(0.12, 5, 4), soul, 2.2 + direction * 0.19, BASE_HEIGHT + 7.62, 0.98);
+    part(builder, new SphereGeometry(0.13, 5, 4), soul, direction * 0.3, 6.85, 0.97);
+    part(builder, new SphereGeometry(0.12, 5, 4), soul, 2.2 + direction * 0.19, 7.62, 0.98);
   }
 
   limb(builder, coat, point(1.35, 5.6, 0.2), point(2.15, 4.55, 0.5), 0.32);
-  part(builder, new SphereGeometry(0.33, 6, 5), skin, 2.2, BASE_HEIGHT + 4.45, 0.5);
-  part(builder, new CylinderGeometry(0.14, 0.14, 6.6, 6), wood, 2.2, BASE_HEIGHT + 3.95, 0.5);
-  part(builder, new BoxGeometry(0.95, 1.1, 0.12), iron, 2.2, BASE_HEIGHT + 1.05, 0.5);
-  const spade = part(builder, new ConeGeometry(0.48, 0.5, 4), iron, 2.2, BASE_HEIGHT + 0.25, 0.5);
+  part(builder, new SphereGeometry(0.33, 6, 5), skin, 2.2, 4.45, 0.5);
+  part(builder, new CylinderGeometry(0.14, 0.14, 6.6, 6), wood, 2.2, 3.95, 0.5);
+  part(builder, new BoxGeometry(0.95, 1.1, 0.12), iron, 2.2, 1.05, 0.5);
+  const spade = part(builder, new ConeGeometry(0.48, 0.5, 4), iron, 2.2, 0.25, 0.5);
   spade.rotation.x = Math.PI;
   spade.scale.set(1, 1, 0.25);
-  const skull = part(builder, new SphereGeometry(0.52, 7, 6), bone, 2.2, BASE_HEIGHT + 7.6, 0.5);
+  const skull = part(builder, new SphereGeometry(0.52, 7, 6), bone, 2.2, 7.6, 0.5);
   skull.scale.set(1, 0.95, 1.05);
-  part(builder, new BoxGeometry(0.5, 0.26, 0.42), bone, 2.2, BASE_HEIGHT + 7.12, 0.66);
+  part(builder, new BoxGeometry(0.5, 0.26, 0.42), bone, 2.2, 7.12, 0.66);
 
   limb(builder, iron, point(-1.5, 3.8, 0.55), point(-1.95, 3.62, 0.7), 0.06);
-  part(builder, new ConeGeometry(0.45, 0.35, 6), iron, -1.95, BASE_HEIGHT + 3.45, 0.7);
-  part(builder, new CylinderGeometry(0.36, 0.36, 0.7, 6), soul, -1.95, BASE_HEIGHT + 2.93, 0.7);
-  part(builder, new CylinderGeometry(0.42, 0.42, 0.12, 6), iron, -1.95, BASE_HEIGHT + 2.52, 0.7);
+  part(builder, new ConeGeometry(0.45, 0.35, 6), iron, -1.95, 3.45, 0.7);
+  part(builder, new CylinderGeometry(0.36, 0.36, 0.7, 6), soul, -1.95, 2.93, 0.7);
+  part(builder, new CylinderGeometry(0.42, 0.42, 0.12, 6), iron, -1.95, 2.52, 0.7);
 
-  return { body: builder.body, accentMaterials: [soul], teamMaterials: [team], height: BASE_HEIGHT + 9.6 };
+  return { body: builder.body, accentMaterials: [soul], teamMaterials: [team], height: 9.6 };
 }
 
 function buildClockwright(builder: PartBuilder): FigureParts {
@@ -479,39 +478,39 @@ function buildClockwright(builder: PartBuilder): FigureParts {
   brass.emissive = new Color("#7a4a12");
   const team = material(builder, "#ffffff");
 
-  part(builder, new CylinderGeometry(1.7, 1.9, 2.5, 8), cloth, 0, BASE_HEIGHT + 1.25, 0);
-  const torso = part(builder, new CapsuleGeometry(1.9, 0.9, 3, 8), cloth, 0, BASE_HEIGHT + 3.9, 0);
+  part(builder, new CylinderGeometry(1.7, 1.9, 2.5, 8), cloth, 0, 1.25, 0);
+  const torso = part(builder, new CapsuleGeometry(1.9, 0.9, 3, 8), cloth, 0, 3.9, 0);
   torso.scale.set(1.2, 1, 1.05);
-  const belt = part(builder, new TorusGeometry(1.85, 0.32, 6, 12), team, 0, BASE_HEIGHT + 2.75, 0);
+  const belt = part(builder, new TorusGeometry(1.85, 0.32, 6, 12), team, 0, 2.75, 0);
   belt.rotation.x = Math.PI / 2;
   belt.scale.set(1.12, 1.02, 1);
-  part(builder, new BoxGeometry(0.7, 0.55, 0.3), brass, 0, BASE_HEIGHT + 2.75, 2.2);
+  part(builder, new BoxGeometry(0.7, 0.55, 0.3), brass, 0, 2.75, 2.2);
 
-  part(builder, new SphereGeometry(1, 8, 6), skin, 0, BASE_HEIGHT + 6.95, 0.3);
-  const beard = part(builder, new ConeGeometry(0.8, 1.4, 7), whiskers, 0, BASE_HEIGHT + 5.95, 0.95);
+  part(builder, new SphereGeometry(1, 8, 6), skin, 0, 6.95, 0.3);
+  const beard = part(builder, new ConeGeometry(0.8, 1.4, 7), whiskers, 0, 5.95, 0.95);
   beard.rotation.x = Math.PI - 0.25;
-  const cap = part(builder, new SphereGeometry(1.06, 8, 6), team, 0, BASE_HEIGHT + 7.35, 0.2);
+  const cap = part(builder, new SphereGeometry(1.06, 8, 6), team, 0, 7.35, 0.2);
   cap.scale.set(1, 0.65, 1);
 
   for (const direction of [-1, 1]) {
-    const goggle = part(builder, new CylinderGeometry(0.34, 0.34, 0.3, 8), copper, direction * 0.42, BASE_HEIGHT + 7.4, 1.25);
+    const goggle = part(builder, new CylinderGeometry(0.34, 0.34, 0.3, 8), copper, direction * 0.42, 7.4, 1.25);
     goggle.rotation.x = Math.PI / 2;
-    part(builder, new SphereGeometry(0.24, 6, 5), brass, direction * 0.42, BASE_HEIGHT + 7.4, 1.33);
-    part(builder, new CylinderGeometry(0.2, 0.2, 1.9, 6), copper, direction * 0.85, BASE_HEIGHT + 6.45, -2.75);
-    part(builder, new CylinderGeometry(0.32, 0.22, 0.3, 6), copper, direction * 0.85, BASE_HEIGHT + 7.5, -2.75);
+    part(builder, new SphereGeometry(0.24, 6, 5), brass, direction * 0.42, 7.4, 1.33);
+    part(builder, new CylinderGeometry(0.2, 0.2, 1.9, 6), copper, direction * 0.85, 6.45, -2.75);
+    part(builder, new CylinderGeometry(0.32, 0.22, 0.3, 6), copper, direction * 0.85, 7.5, -2.75);
   }
 
-  part(builder, new BoxGeometry(2.4, 2.6, 1.3), leather, 0, BASE_HEIGHT + 4.7, -2.3);
+  part(builder, new BoxGeometry(2.4, 2.6, 1.3), leather, 0, 4.7, -2.3);
   cog(builder, brass, steel, point(0.15, 6.35, -2.3), 0.95);
   cog(builder, brass, steel, point(-0.45, 4.3, -3.02), 0.6);
 
   limb(builder, cloth, point(1.9, 5.3, 0.3), point(2.65, 3.4, 0.75), 0.45);
-  part(builder, new SphereGeometry(0.44, 6, 5), skin, 2.7, BASE_HEIGHT + 3.3, 0.8);
-  part(builder, new BoxGeometry(0.42, 3.4, 0.26), steel, 2.7, BASE_HEIGHT + 3.7, 0.8);
-  const jaw = part(builder, new TorusGeometry(0.62, 0.26, 4, 8, Math.PI * 1.45), steel, 2.7, BASE_HEIGHT + 6, 0.8);
+  part(builder, new SphereGeometry(0.44, 6, 5), skin, 2.7, 3.3, 0.8);
+  part(builder, new BoxGeometry(0.42, 3.4, 0.26), steel, 2.7, 3.7, 0.8);
+  const jaw = part(builder, new TorusGeometry(0.62, 0.26, 4, 8, Math.PI * 1.45), steel, 2.7, 6, 0.8);
   jaw.rotation.z = Math.PI * 0.775;
 
-  return { body: builder.body, accentMaterials: [brass], teamMaterials: [team], height: BASE_HEIGHT + 8.05 };
+  return { body: builder.body, accentMaterials: [brass], teamMaterials: [team], height: 8.05 };
 }
 
 function buildThrall(builder: PartBuilder): FigureParts {
@@ -524,37 +523,37 @@ function buildThrall(builder: PartBuilder): FigureParts {
 
   for (const direction of [-1, 1]) {
     limb(builder, bone, point(direction * 0.4, 2.05, 0), point(direction * 0.55, 0.3, 0.05), 0.14);
-    part(builder, new BoxGeometry(0.34, 0.2, 0.7), bone, direction * 0.55, BASE_HEIGHT + 0.1, 0.2);
-    part(builder, new SphereGeometry(0.11, 5, 4), soul, direction * 0.19, BASE_HEIGHT + 4.5, 0.52);
+    part(builder, new BoxGeometry(0.34, 0.2, 0.7), bone, direction * 0.55, 0.1, 0.2);
+    part(builder, new SphereGeometry(0.11, 5, 4), soul, direction * 0.19, 4.5, 0.52);
   }
 
-  part(builder, new BoxGeometry(1, 0.4, 0.5), bone, 0, BASE_HEIGHT + 2.15, 0);
+  part(builder, new BoxGeometry(1, 0.4, 0.5), bone, 0, 2.15, 0);
   limb(builder, bone, point(0, 2.2, 0), point(0, 3.9, 0), 0.12);
   limb(builder, bone, point(-0.72, 3.95, 0), point(0.72, 3.95, 0), 0.11);
 
   for (let rib = 0; rib < 3; rib += 1) {
     const hoop = new TorusGeometry(0.55 - Math.abs(rib - 1) * 0.07, 0.09, 4, 10);
-    const ring = part(builder, hoop, bone, 0, BASE_HEIGHT + 2.95 + rib * 0.35, 0.05);
+    const ring = part(builder, hoop, bone, 0, 2.95 + rib * 0.35, 0.05);
     ring.rotation.x = Math.PI / 2;
   }
 
-  const skull = part(builder, new SphereGeometry(0.55, 7, 6), bone, 0, BASE_HEIGHT + 4.45, 0.05);
+  const skull = part(builder, new SphereGeometry(0.55, 7, 6), bone, 0, 4.45, 0.05);
   skull.scale.set(0.95, 1, 1);
-  part(builder, new BoxGeometry(0.46, 0.22, 0.4), bone, 0, BASE_HEIGHT + 4.02, 0.22);
+  part(builder, new BoxGeometry(0.46, 0.22, 0.4), bone, 0, 4.02, 0.22);
 
   limb(builder, bone, point(0.75, 3.9, 0), point(0.95, 2.75, 0.55), 0.1);
-  const blade = part(builder, new BoxGeometry(0.2, 1.7, 0.07), rust, 0.95, BASE_HEIGHT + 3.41, 1.23);
+  const blade = part(builder, new BoxGeometry(0.2, 1.7, 0.07), rust, 0.95, 3.41, 1.23);
   blade.rotation.x = 0.8;
-  const guard = part(builder, new BoxGeometry(0.6, 0.1, 0.14), grip, 0.95, BASE_HEIGHT + 2.82, 0.62);
+  const guard = part(builder, new BoxGeometry(0.6, 0.1, 0.14), grip, 0.95, 2.82, 0.62);
   guard.rotation.x = 0.8;
 
   limb(builder, bone, point(-0.75, 3.9, 0), point(-0.95, 2.95, 0.5), 0.1);
-  const shield = part(builder, new CylinderGeometry(0.8, 0.8, 0.14, 10), team, -1.05, BASE_HEIGHT + 2.95, 0.85);
+  const shield = part(builder, new CylinderGeometry(0.8, 0.8, 0.14, 10), team, -1.05, 2.95, 0.85);
   shield.rotation.x = Math.PI / 2;
-  part(builder, new TorusGeometry(0.8, 0.09, 4, 12), rust, -1.05, BASE_HEIGHT + 2.95, 0.85);
-  part(builder, new SphereGeometry(0.2, 6, 4), rust, -1.05, BASE_HEIGHT + 2.95, 0.95);
+  part(builder, new TorusGeometry(0.8, 0.09, 4, 12), rust, -1.05, 2.95, 0.85);
+  part(builder, new SphereGeometry(0.2, 6, 4), rust, -1.05, 2.95, 0.95);
 
-  return { body: builder.body, accentMaterials: [soul], teamMaterials: [team], height: BASE_HEIGHT + 5 };
+  return { body: builder.body, accentMaterials: [soul], teamMaterials: [team], height: 5 };
 }
 
 function buildBoneGolem(builder: PartBuilder): FigureParts {
@@ -566,43 +565,43 @@ function buildBoneGolem(builder: PartBuilder): FigureParts {
 
   for (const direction of [-1, 1]) {
     limb(builder, marrow, point(direction * 1.4, 0.9, 0.1), point(direction * 1.35, 3.6, 0), 0.85);
-    const foot = part(builder, new SphereGeometry(1, 7, 5), bone, direction * 1.45, BASE_HEIGHT + 0.45, 0.5);
+    const foot = part(builder, new SphereGeometry(1, 7, 5), bone, direction * 1.45, 0.45, 0.5);
     foot.scale.set(1, 0.5, 1.3);
-    part(builder, new SphereGeometry(1.3, 7, 5), bone, direction * 2.85, BASE_HEIGHT + 9.4, 0.1);
+    part(builder, new SphereGeometry(1.3, 7, 5), bone, direction * 2.85, 9.4, 0.1);
     limb(builder, marrow, point(direction * 3.05, 9, 0.2), point(direction * 3.3, 5.2, 1), 0.85);
-    part(builder, new IcosahedronGeometry(1.15, 1), bone, direction * 3.3, BASE_HEIGHT + 4.2, 1.3);
-    part(builder, new SphereGeometry(0.15, 5, 4), soul, direction * 0.3, BASE_HEIGHT + 11.75, 2.38);
+    part(builder, new IcosahedronGeometry(1.15, 1), bone, direction * 3.3, 4.2, 1.3);
+    part(builder, new SphereGeometry(0.15, 5, 4), soul, direction * 0.3, 11.75, 2.38);
   }
 
-  const pelvis = part(builder, new SphereGeometry(1.9, 8, 6), marrow, 0, BASE_HEIGHT + 4.3, 0);
+  const pelvis = part(builder, new SphereGeometry(1.9, 8, 6), marrow, 0, 4.3, 0);
   pelvis.scale.set(1.25, 0.7, 1.05);
-  const chest = part(builder, new SphereGeometry(2.6, 9, 7), bone, 0, BASE_HEIGHT + 7.6, 0.1);
+  const chest = part(builder, new SphereGeometry(2.6, 9, 7), bone, 0, 7.6, 0.1);
   chest.scale.set(1.12, 1.15, 0.92);
-  const hump = part(builder, new SphereGeometry(1.9, 8, 6), bone, 0, BASE_HEIGHT + 10.6, -0.5);
+  const hump = part(builder, new SphereGeometry(1.9, 8, 6), bone, 0, 10.6, -0.5);
   hump.scale.set(1.4, 0.9, 1.05);
-  const binding = part(builder, new TorusGeometry(2, 0.42, 6, 14), team, 0, BASE_HEIGHT + 5.3, 0.05);
+  const binding = part(builder, new TorusGeometry(2, 0.42, 6, 14), team, 0, 5.3, 0.05);
   binding.rotation.x = Math.PI / 2;
   binding.scale.set(1.1, 0.95, 1);
 
   for (let rib = 0; rib < 3; rib += 1) {
-    const arc = part(builder, new TorusGeometry(2.6, 0.2, 4, 10, Math.PI), marrow, 0, BASE_HEIGHT + 6.8 + rib * 0.8, 0.1);
+    const arc = part(builder, new TorusGeometry(2.6, 0.2, 4, 10, Math.PI), marrow, 0, 6.8 + rib * 0.8, 0.1);
     arc.rotation.x = Math.PI / 2;
     arc.scale.set(1.1, 0.93, 1);
   }
 
-  part(builder, new IcosahedronGeometry(0.75, 0), soul, 0, BASE_HEIGHT + 8.2, 2.3);
-  part(builder, new IcosahedronGeometry(1, 0), marrow, 1.8, BASE_HEIGHT + 6.1, 1.55);
-  part(builder, new IcosahedronGeometry(0.9, 0), marrow, -1.7, BASE_HEIGHT + 5.8, 1.5);
-  part(builder, new IcosahedronGeometry(0.8, 0), marrow, -1.9, BASE_HEIGHT + 10.9, 0.8);
+  part(builder, new IcosahedronGeometry(0.75, 0), soul, 0, 8.2, 2.3);
+  part(builder, new IcosahedronGeometry(1, 0), marrow, 1.8, 6.1, 1.55);
+  part(builder, new IcosahedronGeometry(0.9, 0), marrow, -1.7, 5.8, 1.5);
+  part(builder, new IcosahedronGeometry(0.8, 0), marrow, -1.9, 10.9, 0.8);
 
-  const skull = part(builder, new SphereGeometry(0.9, 7, 6), bone, 0, BASE_HEIGHT + 11.7, 1.55);
+  const skull = part(builder, new SphereGeometry(0.9, 7, 6), bone, 0, 11.7, 1.55);
   skull.scale.set(1, 0.95, 1.05);
-  part(builder, new BoxGeometry(0.8, 0.35, 0.6), bone, 0, BASE_HEIGHT + 11, 1.9);
+  part(builder, new BoxGeometry(0.8, 0.35, 0.6), bone, 0, 11, 1.9);
   spike(builder, bone, point(0, 12.1, -0.1), point(0, 13.2, -0.45), 0.32);
   spike(builder, bone, point(0, 12, -1), point(0, 13, -1.6), 0.32);
   spike(builder, bone, point(0, 11.6, -1.75), point(0, 12.35, -2.6), 0.3);
 
-  return { body: builder.body, accentMaterials: [soul], teamMaterials: [team], height: BASE_HEIGHT + 13.2 };
+  return { body: builder.body, accentMaterials: [soul], teamMaterials: [team], height: 13.2 };
 }
 
 function buildTurret(builder: PartBuilder): FigureParts {
@@ -616,18 +615,18 @@ function buildTurret(builder: PartBuilder): FigureParts {
     const angle = Math.PI + (leg * Math.PI * 2) / 3;
     const foot = point(Math.sin(angle) * 2.4, 0.15, Math.cos(angle) * 2.4);
     limb(builder, iron, point(Math.sin(angle) * 0.6, 2.1, Math.cos(angle) * 0.6), foot, 0.18);
-    part(builder, new CylinderGeometry(0.34, 0.42, 0.22, 6), brass, foot.x, BASE_HEIGHT + 0.11, foot.z);
+    part(builder, new CylinderGeometry(0.34, 0.42, 0.22, 6), brass, foot.x, 0.11, foot.z);
   }
 
-  const hull = part(builder, new SphereGeometry(1.3, 10, 8), brass, 0, BASE_HEIGHT + 2.6, 0);
+  const hull = part(builder, new SphereGeometry(1.3, 10, 8), brass, 0, 2.6, 0);
   hull.scale.set(1, 0.82, 1);
-  const band = part(builder, new TorusGeometry(1.3, 0.2, 5, 16), team, 0, BASE_HEIGHT + 2.6, 0);
+  const band = part(builder, new TorusGeometry(1.3, 0.2, 5, 16), team, 0, 2.6, 0);
   band.rotation.x = Math.PI / 2;
-  part(builder, new CylinderGeometry(0.55, 0.75, 0.4, 8), team, 0, BASE_HEIGHT + 3.55, 0);
-  part(builder, new BoxGeometry(0.28, 0.5, 0.28), iron, 0.35, BASE_HEIGHT + 3.95, -0.35);
+  part(builder, new CylinderGeometry(0.55, 0.75, 0.4, 8), team, 0, 3.55, 0);
+  part(builder, new BoxGeometry(0.28, 0.5, 0.28), iron, 0.35, 3.95, -0.35);
 
   const rotor = new Group();
-  rotor.position.set(0, BASE_HEIGHT + 2.65, 1.2);
+  rotor.position.set(0, 2.65, 1.2);
   builder.body.add(rotor);
   const barrels: PartBuilder = { materials: builder.materials, geometries: builder.geometries, body: rotor };
   const housing = part(barrels, new CylinderGeometry(0.5, 0.55, 0.9, 8), iron, 0, 0, 0.45);
@@ -645,7 +644,7 @@ function buildTurret(builder: PartBuilder): FigureParts {
     body: builder.body,
     accentMaterials: [flare],
     teamMaterials: [team],
-    height: BASE_HEIGHT + 4.2,
+    height: 4.2,
     rooted: true,
     rotor,
   };
@@ -858,7 +857,7 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
 
   const model = new Group();
   model.scale.setScalar(FIGURE_SCALE);
-  model.add(base.mesh, parts.body);
+  model.add(base.root, parts.body);
   root.add(model);
 
   const socket = new Object3D();
@@ -924,7 +923,7 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
       if (!isDead) {
         parts.body.rotation.set(0, 0, 0);
         parts.body.position.set(0, 0, 0);
-        base.mesh.scale.setScalar(1);
+        base.root.scale.setScalar(1);
         root.visible = true;
       }
     },
@@ -941,8 +940,6 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
       parts.body.traverse((node) => {
         node.castShadow = castsShadow;
       });
-
-      base.mesh.castShadow = castsShadow;
     },
 
     castOrigin(out) {
@@ -969,7 +966,7 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
         const sink = Math.min(1, Math.max(0, deathTime - DEATH_SECONDS) / SINK_SECONDS);
         parts.body.rotation.set(-fall * (Math.PI / 2) * 0.92, 0, 0);
         parts.body.position.set(0, -fall * 0.6 - sink * SINK_UNITS, -fall * 1.5);
-        base.mesh.scale.setScalar(Math.max(0.001, 1 - sink));
+        base.root.scale.setScalar(Math.max(0.001, 1 - sink));
         root.visible = sink < 1;
 
         return;

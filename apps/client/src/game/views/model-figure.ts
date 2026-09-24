@@ -14,7 +14,6 @@ import {
 import { models, type LoadedModel } from "../../models/library.js";
 import {
   ATTACK_SECONDS,
-  BASE_HEIGHT,
   CAST_SECONDS,
   CHEST_FRACTION,
   DEAD_COLOR,
@@ -108,7 +107,7 @@ function adoptMaterials(instance: Object3D): FigureSurfaces {
 function castSocket(model: LoadedModel, instance: Object3D, body: Object3D, height: number): Object3D {
   if (model.castBone === null) {
     const chest = new Object3D();
-    chest.position.y = height * CHEST_FRACTION - BASE_HEIGHT;
+    chest.position.y = height * CHEST_FRACTION;
     body.add(chest);
 
     return chest;
@@ -128,11 +127,10 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
   const base = createFigureBase();
   const instance = models.instantiate(model);
   const surfaces = adoptMaterials(instance);
-  const height = model.boardHeight === null ? traits.height : BASE_HEIGHT + model.boardHeight;
-  instance.scale.setScalar(model.height > 0 ? (height - BASE_HEIGHT) / model.height : 1);
+  const height = model.boardHeight ?? traits.height;
+  instance.scale.setScalar(model.height > 0 ? height / model.height : 1);
 
   const body = new Group();
-  body.position.y = BASE_HEIGHT;
   body.add(instance);
   const socket = castSocket(model, instance, body, height);
 
@@ -145,7 +143,7 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
 
   const frame = new Group();
   frame.scale.setScalar(FIGURE_SCALE);
-  frame.add(base.mesh, body);
+  frame.add(base.root, body);
   root.add(frame);
 
   const mixer = new AnimationMixer(instance);
@@ -285,8 +283,8 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
         deathTime = Number.POSITIVE_INFINITY;
         mixer.stopAllAction();
         current = null;
-        body.position.set(0, BASE_HEIGHT, 0);
-        base.mesh.scale.setScalar(1);
+        body.position.set(0, 0, 0);
+        base.root.scale.setScalar(1);
         root.visible = true;
         play(loopAction(), 0);
       }
@@ -314,8 +312,6 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
       instance.traverse((node) => {
         node.castShadow = castsShadow;
       });
-
-      base.mesh.castShadow = castsShadow;
     },
 
     castOrigin(out) {
@@ -356,8 +352,8 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
       if (dead) {
         const fallSeconds = actions.get("death")?.getClip().duration ?? 0;
         const sink = Math.min(1, Math.max(0, deathTime - fallSeconds - DEATH_HOLD_SECONDS) / SINK_SECONDS);
-        body.position.set(0, BASE_HEIGHT - sink * SINK_UNITS, 0);
-        base.mesh.scale.setScalar(Math.max(0.001, 1 - sink));
+        body.position.set(0, -sink * SINK_UNITS, 0);
+        base.root.scale.setScalar(Math.max(0.001, 1 - sink));
         root.visible = sink < 1;
 
         return;
@@ -368,7 +364,7 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
           ? Math.sin((Math.PI * attackTime) / ATTACK_SECONDS) * LUNGE_UNITS
           : 0;
 
-      body.position.set(0, BASE_HEIGHT, lunge);
+      body.position.set(0, 0, lunge);
 
       const glow = castTime < CAST_SECONDS ? 1 + Math.sin((Math.PI * castTime) / CAST_SECONDS) * CAST_GLOW_BOOST : 1;
 
