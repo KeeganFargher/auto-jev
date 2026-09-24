@@ -145,12 +145,13 @@ halve it.
    - Both figure types implement the same `HeroFigure` interface, so the
      battle, placement, teleport and environment views didn't change.
 4. **Model figures.**
-   - **Scale and base.** Each model stands on the same team-coloured base
-     as the placeholder and is scaled to that hero's placeholder height.
-     Health bars and on-board sizes stay where they were.
+   - **Scale and footing.** Each model stands on the board on the same
+     contact shadow and team ring as the placeholder, and is scaled to that
+     hero's placeholder height. Health bars and on-board sizes stay where
+     they were.
    - **Board height.** When a placeholder's height is wrong for its model,
-     the catalogue entry sets `boardHeight` (on-board units, without the
-     base). Cinder's placeholder wears a tall hat, so `pyromancer` sets
+     the catalogue entry sets `boardHeight` (on-board units). Cinder's
+     placeholder wears a tall hat, so `pyromancer` sets
      8.3: her head sits a little under Gorrak's and Anvil's, her hair tips
      level with their crests. Her health plate follows the model.
    - **Clips.** `idle` and `run` loop and crossfade. `attack`, `cast` and
@@ -169,6 +170,12 @@ halve it.
        and a dust ring.
      - glTF can't carry the Blender version's per-object alpha or
        additive blending, so effects like this live in code.
+   - **Cast socket.** A catalogue entry can set `castBone`, the node that
+     projectiles and cast flares leave from. It should be a hand or weapon
+     bone that the clips animate. Cinder's is the `flame` bone in her left
+     hand. A figure without one casts from its chest.
+     - The figure throws when it's built if the node doesn't exist.
+     - `models:check` reports it as an error before then.
    - **Spell visuals.** Signature abilities get code-drawn visuals in
      `game/views/spell-visuals.ts`, looked up by ability id. See
      `docs/architecture.md` for where the battle view calls it. Cinder's
@@ -247,7 +254,8 @@ work that Gorrak and Cinder went through. The minimal steps are:
    - Rig it with one armature, and name the accent material `team`.
    - Make one action per contract clip.
 3. Run `pnpm models:build <id>` and fix anything it reports.
-4. Add the id to `apps/client/src/models/catalogue.ts`.
+4. Add the id to `apps/client/src/models/catalogue.ts`. If the hero
+   throws or casts from a hand or weapon, set `castBone` to that bone.
 5. Check it in `#models`: clips, team colour, and ×32 stats against the
    placeholder.
 6. Commit the `.blend` (LFS), the `.glb` and the catalogue line together.
