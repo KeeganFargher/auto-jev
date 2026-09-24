@@ -3081,6 +3081,14 @@ and the server's deadline fallback drafts at random.
   in `toggleDraftPick` sends the new selection. The resets on leaving the
   draft and on adopting a session, and the filter for offers that aren't
   on the table, went, since the seed covers them.
+- **A reconnect resends the latest selection.** The SDK buffers messages
+  sent while the socket is closed, but one written just as it drops is
+  lost, and the timer would then commit an older selection than the one
+  on screen. The session remembers the latest selection and sends it
+  again from `onReconnect` while the draft is open. It is the whole
+  selection, so sending it twice is harmless. Checked in the browser by
+  dropping two selection frames and forcing a reconnect: before, the timer
+  committed the server's older team; after, the one on screen.
 - `PROTOCOL_VERSION` is 4: a new intent and a new view field.
 - **Verified.**
   - Three new server tests: a selection committed at the deadline, a
