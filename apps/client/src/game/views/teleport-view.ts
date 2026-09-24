@@ -425,13 +425,6 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
     return beat !== null && from < beat && beat <= to;
   }
 
-  function panAt(position: Vector3): number | undefined {
-    const point = stage.toScreen(position);
-    const width = stage.canvas.clientWidth;
-
-    return point === null || width === 0 ? undefined : (point.x / width) * 2 - 1;
-  }
-
   function playBeats(from: number, to: number): void {
     if (to <= from || to - from > BEAT_SKIP_SECONDS) {
       return;
@@ -439,11 +432,11 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
 
     for (const traveller of travellers) {
       if (crossed(traveller.departAt, from, to)) {
-        playTeleport("out", panAt(traveller.rest));
+        playTeleport("out", stage.screenPan(traveller.rest));
       }
 
       if (crossed(traveller.arriveAt === null ? null : traveller.arriveAt + TOUCHDOWN_SECONDS, from, to)) {
-        playTeleport("in", panAt(traveller.rest));
+        playTeleport("in", stage.screenPan(traveller.rest));
       }
     }
 

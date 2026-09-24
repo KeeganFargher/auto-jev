@@ -27,3 +27,9 @@ export function button(className: string, onClick: () => void, ...children: Chil
 
   return node;
 }
+
+export function setText(node: Pick<Node, "textContent">, text: string): void {
+  if (node.textContent !== text) {
+    node.textContent = text;
+  }
+}

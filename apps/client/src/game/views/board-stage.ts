@@ -152,6 +152,7 @@ export interface BoardStage {
   setOrbit(radians: number): void;
   toScene(point: Vector2, height: number): Vector3;
   toScreen(point: Vector3): ScreenPoint | null;
+  screenPan(point: Vector3): number | undefined;
   groundPointAt(clientX: number, clientY: number): Vector2 | null;
   setExposure(multiplier: number): void;
   setTheme(theme: StageTheme): void;
@@ -689,6 +690,10 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     particles,
 
     showBoard(nextGrid, nextSide, nextInsets) {
+      if (board !== null && sameGrid(grid, nextGrid) && side === nextSide && sameInsets(insets, nextInsets)) {
+        return;
+      }
+
       if (!sameGrid(grid, nextGrid) || side !== nextSide || board === null) {
         rebuildBoard(nextGrid, nextSide);
       }
@@ -751,6 +756,12 @@ export function createBoardStage(container: HTMLElement): BoardStage {
         x: ((projected.x + 1) / 2) * viewportWidth,
         y: ((1 - projected.y) / 2) * viewportHeight,
       };
+    },
+
+    screenPan(point) {
+      const projected = point.clone().project(camera);
+
+      return projected.z > 1 ? undefined : Math.max(-1, Math.min(1, projected.x));
     },
 
     groundPointAt(clientX, clientY) {

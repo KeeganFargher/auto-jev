@@ -502,15 +502,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
   }
 
-  function panAt(position: Vector3): number | undefined {
-    const point = stage.toScreen(position);
-    const width = stage.canvas.clientWidth;
-
-    return point === null || width === 0 ? undefined : (point.x / width) * 2 - 1;
-  }
-
   function panOf(record: UnitRecord): number | undefined {
-    return panAt(record.position);
+    return stage.screenPan(record.position);
   }
 
   function sourceOf(record: UnitRecord): SoundSource {
@@ -561,14 +554,14 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       const center = stage.toScene(event.position, 0);
       effects.impactFlash(center, 8, SPAWN_COLOR);
       stage.particles.emit(SPAWN_MOTES, center.clone().setY(1), UP, SPAWN_MOTE_COUNT);
-      playSpawn(event.heroId, panAt(center));
+      playSpawn(event.heroId, stage.screenPan(center));
 
       return;
     }
 
     if (event.kind === "impact-landed") {
       const center = stage.toScene(event.center, 0);
-      playLanding(event.abilityId, panAt(center));
+      playLanding(event.abilityId, stage.screenPan(center));
       const landing = landingVisual(stage.particles, event.abilityId, center, event.radiusUnits);
 
       if (landing === null) {
@@ -1048,6 +1041,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
   return {
     update(next, nextSelectedUnitId, latestEvents) {
+      if (next === snapshot && nextSelectedUnitId === selectedUnitId && latestEvents.length === 0) {
+        return;
+      }
+
       stage.showBoard(snapshotGrid(next), options.viewSide, options.insets);
 
       const snapAll = snapshot === null || next.tick < lastTick || next.tick - lastTick > TICK_JUMP_FOR_SNAP;
@@ -1075,7 +1072,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       falling.sync(next.impacts, next.tick, (impactId) => {
         const impact = next.impacts.find((candidate) => candidate.impactId === impactId);
 
-        return impact === undefined ? undefined : panAt(stage.toScene(impact.center, 0));
+        return impact === undefined ? undefined : stage.screenPan(stage.toScene(impact.center, 0));
       });
     },
 
