@@ -70,6 +70,24 @@
         "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && nvm use 24 >/dev/null && JEV_PROVIDER=offline pnpm --filter ./apps/server exec tsx src/index.ts"
       ],
       "port": 2567
+    },
+    {
+      "name": "audio-verify-server",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && nvm use 24 >/dev/null && PORT=2577 JEV_PROVIDER=offline pnpm --filter ./apps/server exec tsx src/index.ts"
+      ],
+      "port": 2577
+    },
+    {
+      "name": "audio-verify-client",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "VITE_SERVER_URL=ws://localhost:2577 pnpm --filter ./apps/client exec vite --port 5186 --strictPort"
+      ],
+      "port": 5186
     }
   ]
 }
