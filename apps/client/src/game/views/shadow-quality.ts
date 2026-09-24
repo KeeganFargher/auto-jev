@@ -1,6 +1,5 @@
-import { PCFShadowMap, type LightShadow, type ShadowMapType } from "three";
-
-export type ShadowQuality = "soft" | "simple";
+import { PCFShadowMap, type DirectionalLight, type ShadowMapType } from "three";
+import type { ShadowQuality } from "../../graphics/settings.js";
 
 export interface ShadowMapState {
   enabled: boolean;
@@ -9,8 +8,9 @@ export interface ShadowMapState {
 
 const SOFT_SHADOW_RADIUS = 4;
 
-export function applyShadowQuality(shadowMap: ShadowMapState, shadow: LightShadow, quality: ShadowQuality): void {
-  shadowMap.enabled = quality === "soft";
+export function applyShadowQuality(shadowMap: ShadowMapState, light: DirectionalLight, quality: ShadowQuality): void {
+  shadowMap.enabled = true;
   shadowMap.type = PCFShadowMap;
-  shadow.radius = SOFT_SHADOW_RADIUS;
+  light.castShadow = quality === "soft";
+  light.shadow.radius = SOFT_SHADOW_RADIUS;
 }

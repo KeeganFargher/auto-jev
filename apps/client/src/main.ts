@@ -11,8 +11,10 @@ import { audio } from "./audio/engine.js";
 import { models } from "./models/library.js";
 import { mountSettingsWindow } from "./hud/settings/settings-window.js";
 import { createAudioTab } from "./hud/settings/audio-tab.js";
+import { createGraphicsTab } from "./hud/settings/graphics-tab.js";
+import { graphicsSettings } from "./graphics/settings.js";
 
-mountSettingsWindow(document.body, [createAudioTab(audio.settings)]);
+mountSettingsWindow(document.body, [createAudioTab(audio.settings), createGraphicsTab(graphicsSettings)]);
 
 void audio.preload("boot");
 

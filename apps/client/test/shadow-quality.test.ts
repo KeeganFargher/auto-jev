@@ -7,18 +7,30 @@ test("soft shadows use the PCF filter three r186 still ships, with a blur wider 
   const shadowMap: ShadowMapState = { enabled: false, type: BasicShadowMap };
   const light = new DirectionalLight();
 
-  applyShadowQuality(shadowMap, light.shadow, "soft");
+  applyShadowQuality(shadowMap, light, "soft");
 
   assert.equal(shadowMap.enabled, true);
   assert.equal(shadowMap.type, PCFShadowMap);
+  assert.equal(light.castShadow, true);
   assert.ok(light.shadow.radius > 1, `radius ${light.shadow.radius} blurs only one texel`);
 });
 
-test("simple shadows switch the shadow map off and leave grounding to contact shadows", () => {
+test("simple shadows stop the sun casting, which leaves grounding to contact shadows", () => {
+  const shadowMap: ShadowMapState = { enabled: true, type: PCFShadowMap };
+  const light = new DirectionalLight();
+  light.castShadow = true;
+
+  applyShadowQuality(shadowMap, light, "simple");
+
+  assert.equal(light.castShadow, false);
+});
+
+test("switching back to soft shadows makes the sun cast again", () => {
   const shadowMap: ShadowMapState = { enabled: true, type: PCFShadowMap };
   const light = new DirectionalLight();
 
-  applyShadowQuality(shadowMap, light.shadow, "simple");
+  applyShadowQuality(shadowMap, light, "simple");
+  applyShadowQuality(shadowMap, light, "soft");
 
-  assert.equal(shadowMap.enabled, false);
+  assert.equal(light.castShadow, true);
 });

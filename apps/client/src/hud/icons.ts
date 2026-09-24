@@ -360,6 +360,30 @@ export function dialogueIcon(): SVGSVGElement {
   return svg("0 0 24 24", path("M4 3.5h16A1.5 1.5 0 0 1 21.5 5v10.5A1.5 1.5 0 0 1 20 17h-9.5L5.5 21v-4H4a1.5 1.5 0 0 1-1.5-1.5V5A1.5 1.5 0 0 1 4 3.5Z"));
 }
 
+export function displayIcon(): SVGSVGElement {
+  return svg(
+    "0 0 24 24",
+    path("M3.5 4h17A1.5 1.5 0 0 1 22 5.5v10a1.5 1.5 0 0 1-1.5 1.5H3.5A1.5 1.5 0 0 1 2 15.5v-10A1.5 1.5 0 0 1 3.5 4Zm.5 2v9h16V6Z", "evenodd"),
+    path("M9.5 18h5l.8 2H18v1.5H6V20h2.7Z"),
+  );
+}
+
+export function shadowIcon(): SVGSVGElement {
+  return svg("0 0 24 24", circle(12, 8.5, 5.5), path("M3.5 19.5c0-1.5 3.8-2.7 8.5-2.7s8.5 1.2 8.5 2.7-3.8 2.7-8.5 2.7-8.5-1.2-8.5-2.7Z"));
+}
+
+export function glowIcon(): SVGSVGElement {
+  return svg("0 0 24 24", path(SUN));
+}
+
+export function gaugeIcon(): SVGSVGElement {
+  return svg(
+    "0 0 24 24",
+    path("M12 4.5A10 10 0 0 0 3.3 19.4l1.7-1A8 8 0 0 1 4 14.5a8 8 0 0 1 16 0 8 8 0 0 1-1 3.9l1.7 1A10 10 0 0 0 12 4.5Z"),
+    path("M16.9 9.2 13.5 14a1.9 1.9 0 1 1-1.4-1.4Z"),
+  );
+}
+
 export function closeIcon(): SVGSVGElement {
   return svg("0 0 24 24", path("M5.6 3.5 12 9.9l6.4-6.4 2.1 2.1-6.4 6.4 6.4 6.4-2.1 2.1-6.4-6.4-6.4 6.4-2.1-2.1 6.4-6.4-6.4-6.4Z"));
 }

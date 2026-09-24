@@ -1,4 +1,5 @@
 import type { BoardStage } from "../views/board-stage.js";
+import { createFrameSampler } from "../views/frame-sampler.js";
 import { button, el } from "../../hud/dom.js";
 
 export interface StatsPanel {
@@ -42,18 +43,16 @@ export function createStatsPanel(stage: BoardStage, onLeakTest: () => void): Sta
 
   root.hidden = true;
 
-  const intervals: number[] = [];
-  let last = performance.now();
+  const sampler = createFrameSampler(SAMPLE_FRAMES, performance.now());
   let refreshed = 0;
 
   function paint(): void {
-    const total = intervals.reduce((sum, interval) => sum + interval, 0);
-    const average = intervals.length === 0 ? 0 : total / intervals.length;
+    const average = sampler.averageMs();
     const reading = stage.stats();
 
     fps.textContent = average === 0 ? "–" : String(Math.round(1000 / average));
     frameTime.textContent = `${average.toFixed(1)} ms`;
-    worst.textContent = `${Math.round(Math.max(0, ...intervals))} ms`;
+    worst.textContent = `${Math.round(sampler.worstMs())} ms`;
     calls.textContent = count(reading.drawCalls);
     triangles.textContent = count(reading.triangles);
     geometries.textContent = String(reading.geometries);
@@ -63,12 +62,7 @@ export function createStatsPanel(stage: BoardStage, onLeakTest: () => void): Sta
 
   const stopFrames = stage.onFrame(() => {
     const now = performance.now();
-    intervals.push(now - last);
-    last = now;
-
-    if (intervals.length > SAMPLE_FRAMES) {
-      intervals.shift();
-    }
+    sampler.record(now);
 
     if (!root.hidden && now - refreshed >= REFRESH_MILLISECONDS) {
       refreshed = now;
