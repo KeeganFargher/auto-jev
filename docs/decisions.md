@@ -3148,3 +3148,147 @@ and the server's deadline fallback drafts at random.
     selections survived the timer on localhost and through an 80 ms
     proxy, Confirm still commits at once, and a reload mid-draft kept
     the picks.
+
+## Lighting, shadows and effects (2026-09-24)
+
+The user pasted advice on lighting, shadows, glow, particles, attachment
+points and performance for an auto-battler, and asked for whatever
+improvements could be made. The stage already had the advised setup: one
+shadow-casting sun, hemisphere fill, a rim light and a fixed perspective
+camera. This pass fixed what was broken, then added the missing layers.
+Each layer is its own commit and a working game.
+
+- **Soft shadows were silently off.**
+  - three r186 removed `PCFSoftShadowMap`. The stage still asked for it,
+    so the renderer logged a warning and used hard one-texel PCF.
+  - `PCFShadowMap` with `shadow.radius = 4` restores the soft edge.
+  - It lives in `shadow-quality.ts` so a test can pin it without WebGL.
+    The test failed on the old setting first.
+- **Contact shadows.** A soft dark disc under every figure grounds it
+  when the sun's shadow falls off to the side.
+  - It is one computed texture, geometry and material shared by all
+    figures.
+  - The teleport view used to set `castShadow` on every node under a
+    figure. That would have made the disc (and Gorrak's cyclone streaks)
+    cast a hard shadow after a teleport.
+  - Figures now own that switch (`HeroFigure.setCastsShadow`). A test
+    reproduced the bug first.
+- **The coloured puck is gone.** The user "still hate[s] the blue/red
+  circle under the heroes". It was a thick, lit, faintly glowing
+  cylinder half a cell wide, left from the tabletop-miniature
+  placeholders, and it lifted every hero 0.7 units.
+  - Heroes now stand on the board on their contact shadow.
+  - A flat ring in the team colour sits at their feet: a crisp band, a
+    faint pool of colour inside and a soft halo, drawn unlit and
+    alpha-blended so it reads on bright boards. This is what Underlords
+    and TFT do.
+  - The draft's cream, gold-on-hover, blue-when-picked and grey-when-dimmed
+    states still come through `setTeamColor`.
+  - `BASE_HEIGHT` was removed rather than set to zero. Models keep their
+    on-board size.
+  - **Refined after a second look.** The user felt the first ring still
+    needed work. Three candidates were compared side by side on the cove
+    and ruins boards: a clean rim, the rim in four arcs, and a soft pool
+    with no rim.
+    - The clean rim won. The first ring's flat pool of colour had turned
+      murky over the contact shadow, and it was nearly a cell wide.
+    - The arcs' gaps disappear behind bodies at board distance. The pool
+      is weakest at telling teams apart, and cream on sand vanishes.
+    - It's now a thin crisp rim with a soft glow rising toward it and a
+      clear centre, 15% smaller (radius 2.9 in figure units).
+- **Particles** (`particles.ts`, owned by the stage).
+  - Two instanced quads in ring buffers:
+    - `solid`: alpha-blended, 2,048 particles.
+    - `glow`: additive, 4,096 particles.
+  - A particle's motion is a closed form evaluated in the vertex shader,
+    so an emit writes only its slots and uploads that range.
+  - It costs two draw calls whatever is on screen. `clear()` is one
+    uniform write.
+  - It replaces a mesh and material allocated per hit, and six of each
+    per heal.
+  - **Why not additive for everything.** Additive colour washes to white
+    on the cove and frost boards. Tried first, the sparks were invisible
+    specks, as the new-hero skill warns. Coloured particles use the
+    `solid` layer in saturated mid-tones, and a per-style softness keeps
+    sparks crisp and smoke soft. Glow is for short flashes.
+  - **Found while testing:** the billboard basis was a mirror, so every
+    quad's winding flipped and back-face culling dropped them all. A bare
+    renderer page with one particle showed it.
+- **Hit effects** (`hit-effects.ts`).
+  - Abilities map to what they hit with: blunt, blade, fire, frost,
+    dark, thorn, rivet, holy, or strike. The map lives in the client
+    beside the ability ids; cosmetics stay out of the engine.
+  - Hits spray away from the attacker, and crits and heavy hits spray
+    more.
+  - Bolts take the tint and leave trails spaced by distance, so a trail
+    looks the same at any frame rate. A test covers that.
+  - Heals, summons, deaths, combos and generic landings got bursts.
+  - Cinder's Firebolt and falling Meteor trail embers and smoke. Her
+    Meteor blast erupts, Flame Ward sends a ring of embers out, and
+    burning ground smoulders.
+- **Cast sockets.** Spells leave from a socket.
+  - A model's catalogue `castBone` names it. Cinder's is the `flame`
+    bone in her hand; everything else keeps its chest.
+  - A missing bone throws when the figure is built, and `models:check`
+    now reports it as an error (proved by pointing at a missing bone
+    first).
+  - Ranged casts flash a small burst there.
+  - The advised charge-up before the release needs look-ahead: the cast
+    event arrives at the release. Left for later.
+- **Glow** (`stage-glow.ts`).
+  - The stage renders through an `EffectComposer`: the scene, into a
+    half-float target with 4× MSAA so antialiasing survives; then
+    `UnrealBloomPass`; then `OutputPass` with the existing ACES exposure.
+  - The threshold is 1.05 in linear HDR. The sun and sky give the
+    brightest boards about 0.7 to 0.9, while fires, lanterns, braziers,
+    hero glows, meteor flashes and overlapping spell shells go past 1.
+    So things glow without lighting their surroundings, as the advice
+    puts it.
+  - Checked on all four themes: no haze on the sand or snow.
+  - It costs about 20 kB minified (5 kB gzipped) and a dozen shrinking
+    fullscreen passes.
+  - **Spell lights were not added.** Glow gives spells their brightness.
+    Extra point lights would cost every lit pixel, and adding or removing
+    them recompiles materials.
+- **Graphics settings.** A Graphics tab beside Audio, saved to
+  `localStorage` and applied live:
+  - Resolution: 100%, 75% or 50% of the device pixel ratio.
+  - Shadows: soft or simple.
+  - Glow: on or off.
+  - Frame stats: on or off. The overlay shows FPS, average and worst
+    frame time, draw calls, triangles, particles and the pixel ratio, on
+    every screen.
+  - Simple shadows turn off the sun's `castShadow`. three rebuilds
+    materials when the shadow-casting lights change, but not when
+    `shadowMap.enabled` flips.
+  - On the cove lab board, simple shadows take a frame from 682 draw
+    calls to 300 (89k to 55k triangles), since every caster was drawn
+    twice.
+  - `renderer.info` now resets once per frame, just before rendering, so
+    the counts cover every pass.
+- **Not done.**
+  - **Environment props are still the biggest cost.** Themes are about
+    560 to 660 draw calls, as the board-themes entry noted. Merging
+    static props per material needs the prop kit to know which props its
+    animators move.
+  - Flipbook fire and smoke textures remain `missing_assets.md` entry 10.
+    The particles draw procedural soft discs until then.
+- **Verified.**
+  - 20 client tests pass (new `test` script: `node:test` through `tsx`,
+    typechecked with the client). Lint, the client and scripts
+    typechecks, `models:check` and the client build pass.
+  - Frames were stepped deterministically in headless Chromium with
+    software WebGL, by driving `requestAnimationFrame` from the test.
+    Playwright's fake clock stopped the stage's loop after a pause.
+  - Checked in the frame-stepped captures:
+    - every hit kind on the cove board, and Cinder's spells on the cove
+      and ruins;
+    - a 3v3 lab fight with frost bolts, fireballs, Meteor, Overload and
+      Shatter;
+    - the menu, the draft (hover, pick) and all four themes with glow;
+    - the Graphics tab, with each option applied and surviving a reload.
+  - No console errors anywhere.
+  - The `#models` leak test holds flat (geometries 180 → 180, textures
+    51 → 51 over 12 rebuilds).
+  - Frame rates can't be judged here: software WebGL runs at about
+    2 FPS.

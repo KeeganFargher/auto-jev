@@ -276,6 +276,9 @@ sounds. Music is still a placeholder (`missing_assets.md` entry 7).
   point) follows it, including after a placeholder swaps to the model.
 - **Celebrating.** `HeroFigure.setCelebrating` loops the `victory` clip
   (for the draft lineup). Placeholders ignore it.
+- **Cast socket.** `HeroFigure.castOrigin` is where projectiles and cast
+  flares leave from. It's the catalogue's `castBone` when a model names
+  one (Cinder's `flame` bone), otherwise the chest.
 - **Spell visuals.** `game/views/spell-visuals.ts` maps ability ids to
   code-drawn visuals. The battle view asks it at five points, and an
   ability without an entry keeps the generic effect:
@@ -293,3 +296,80 @@ sounds. Music is still a placeholder (`missing_assets.md` entry 7).
 
 The sources, the export (`pnpm models:build`) and the contract check
 (`pnpm models:check`) are described in `docs/models.md`.
+
+## Client rendering
+
+Every screen draws through one `BoardStage` (`game/views/board-stage.ts`):
+renderer, camera, lights, board, particles and glow. The views add their
+own objects to its scene.
+
+- **Light.** One sun (a directional light) casts the shadows. A
+  hemisphere light fills the shaded sides, and a rim light from behind
+  separates heroes from the board. Each board theme sets the colours and
+  strengths (`StageAtmosphere`).
+- **Shadows.** `PCFShadowMap` with a 4-texel blur radius
+  (`shadow-quality.ts`). three r186 removed `PCFSoftShadowMap`, and the
+  stage used to fall back to hard shadows because of it.
+  - Every figure stands on a soft contact shadow and a flat ring in the
+    team colour (`figure-base.ts`).
+  - All figures share one geometry and the textures. Each figure owns
+    only its ring material, which `setTeamColor` recolours.
+  - Figures decide which of their parts cast shadows
+    (`HeroFigure.setCastsShadow`), so a flat decal never does.
+- **Particles.** `stage.particles` (`particles.ts`) has two instanced
+  layers in ring buffers:
+  - `solid`: alpha-blended, 2,048 particles.
+  - `glow`: additive, 4,096 particles.
+  - Motion is a closed form evaluated in the vertex shader: speed, drag,
+    gravity, size and colour over the particle's life. An emit only
+    writes the slots it claims.
+  - The system costs two draw calls, and nothing is allocated per effect.
+  - `clear()` hides everything; the battle view calls it on reset, seek
+    and dispose.
+  - `createTrail` spaces particles by distance travelled, so a trail
+    looks the same at any frame rate.
+  - Use `solid` for anything that has to read on the bright boards
+    (sparks, embers, motes, smoke, dust). Additive colour washes to
+    white there, so `glow` is for short flashes.
+- **Hit effects.** `hit-effects.ts` maps ability ids to what they hit
+  with: blunt, blade, fire, frost, dark, thorn, rivet, holy, or strike
+  for anything unlisted.
+  - Each kind has a burst that sprays away from the attacker, larger for
+    crits and heavy hits.
+  - Each kind also has a bolt tint, a trail and a release flare at the
+    cast socket.
+  - This is cosmetic, so it stays out of the engine.
+- **Glow.** `stage-glow.ts` renders through an `EffectComposer`:
+  - the scene, into a half-float target with 4× MSAA;
+  - `UnrealBloomPass`, with a threshold of 1.05 in linear HDR;
+  - `OutputPass`, which applies the ACES tone mapping and exposure.
+  Lit surfaces stay below the threshold, so only emissive things and
+  spell cores bloom.
+- **Graphics settings.** `graphics/settings.ts` saves them to
+  `localStorage` under `jev-game.graphics.*`. The Graphics tab
+  (`hud/settings/graphics-tab.ts`) edits them, and every stage applies
+  them live:
+  - Resolution: 100%, 75% or 50% of the device pixel ratio, which is
+    still capped at 2.
+  - Shadows: Soft, or Simple, which stops the sun casting. Simple
+    changes `castShadow` on the light because three rebuilds materials
+    when the shadow-casting lights change, but not when
+    `shadowMap.enabled` flips.
+  - Glow: on or off.
+  - Frame stats: on or off.
+- **Frame stats.** `stage-monitor.ts` shows FPS, average and worst frame
+  time, draw calls, triangles, live particles and the pixel ratio in the
+  bottom-left corner, on every screen.
+  - `renderer.info` resets just before each render, so the counts cover
+    every pass of a frame.
+  - Frame listeners, like the labs' stats panels, read the whole
+    previous frame.
+- **Tests.** `pnpm --filter ./apps/client test` runs `node:test` through
+  `tsx` on the parts that don't need WebGL. It covers:
+  - shadow quality;
+  - which figure parts cast shadows, and cast sockets;
+  - the particle ring buffer, cone sampling, expiry and clear;
+  - trails;
+  - settings parsing and resolution;
+  - the frame sampler.
+  `pnpm --filter ./apps/client typecheck` checks the tests too.

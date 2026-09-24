@@ -43,13 +43,14 @@ A hero is two Blender scripts, a spell-visuals entry and two user sign-offs. The
 ## 4. Ship the model
 
 - `pnpm models:build <id>` exports and checks it. Fix every finding.
-- Add the catalogue line in `apps/client/src/models/catalogue.ts`. If the placeholder's height is wrong for the model (a hat, a hood), set `boardHeight` against Gorrak (8.9) and Anvil (8.4).
+- Add the catalogue line in `apps/client/src/models/catalogue.ts`. If the placeholder's height is wrong for the model (a hat, a hood), set `boardHeight` against Gorrak (8.9) and Anvil (8.4). If the hero throws or casts from a hand or weapon, set `castBone` to that bone (Cinder's is `flame`); projectiles and cast flares leave from it, and `models:check` fails on a name the model doesn't have.
 - Check `#models/<id>`: every clip, team colour, ×32 stats against the placeholder and the leak test.
 
 ## 5. Signature spell visuals
 
 - Give the hero's signature abilities code-drawn visuals in `apps/client/src/game/views/spell-visuals.ts`, keyed by ability id: impact (a pending delayed hit), landing, zone, cast or projectile. Cinder's Meteor, Flame Ward and Firebolt are the model.
 - Make every effect readable on light boards: something opaque or dark (a rock, a scorch mark, flame cores with normal blending), not only additive glow.
+- Sparks, embers, motes, smoke and trails come from the stage's particle system (`stage.particles`, `game/views/particles.ts`; `createTrail` for anything that travels). Use the `solid` layer for coloured particles; `glow` washes to white on bright boards. Give each of the hero's abilities a hit kind in `game/views/hit-effects.ts` so hits, bolts and release flares take its colour.
 - Time anything that waits for a hit from ticks, not seconds, so it stays in sync at every playback speed.
 
 ## 6. Check in battle and final sign-off

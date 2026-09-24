@@ -534,10 +534,7 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
 
     if (castsShadow !== traveller.castsShadow) {
       traveller.castsShadow = castsShadow;
-
-      root.traverse((node) => {
-        node.castShadow = castsShadow;
-      });
+      traveller.figure.setCastsShadow(castsShadow);
     }
 
     const beam = beamOf(traveller);

@@ -1,9 +1,9 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MODELS } from "../../apps/client/src/models/catalogue.js";
+import { MODELS, isModelId, type ModelDefinition } from "../../apps/client/src/models/catalogue.js";
 import { MODEL_KINDS, type ModelKind } from "./contract.js";
-import { inspectModel } from "./inspect.js";
+import { inspectModel, type ModelReport } from "./inspect.js";
 import { validateModel, type Finding } from "./validate.js";
 
 export interface AssetFile {
@@ -86,6 +86,20 @@ function catalogueFindings(files: readonly AssetFile[]): Map<string, Finding[]> 
   return findings;
 }
 
+function socketFindings(id: string, report: ModelReport): Finding[] {
+  if (!isModelId(id)) {
+    return [];
+  }
+
+  const definition: ModelDefinition = MODELS[id];
+
+  if (definition.castBone === undefined || report.nodes.includes(definition.castBone)) {
+    return [];
+  }
+
+  return [{ level: "error", message: `castBone "${definition.castBone}" is not a node in the model, so spells have nowhere to leave from` }];
+}
+
 function column(value: string | number, width: number): string {
   return String(value).padEnd(width);
 }
@@ -105,7 +119,13 @@ export async function checkModels(files: readonly AssetFile[]): Promise<boolean>
 
   for (const file of files) {
     const report = await inspectModel(file.path);
-    const findings = [...validateModel(file.kind, file.id, report), ...(catalogue.get(file.path) ?? [])];
+
+    const findings = [
+      ...validateModel(file.kind, file.id, report),
+      ...socketFindings(file.id, report),
+      ...(catalogue.get(file.path) ?? []),
+    ];
+
     catalogue.delete(file.path);
 
     const cells = [
