@@ -1392,7 +1392,7 @@ wired in through `@tailwindcss/vite` in a new `apps/client/vite.config.ts`.
 It's `@theme static` so tokens referenced only from custom CSS or inline
 `style` still get emitted, since Tailwind otherwise drops unused theme
 variables. Components are named classes (`.seat-card`, `.round-plate`,
-`.brush-banner`, `.action-button`, `.hero-card`) defined against those
+`.brush-banner`, `.action-button`, `.unit-card`) defined against those
 tokens, not long utility strings in TypeScript. Every element here is
 built with `createElement`, so readable class names keep the DOM code
 and browser probes legible, and a restyle stays a CSS change. Tailwind's
@@ -2834,6 +2834,224 @@ quality). They replace the glyph wherever it's big enough to read.
     role chips and the tooltip header icons.
 - Nothing was committed.
 
+## Cinder's game model and spell visuals (2026-09-24)
+
+The user asked to start the Pyromancer as the next hero, signed off her
+look from a painted preview, then asked for her to be added in. On seeing
+her, they asked why her spells had no animation or design.
+
+- **Two scripts, shared kits.** The bake and clip code moved out of
+  Gorrak's recipe into `art/generators/bake_kit.py` and `clip_kit.py`.
+  Gorrak's rebuild was checked against the old script: the same
+  triangles, UV islands, bake coverage and clip checks. The texture
+  differs only by the GPU bake's noise, which also shows between two
+  runs of the unchanged script.
+- **Portrait over placeholder.** Cinder follows her painted portrait
+  (copper hair, dark coat, scarf, flame in her left hand), not the
+  placeholder's wizard hat.
+- **Team colour on small parts.** The contract makes `team` plain white
+  with no texture, so the scarf, its tail and the cuffs carry it, and the
+  shoulder mantle is painted cloth.
+- **Face quality.** The first bake's face was rough: hair locks were
+  projected onto the skin, and the face had a sliver of the texture. The
+  kit gained options for isolated bake groups, per-material texture
+  space, a soft skin paint and smooth skin weights. The hidden scalp was
+  deleted.
+- **Size in game.** Her placeholder is 10.4 units tall because of its
+  hat, so her model would have stood taller than Gorrak. The catalogue's
+  new `boardHeight` sets her to 8.3. The shipped heroes don't share one
+  scale either (Anvil is enlarged about 17% more than Gorrak), which is
+  left as it is.
+- **Spell visuals.**
+  - Signature abilities now get code-drawn visuals, keyed by ability id
+    in `spell-visuals.ts`. The battle view falls back to the generic
+    effects for everything else.
+  - Meteor draws a rock that streaks down onto the hit, with a growing
+    ground shadow, then a blast and burning ground.
+  - Flame Ward is a ring of fire that races outward. Firebolt is a
+    fireball.
+  - The rock and burning ground come from snapshot state, so seeks and
+    resets rebuild them.
+  - Meteor and Flame Ward share one `cast` pose, because a figure has a
+    single cast clip.
+  - The battle view used to play `cast` for ranged basic attacks. Firebolt
+    would have shown her arms-up Meteor pose, with the cast glow, every
+    two seconds. Every basic attack now plays `attack`. Ranged placeholders
+    (Rime, Moira and the rest) lunge on their basic attacks instead of
+    glowing.
+- **Verified.**
+  - `pnpm models:check` passes for all 5 models with 0 errors and 0
+    warnings. Lint and typecheck pass.
+  - In a battle-lab fight (Cinder and Anvil against four), Meteor fell,
+    landed and burned with no console errors, and a mid-fight reset left
+    nothing behind.
+  - A Cinder-alone fight against two melee heroes triggered Flame Ward.
+
+## Draft screen: the offered heroes on your arena (2026-09-24)
+
+The user asked to redo "Draft your team" in the style of the HUD work, with
+a better background and the actual models instead of still pictures. The
+card grid on a flat purple backdrop is gone.
+
+- **Where it happens.** The draft uses the same 3D stage as placement and
+  battles, dressed with your saved board theme. The five offered heroes
+  stand in a shallow arc across the middle of the board, facing the camera.
+  - Heroes with a game model (Anvil, Gorrak, Cinder) show it with their
+    idle loop. The others use their battle placeholder, so the draft always
+    matches what fights look like.
+  - They rise out of the board one after another when the draft opens.
+- **Camera shots** (`board-stage.ts`). `frame(shot)` takes a pitch, a
+  look-at point and a box to fit. `frame(null)` returns to the usual board
+  framing, and the camera glides between them, pitch and target included.
+  - The draft uses an 18° pitch, down from 56°. At that angle all four
+    themes still look finished, with props and sky behind the heroes. At
+    12° the cove and frost horizons show.
+  - Leaving the draft glides back into the placement view.
+- **Nameplates** (`hud/draft.ts`, positioned by `game/views/draft-view.ts`).
+  Each hero gets one button covering the model and a plate under it, laid
+  out in the stage overlay every frame.
+  - The plate shows the name, archetype and reach, then two rows: which
+    combo the hero **sets up** (condition colour) and which it
+    **detonates** (school colour). The combo names match the COMBOS panel.
+  - Once you have picks, a plate shows **+ Overload** style chips when
+    drafting that hero would switch a combo on or raise its tier. This
+    reuses the reward screen's gain chips and tooltips.
+  - Hovering shows the same hero card tooltip as the HUD, with "Click to
+    draft", "Drafted · click to send back" or "Team full" as the hint.
+- **Picking.**
+  - A picked hero steps forward, gets a blue base and a numbered badge,
+    casts once and then loops its victory clip. `setCelebrating` on
+    `HeroFigure` was added by the 3D models session for this.
+  - When three are picked, the rest dim and their bases grey out. Clicking
+    a picked hero sends it back.
+  - Hovering lifts the plate, glows the model and turns its base gold.
+  - After Confirm, the unpicked heroes sink into the board and a "Team
+    locked in" banner shows until everyone has drafted.
+- **Right-hand column during the draft.** YOUR TEAM shows three slots that
+  fill with portraits as you pick, above the same COMBOS panel as the rest
+  of the match, so combos light up as the picks come together.
+- **Removed:** `heroOfferCard`, `.offer-grid` and the draft's `.hero-card*`
+  styles.
+- **Verified.**
+  - Played at 1512×760 and 1280×720 in the cove and frost themes, with real
+    clicks and hovers: pick, send back, the three-pick cap, hover cards,
+    gain chips and the glide into placement.
+  - All four themes were checked at 12° and 20° in a camera test first.
+  - The lock-in banner and picks were checked in the DOM only. In a solo
+    match the bots have already drafted, so the phase moves on the moment
+    you confirm and the sink animation barely shows.
+  - The environment lab and battle framing are unchanged. Lint and
+    typecheck pass on Node 20 and Node 24.
+
+## Fewer damage numbers, a white damage trail and HP tick lines (2026-09-24)
+
+The user found the damage numbers cluttered and asked for "just important
+things", plus the Dota 2 health bar where the lost chunk turns white and
+drains after a short delay.
+
+- **Why.** A census of 80 simulated battles (3v3 and 5v5, half with items)
+  counted about 309 numbers per battle, 11 a second, with about 10 on screen
+  at once and spikes past 100. Basic attacks were 34%, echo and reaction
+  hits 15%, poison and burn ticks 19%, small spell hits 10%, small heals 6%
+  and shield absorbs 4%.
+- **What still shows a number** (`landHit` and `healBurst` in
+  `battle-view.ts`):
+  - **Combos:** one callout, the combo name over the damage, in the
+    condition's colour. It replaces the separate "OVERLOAD!" label and
+    number.
+  - **Crits:** gold with "!", and bigger when the hit is 20% or more of max
+    HP.
+  - **Big hits:** a single hit worth 20% or more of a hero's max HP. Hits on
+    summons don't count, since any hit is big against a skeleton.
+  - **Big heals:** green "+N" when a heal is 15% or more of max HP.
+  - Hit totals include damage the shield took, because shield numbers no
+    longer show on their own.
+- **What doesn't:** basic attacks, smaller spell hits, echoes, DoT ticks,
+  shield absorbs, blood-price HP costs and small heals. The health bar's
+  white trail shows them instead.
+- **Result.** The same census gives about 18 numbers per battle, 0–2 on
+  screen and at most 10 in a burst of simultaneous combos. In the browser
+  harness a lab 3v3 showed 24 numbers in 31 s and a Morrow team 6 in 22 s.
+  These are lower bounds, because the harness skips event batches when the
+  clock jumps.
+- **White damage trail** (`game/views/health-trail.ts`). Each plate's bar
+  has a white layer under the fill.
+  - When HP drops, the white layer holds where the HP was, 0.4 s after the
+    last hit and never more than 1 s after the chunk began. It then drains
+    with an ease-out.
+  - Heals raise the fill instantly and never show white ahead of it. Seeks
+    and rewinds snap the trail.
+  - The fill's 120 ms width transition is gone, so the bar drops
+    immediately and the trail does the smoothing.
+  - In the browser, single hits held for 400–416 ms and 15% chunks cleared
+    in about 800 ms. Across 13 heals, none showed white ahead of the fill.
+- **Tick lines: one per 250 HP, drawn only on the fill.** The user said the
+  bars felt inverted: fewer HP should mean fewer lines.
+  - The 2026-09-23 rule picked the smallest step giving at most 12 ticks.
+    With today's HP that gave a 480 HP Thrall 9 lines against 5–8 for
+    1,500–2,200 HP heroes, and a hero pushed past 3,000 HP would drop from
+    11 lines to 6.
+  - Every unit now gets a line every 250 HP, so more max HP always means
+    more lines: a Thrall has 1, a Turret 2 and Anvil 8.
+  - The lines are part of the fill's background, sized against the whole
+    bar with container units, so they stay put as HP drops. The white trail
+    and the empty track have none, so a wounded unit visibly loses lines.
+  - Checked at 5× in the browser: Anvil at full HP showed 8 lines, a Thrall
+    at 81% showed 1 and a hero at 16% showed none.
+- **Not changed:** the selected-unit card's HP bar. Its shield segment is
+  already near-white, so a white trail there would read as shield.
+- **Removed:** the absorbed, DoT, echo, burn, poison, HP-cost and combo
+  label number styles, the `combo-callout` keyframes, `hpPerSegment` and
+  the bar's `::after` tick overlay.
+
+---
+
+## The stone-arena sound set and hero voice lines (2026-09-24)
+
+The user hated the first sounds ("like collecting gold in an arcade
+game"), picked the stone-arena style from a four-style audition, and
+asked for sound effects and voice lines everywhere.
+
+- **Style.** Every prompt names a physical sound and ends with "big and
+  deep, echoing through a vast stone arena, no voice". Arcade words
+  (mallet, chime, sparkle, plucked, playful) are banned. Details are in
+  `docs/audio.md`.
+- **Coverage.** 62 sounds replace the seven old placeholders:
+  - every ability has its own cast and hit sounds (`sound-map.ts`);
+  - summons have spawn and death sounds, and combos, crits, big hits,
+    shields, meteor falls, teleport beats, the draft, rewards and every
+    match moment have their own sounds.
+  - The three condition-apply sounds from the old asset list were
+    dropped. Conditions land on almost every hit, and the ability sounds
+    already cover the moment.
+- **Voice lines.** Ten ElevenLabs library voices, one per hero, with five
+  lines each: pick, two cast lines, death and win.
+  - A pure director (`line-policy.ts`) allows one line at a time.
+  - Pick and win interrupt; cast and death lines need gaps and play less
+    often for enemies.
+  - A Scribe transcript confirmed all 50 lines say their scripts.
+- **Engine change.** Each channel now has its own 16-voice pool, and a
+  full pool always steals the oldest voice instead of dropping the new
+  sound. Before this, a busy fight could silently drop a voice line or
+  the round-won stinger. `"skip"` now only means "don't restart this
+  sound over itself".
+- **Picking takes without listening.** Nobody listened during
+  generation.
+  - Takes were chosen by loudness and spectrogram.
+  - Three sounds whose takes were near-silent (hit-blade, shield-up,
+    teleport-in) were re-prompted, and three others switched to their
+    second take.
+  - Raw takes live in `art/audio/` (LFS) with `takes.json`, so an
+    alternate is one reprocess away.
+- **Checked in the browser.**
+  - A lab 3v3 made 247 sound requests with none missing.
+  - A solo match on an offline server made 491 requests: 465 played, 26
+    were same-frame duplicates dropped by cooldown, and none was dropped
+    for being unloaded or over the limit.
+  - 16 voice lines played with no overlap except intended interrupts.
+- **Removed:** `attack-swing.mp3`, `hit-impact.mp3`, `spell-cast.mp3`,
+  `heal.mp3` and `missing_assets.md` entries 4, 14, 19, 20 and 23.
+
 
 ## Draft picks survive the timer (2026-09-24)
 
@@ -2859,8 +3077,10 @@ and the server's deadline fallback drafts at random.
   and 0 of 2 with 80 ms of latency each way. Anything the client sends at
   expiry loses that race.
 - **The client seeds its selection from the view** on the first render
-  of each phase, so a reload mid-draft shows the same picks. The resets
-  on Confirm and on adopting a session went, since the seed covers them.
+  of each phase, so a reload mid-draft shows the same picks. Each toggle
+  in `toggleDraftPick` sends the new selection. The resets on leaving the
+  draft and on adopting a session, and the filter for offers that aren't
+  on the table, went, since the seed covers them.
 - `PROTOCOL_VERSION` is 4: a new intent and a new view field.
 - **Verified.**
   - Three new server tests: a selection committed at the deadline, a

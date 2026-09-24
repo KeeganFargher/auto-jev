@@ -20,6 +20,7 @@ export interface LoadedModel {
   readonly triangles: number;
   readonly drawCalls: number;
   readonly channelEffect: ChannelEffect | null;
+  readonly boardHeight: number | null;
 }
 
 export type ModelState = "unloaded" | "loading" | "ready" | "failed";
@@ -103,6 +104,7 @@ export function createModelLibrary(): ModelLibrary {
     const model: LoadedModel = {
       id,
       channelEffect: definition.channelEffect ?? null,
+      boardHeight: definition.boardHeight ?? null,
       template: gltf.scene,
       clips: new Map(gltf.animations.map((clip) => [clip.name, clip])),
       ...measure(gltf.scene),

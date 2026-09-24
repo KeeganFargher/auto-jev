@@ -236,7 +236,7 @@ def clip_stats(rig, low, groups, action, slot, count, loops):
     return stats
 
 
-def clip_sheet(rig, low, actions, lengths, path, out, columns=6, size=260):
+def clip_sheet(rig, low, actions, lengths, path, out, columns=6, size=260, view=((-3.1, -4.9, 2.6), (0.0, 0.0, 0.8), 42)):
     scene = bpy.context.scene
 
     for obj in scene.objects:
@@ -258,7 +258,7 @@ def clip_sheet(rig, low, actions, lengths, path, out, columns=6, size=260):
         for column in range(columns):
             frame = round(count * column / (columns - 1))
             play(rig, action, slot, frame)
-            shoot(camera, (-3.1, -4.9, 2.6), (0.0, 0.0, 0.8), frame_path, (size, size), lens=42)
+            shoot(camera, view[0], view[1], frame_path, (size, size), lens=view[2])
             image = bpy.data.images.load(str(frame_path), check_existing=False)
             tiles.append(np.array(image.pixels[:], dtype=np.float32).reshape(size, size, 4))
             bpy.data.images.remove(image)

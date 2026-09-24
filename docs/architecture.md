@@ -165,21 +165,55 @@ icon, content element) to `mountSettingsWindow` in `main.ts`.
 
 **Adding a sound.** Add an entry to `SOUNDS` in `catalogue.ts` with its
 channel, preload group, volume and overlap rules, then call
-`audio.play(id)`. Battle sounds go through `game/fx/battle-sounds.ts`,
-which maps battle cues (swing, cast, hit, heal, death) to sound ids.
-`battle-view.ts` fires each cue at the same moment as the matching
-visual. Hits sound when a projectile lands, not when the event arrives.
-Snaps (skip to end, catching up after a stall) skip event handling
-entirely, so they stay silent.
+`audio.play(id)`. How the files are made is in `docs/audio.md`.
+
+**Battle sounds.** `battle-view.ts` fires each cue at the same moment as
+the matching visual, through `game/fx/battle-sounds.ts`. Which sound a
+cue plays comes from the tables in `sound-map.ts`:
+
+- `abilitySounds(id)`: an ability's cast and hit sounds, plus any heal,
+  falling or landing sound.
+- `unitSounds(id)`: a summon's spawn and death sounds. Heroes use
+  `death`.
+- The combo, crit, shield and teleport sounds.
+
+`pnpm audio:check` fails if an ability or voiced hero has no entry.
+
+- Hits sound when a projectile lands, not when the event arrives. A hit
+  worth 20% or more of the target's max HP adds `crit-heavy`, and any
+  other crit adds `crit-hit`.
+- DoT ticks and reactions are silent.
+- A meteor's whistle starts 45% of the way through its fall.
+- Teleport beats play only while the teleport runs forward in real time.
+- Snaps (skip to end, catching up after a stall) skip event handling
+  entirely, so they stay silent.
+- A button click is not voiced if another effect started in the last
+  30 ms, so a click that triggers its own sound plays once.
+
+**Voice lines.** Each hero has pick, cast, death and win lines
+(`voice-lines.ts`), played through `game/fx/hero-voices.ts`. Whether a
+line may play right now is decided by `line-policy.ts`, a pure function:
+
+- One line plays at a time. Pick and win lines interrupt by fading out
+  the dialogue channel; cast and death lines wait.
+- Cast and death lines need gaps since the last line, and play less
+  often for enemies.
+- Cast lines fire only on signature casts (abilities with a mana cost).
+
+The numbers are in `docs/audio.md`.
 
 **Overlap rules** (`voice-policy.ts`, a pure function):
 
 - `cooldownMs`: a repeat of the same sound inside this window is
   dropped. This stops 8 AoE hits in one frame from stacking.
-- `maxVoices`: at most this many copies play at once.
+- `maxVoices`: at most this many copies of one sound play at once.
   `onLimit: "steal-oldest"` fades the oldest copy out over 15 ms, which
-  avoids a click. `"skip"` drops the new one instead.
-- `GLOBAL_VOICE_LIMIT` (16) caps all one-shots together.
+  avoids a click. `"skip"` drops the new one instead, so a stinger or
+  line never restarts over itself.
+- `GLOBAL_VOICE_LIMIT` (16) caps each channel's one-shots. Voice lines
+  never compete with effects for slots. When a channel is full, the new
+  sound always takes the oldest one's slot. A stinger or line is never
+  dropped because a fight is busy.
 - Each copy gets a small random pitch and volume change so repeats don't
   sound robotic. Battle sounds are also panned by the unit's position on
   screen.
@@ -191,7 +225,8 @@ requested, started, skipped and stolen counts.
 
 **Loading.** Sound effects are decoded into memory
 (`AudioBuffer`s). Each belongs to a `PreloadGroup`: `boot` loads at
-startup, and `battle` loads when the lab or match scene is created.
+startup, and `battle` and `voices` load when the lab or match scene is
+created.
 Decoded audio costs about 384 KB per second of stereo sound, so keep
 effects short. Music is never decoded. Each track is an
 `HTMLAudioElement` with `preload="none"`, streamed with range requests
@@ -206,8 +241,10 @@ key press unlocks audio; browsers block audio before that. The match
 scene picks its track from `MUSIC_FOR_SCREEN` (menu / planning / battle)
 in `syncMusic()`. Leaving the match fades the music out.
 
-Placeholder and missing files are tracked in `missing_assets.md` entries
-4, 7, 14, 19 and 20.
+The match scene also plays the draft sounds, the last three countdown
+seconds, `battle-start` when a battle is joined in its first 6 ticks,
+the round result and run result stingers, and reward and recruit
+sounds. Music is still a placeholder (`missing_assets.md` entry 7).
 
 ## Client 3D models
 
@@ -232,6 +269,24 @@ Placeholder and missing files are tracked in `missing_assets.md` entries
   wherever it already spins a channelling unit. Model figures loop their
   `channel` clip while it's set, plus the catalogue's `channelEffect`
   (`cyclone-effect.ts` for Gorrak). Placeholders ignore it.
+- **Board height.** A catalogue entry can set `boardHeight`, the on-board
+  height in units, when a model shouldn't take its placeholder's height.
+  Cinder uses it because her placeholder wears a tall hat. The model
+  figure scales to it, and `HeroFigure.height` (health plates, chest
+  point) follows it, including after a placeholder swaps to the model.
+- **Celebrating.** `HeroFigure.setCelebrating` loops the `victory` clip
+  (for the draft lineup). Placeholders ignore it.
+- **Spell visuals.** `game/views/spell-visuals.ts` maps ability ids to
+  code-drawn visuals. The battle view asks it at five points, and an
+  ability without an entry keeps the generic effect:
+  - pending impacts (Meteor's falling rock and ground shadow, timed from
+    ticks so it lands on the hit at any playback speed);
+  - impact landings (the blast);
+  - zones (burning ground);
+  - casts (Flame Ward's ring of fire);
+  - projectiles (Firebolt's fireball).
+  Rocks and burning ground are rebuilt from the snapshot's impacts and
+  zones, so seeks and resets never leave them behind.
 - **Dev lab.** `#models` is the model lab: clips on demand, a crowd
   button that cycles ×16 and ×32 stress crowds, a placeholder comparison and the stats panel with a
   leak test. In dev builds, `window.jevModels` exposes the library.

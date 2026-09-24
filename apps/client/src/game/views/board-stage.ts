@@ -53,6 +53,16 @@ interface CameraFit {
   distance: number;
   offsetX: number;
   offsetY: number;
+  pitch: number;
+  target: Vector3;
+}
+
+export interface StageShot {
+  pitch: number;
+  target: Vector3;
+  halfWidth: number;
+  halfDepth: number;
+  height: number;
 }
 
 interface CameraGlide {
@@ -132,6 +142,7 @@ export interface BoardStage {
   readonly canvas: HTMLCanvasElement;
   readonly overlay: HTMLElement;
   showBoard(grid: BoardGrid, side: ViewSide, insets: ViewportInsets): void;
+  frame(shot: StageShot | null): void;
   toScene(point: Vector2, height: number): Vector3;
   toScreen(point: Vector3): ScreenPoint | null;
   groundPointAt(clientX: number, clientY: number): Vector2 | null;
@@ -400,6 +411,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   let lastFrameTime = performance.now();
   let fit: CameraFit | null = null;
   let glide: CameraGlide | null = null;
+  let shot: StageShot | null = null;
   let theme = DEFAULT_STAGE_THEME;
   let exposureBoost = 1;
   const fog = new Fog(new Color(theme.atmosphere.backdrop));
@@ -448,27 +460,41 @@ export function createBoardStage(container: HTMLElement): BoardStage {
 
   applyAtmosphere();
 
-  function placeCamera(distance: number): void {
+  function boardShot(): StageShot {
+    return {
+      pitch: PITCH_RADIANS,
+      target: new Vector3(),
+      halfWidth: (grid?.width ?? 80) / 2 + FRAME_WIDTH,
+      halfDepth: (grid?.height ?? 80) / 2 + FRAME_WIDTH,
+      height: FIT_HEIGHT_UNITS,
+    };
+  }
+
+  function placeCamera(distance: number, pitch: number, target: Vector3): void {
     const direction = side === "south" ? 1 : -1;
 
-    camera.position.set(0, distance * Math.sin(PITCH_RADIANS), direction * distance * Math.cos(PITCH_RADIANS));
-    camera.lookAt(0, 0, 0);
+    camera.position.set(
+      target.x,
+      target.y + distance * Math.sin(pitch),
+      target.z + direction * distance * Math.cos(pitch),
+    );
+
+    camera.lookAt(target);
     camera.updateMatrixWorld();
     camera.updateProjectionMatrix();
   }
 
-  function projectedBounds(): ScreenBounds {
-    const halfWidth = (grid?.width ?? 80) / 2 + FRAME_WIDTH;
-    const halfHeight = (grid?.height ?? 80) / 2 + FRAME_WIDTH;
+  function projectedBounds(framing: StageShot): ScreenBounds {
+    const { target, halfWidth, halfDepth } = framing;
     const corner = new Vector3();
     let minX = Number.POSITIVE_INFINITY;
     let maxX = Number.NEGATIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
 
-    for (const x of [-halfWidth, halfWidth]) {
-      for (const z of [-halfHeight, halfHeight]) {
-        for (const y of [0, FIT_HEIGHT_UNITS]) {
+    for (const x of [target.x - halfWidth, target.x + halfWidth]) {
+      for (const z of [target.z - halfDepth, target.z + halfDepth]) {
+        for (const y of [0, framing.height]) {
           corner.set(x, y, z).project(camera);
           const pixelX = ((corner.x + 1) / 2) * viewportWidth;
           const pixelY = ((1 - corner.y) / 2) * viewportHeight;
@@ -484,7 +510,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   }
 
   function applyFit(next: CameraFit): void {
-    placeCamera(next.distance);
+    placeCamera(next.distance, next.pitch, next.target);
     camera.setViewOffset(viewportWidth, viewportHeight, next.offsetX, next.offsetY, viewportWidth, viewportHeight);
     camera.updateProjectionMatrix();
     fit = next;
@@ -495,6 +521,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     camera.aspect = viewportWidth / viewportHeight;
     camera.clearViewOffset();
 
+    const framing = shot ?? boardShot();
     const safeWidth = Math.max(1, viewportWidth - insets.left - insets.right - FIT_PADDING_PIXELS * 2);
     const safeHeight = Math.max(1, viewportHeight - insets.top - insets.bottom - FIT_PADDING_PIXELS * 2);
 
@@ -503,8 +530,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
 
     for (let step = 0; step < 40; step += 1) {
       const distance = (near + far) / 2;
-      placeCamera(distance);
-      const bounds = projectedBounds();
+      placeCamera(distance, framing.pitch, framing.target);
+      const bounds = projectedBounds(framing);
       const fits = bounds.maxX - bounds.minX <= safeWidth && bounds.maxY - bounds.minY <= safeHeight;
 
       if (fits) {
@@ -514,9 +541,9 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       }
     }
 
-    placeCamera(far);
+    placeCamera(far, framing.pitch, framing.target);
 
-    const bounds = projectedBounds();
+    const bounds = projectedBounds(framing);
     const safeCenterX = insets.left + FIT_PADDING_PIXELS + safeWidth / 2;
     const safeCenterY = insets.top + FIT_PADDING_PIXELS + safeHeight / 2;
 
@@ -524,6 +551,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       distance: far,
       offsetX: (bounds.minX + bounds.maxX) / 2 - safeCenterX,
       offsetY: (bounds.minY + bounds.maxY) / 2 - safeCenterY,
+      pitch: framing.pitch,
+      target: framing.target.clone(),
     };
   }
 
@@ -554,6 +583,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       distance: from.distance + (to.distance - from.distance) * progress,
       offsetX: from.offsetX + (to.offsetX - from.offsetX) * progress,
       offsetY: from.offsetY + (to.offsetY - from.offsetY) * progress,
+      pitch: from.pitch + (to.pitch - from.pitch) * progress,
+      target: from.target.clone().lerp(to.target, progress),
     });
   }
 
@@ -626,6 +657,20 @@ export function createBoardStage(container: HTMLElement): BoardStage {
         glideCamera(fit);
       } else if (turned) {
         applyFit(fit);
+      }
+    },
+
+    frame(nextShot) {
+      if (shot === nextShot) {
+        return;
+      }
+
+      shot = nextShot;
+
+      if (fit === null) {
+        fitCamera();
+      } else {
+        glideCamera(fit);
       }
     },
 

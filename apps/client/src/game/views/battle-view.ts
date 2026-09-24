@@ -19,10 +19,32 @@ import {
 } from "three";
 import { CONDITION_DURATION_TICKS, type BattleEvent, type BattleSnapshot, type BoardGrid, type ComboKind, type ConditionKind, type DamageDealtEvent, type UnitState } from "@jev-game/game";
 import { abilityDefinition, heroDefinition } from "../catalogues.js";
+import {
+  castVisual,
+  impactVisual,
+  landingVisual,
+  projectileVisual,
+  zoneVisual,
+  type SpellVisual,
+  type TickedVisual,
+} from "./spell-visuals.js";
 import { conditionIcon, statusIcon } from "../../hud/icons.js";
+import { comboName } from "../../hud/tips.js";
 import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
+import { createHealthTrail, type HealthTrail } from "./health-trail.js";
 import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
-import { playBattleCue } from "../fx/battle-sounds.js";
+import {
+  createFallingTracker,
+  playCast,
+  playCombo,
+  playDeath,
+  playHeal,
+  playHit,
+  playLanding,
+  playShield,
+  playSpawn,
+  type SoundSource,
+} from "../fx/battle-sounds.js";
 
 export interface BattleView {
   update(snapshot: BattleSnapshot, selectedUnitId: string | null, latestEvents: readonly BattleEvent[]): void;
@@ -84,9 +106,7 @@ const HEAL_MOTES = 6;
 
 const FLOAT_NUMBER_MILLISECONDS = 900;
 
-const HP_SEGMENT_STEPS = [25, 50, 100, 250, 500, 1000];
-
-const MAX_HP_SEGMENTS = 12;
+const HP_PER_SEGMENT = 250;
 
 const RANGED_ATTACK_CELLS = 1.5;
 
@@ -134,6 +154,8 @@ const COMBO_BURST_SECONDS = 0.55;
 
 const BIG_HIT_FRACTION = 0.2;
 
+const BIG_HEAL_FRACTION = 0.15;
+
 interface GroundMarker {
   mesh: Mesh<RingGeometry, MeshBasicMaterial>;
   seen: boolean;
@@ -148,6 +170,7 @@ interface UnitRecord {
   state: UnitState;
   plate: HTMLElement;
   plateHp: HTMLElement;
+  plateTrail: HealthTrail;
   plateShield: HTMLElement;
   plateMana: HTMLElement | null;
   plateCondition: HTMLElement;
@@ -200,14 +223,8 @@ export function snapshotGrid(snapshot: BattleSnapshot): BoardGrid {
   };
 }
 
-function hpPerSegment(maxHp: number): number {
-  for (const step of HP_SEGMENT_STEPS) {
-    if (maxHp / step <= MAX_HP_SEGMENTS) {
-      return step;
-    }
-  }
-
-  return maxHp / MAX_HP_SEGMENTS;
+function hpFraction(unit: UnitState): number {
+  return Math.max(0, unit.hp / Math.max(1, unit.maxHp));
 }
 
 function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean): HTMLElement {
@@ -217,7 +234,10 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
   const maxHp = Math.max(1, unit.maxHp);
   const bar = document.createElement("div");
   bar.className = "unit-plate-bar";
-  bar.style.setProperty("--segment-width", `${(hpPerSegment(maxHp) / maxHp) * 100}%`);
+  bar.style.setProperty("--segment", String(HP_PER_SEGMENT / maxHp));
+
+  const trail = document.createElement("div");
+  trail.className = "unit-plate-trail";
 
   const hp = document.createElement("div");
   hp.className = "unit-plate-hp";
@@ -225,7 +245,7 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
   const shield = document.createElement("div");
   shield.className = "unit-plate-shield";
 
-  bar.append(hp, shield);
+  bar.append(trail, hp, shield);
 
   const condition = document.createElement("div");
   condition.className = "unit-plate-condition";
@@ -259,6 +279,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   const records = new Map<string, UnitRecord>();
   const effects: TransientEffect[] = [];
   const chainTargets = new Map<number, string>();
+
+  const falling = createFallingTracker();
+  const spellVisuals = new Set<SpellVisual>();
+  const stateVisuals = new Map<string, TickedVisual | null>();
 
   const bubbleGeometry = new SphereGeometry(6.4, 20, 14);
   const frostGeometry = new RingGeometry(4.9, 5.8, 32);
@@ -311,6 +335,49 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     effects.push(effect);
     effect.step(0);
+  }
+
+  function showSpell(visual: SpellVisual): void {
+    stage.scene.add(visual.root);
+    spellVisuals.add(visual);
+    visual.update(0);
+  }
+
+  function syncStateVisual(key: string, tick: number, seen: Set<string>, create: () => TickedVisual | null): void {
+    seen.add(key);
+    let visual = stateVisuals.get(key);
+
+    if (visual === undefined) {
+      visual = create();
+      stateVisuals.set(key, visual);
+
+      if (visual !== null) {
+        stage.scene.add(visual.root);
+      }
+    }
+
+    visual?.sync(tick);
+  }
+
+  function stepSpells(deltaSeconds: number): void {
+    for (const visual of stateVisuals.values()) {
+      visual?.update(deltaSeconds);
+    }
+
+    for (const visual of spellVisuals) {
+      visual.update(deltaSeconds);
+
+      if (visual.finished()) {
+        spellVisuals.delete(visual);
+        visual.dispose();
+      }
+    }
+  }
+
+  function areaRadius(abilityId: string): number {
+    const area = abilityDefinition(abilityId)?.area;
+
+    return area?.kind === "circle" ? area.radiusUnits : 0;
   }
 
   function disposeEffectObjects(effect: TransientEffect): void {
@@ -378,41 +445,35 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       return;
     }
 
-    const { amount, shieldAbsorbed: absorbed } = event;
-
     if (event.dot === undefined) {
       record.figure.trigger("hit");
       spark(record);
-      playBattleCue("hit", panOf(record));
+      playHit(event, event.amount + event.shieldAbsorbed >= record.state.maxHp * BIG_HIT_FRACTION, panOf(record));
     }
 
-    const total = amount + absorbed;
+    const total = event.amount + event.shieldAbsorbed;
+
+    if (event.combo !== undefined) {
+      const callout = floatNumber(record, total > 0 ? String(total) : "", "combo");
+
+      if (callout !== null) {
+        callout.dataset.condition = COMBO_CONDITION[event.combo];
+        callout.dataset.label = comboName(event.combo);
+      }
+
+      return;
+    }
+
+    if (event.dot !== undefined || total <= 0) {
+      return;
+    }
+
     const big = total >= record.state.maxHp * BIG_HIT_FRACTION;
 
-    if (amount > 0) {
-      let kind = event.dot === undefined ? "damage" : `dot is-${event.dot}`;
-
-      if (event.reaction === true && event.dot === undefined) {
-        kind = "damage is-echo";
-      }
-
-      if (event.combo !== undefined) {
-        kind = "damage is-combo";
-      } else if (event.crit === true) {
-        kind = big ? "damage is-crit is-huge" : "damage is-crit";
-      } else if (big) {
-        kind = "damage is-big";
-      }
-
-      const element = floatNumber(record, String(amount), kind);
-
-      if (element !== null && event.combo !== undefined) {
-        element.dataset.condition = COMBO_CONDITION[event.combo];
-      }
-    }
-
-    if (absorbed > 0) {
-      floatNumber(record, String(absorbed), "absorbed");
+    if (event.crit === true) {
+      floatNumber(record, String(total), big ? "crit is-huge" : "crit");
+    } else if (big && record.state.summonerUnitId === null) {
+      floatNumber(record, String(total), "big");
     }
   }
 
@@ -459,12 +520,6 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         flash.material.opacity = 1 - progress;
       },
     });
-
-    const label = floatNumber(record, `${combo.toUpperCase()}!`, "combo-label");
-
-    if (label !== null) {
-      label.dataset.condition = condition;
-    }
   }
 
   function impactFlash(x: number, z: number, radius: number, color: string): void {
@@ -482,12 +537,30 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     });
   }
 
-  function projectile(sourceId: string, targetId: string, onDone: () => void): void {
+  function projectile(sourceId: string, targetId: string, abilityId: string, onDone: () => void): void {
     const source = records.get(sourceId);
     const target = records.get(targetId);
 
     if (source === undefined || target === undefined) {
       onDone();
+
+      return;
+    }
+
+    const visual = projectileVisual(abilityId);
+
+    if (visual !== null) {
+      const from = chestOf(source);
+
+      addEffect({
+        objects: visual.objects,
+        age: 0,
+        duration: PROJECTILE_SECONDS,
+        onDone,
+        step(progress) {
+          visual.place(from, chestOf(target), progress);
+        },
+      });
 
       return;
     }
@@ -591,15 +664,24 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       },
     });
 
-    floatNumber(record, `+${amount}`, "heal");
-    playBattleCue("heal", panOf(record));
+    if (amount >= record.state.maxHp * BIG_HEAL_FRACTION) {
+      floatNumber(record, `+${amount}`, "heal");
+    }
   }
 
-  function panOf(record: UnitRecord): number | undefined {
-    const point = stage.toScreen(record.position);
+  function panAt(position: Vector3): number | undefined {
+    const point = stage.toScreen(position);
     const width = stage.canvas.clientWidth;
 
     return point === null || width === 0 ? undefined : (point.x / width) * 2 - 1;
+  }
+
+  function panOf(record: UnitRecord): number | undefined {
+    return panAt(record.position);
+  }
+
+  function sourceOf(record: UnitRecord): SoundSource {
+    return { heroId: record.state.heroId, friendly: record.state.teamId === options.friendlyTeamId };
   }
 
   function isRangedAbility(abilityId: string): boolean {
@@ -618,15 +700,21 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         return;
       }
 
-      const melee = event.isBasicAttack && !isRangedAbility(event.abilityId);
-      record.figure.trigger(melee ? "attack" : "cast");
-      playBattleCue(melee ? "swing" : "cast", panOf(record));
+      record.figure.trigger(event.isBasicAttack ? "attack" : "cast");
+      playCast(event, sourceOf(record), panOf(record));
+      const flourish = castVisual(event.abilityId, record.position, areaRadius(event.abilityId));
+
+      if (flourish !== null) {
+        showSpell(flourish);
+      }
 
       return;
     }
 
     if (event.kind === "combo-detonated") {
       comboBurst(event.targetUnitId, event.combo);
+      const target = records.get(event.targetUnitId);
+      playCombo(event.combo, target === undefined ? undefined : panOf(target));
 
       return;
     }
@@ -634,13 +722,21 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     if (event.kind === "unit-spawned") {
       const center = stage.toScene(event.position, 0);
       impactFlash(center.x, center.z, 8, SPAWN_COLOR);
+      playSpawn(event.heroId, panAt(center));
 
       return;
     }
 
     if (event.kind === "impact-landed") {
       const center = stage.toScene(event.center, 0);
-      impactFlash(center.x, center.z, event.radiusUnits, IMPACT_COLOR);
+      playLanding(event.abilityId, panAt(center));
+      const landing = landingVisual(event.abilityId, center, event.radiusUnits);
+
+      if (landing === null) {
+        impactFlash(center.x, center.z, event.radiusUnits, IMPACT_COLOR);
+      } else {
+        showSpell(landing);
+      }
 
       return;
     }
@@ -658,7 +754,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       chainTargets.set(event.causeSequence, event.targetUnitId);
 
       if (previousTarget === undefined) {
-        projectile(event.sourceUnitId, event.targetUnitId, land);
+        projectile(event.sourceUnitId, event.targetUnitId, event.abilityId, land);
       } else {
         arc(previousTarget, event.targetUnitId, land);
       }
@@ -671,16 +767,17 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       if (record !== undefined) {
         healBurst(record, event.amount);
+        playHeal(event.abilityId, panOf(record));
       }
 
       return;
     }
 
-    if (event.kind === "hp-paid") {
-      const record = records.get(event.unitId);
+    if (event.kind === "shield-applied") {
+      const record = records.get(event.targetUnitId);
 
       if (record !== undefined) {
-        floatNumber(record, String(event.amount), "paid");
+        playShield(event.abilityId, panOf(record));
       }
 
       return;
@@ -691,7 +788,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       if (record !== undefined) {
         record.figure.setDead(true);
-        playBattleCue("death", panOf(record));
+        playDeath(sourceOf(record), panOf(record));
       }
     }
   }
@@ -742,6 +839,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       state: unit,
       plate,
       plateHp: plate.querySelector<HTMLElement>(".unit-plate-hp")!,
+      plateTrail: createHealthTrail(plate.querySelector<HTMLElement>(".unit-plate-trail")!, hpFraction(unit)),
       plateShield: plate.querySelector<HTMLElement>(".unit-plate-shield")!,
       plateMana: plate.querySelector<HTMLElement>(".unit-plate-mana-fill"),
       plateCondition: plate.querySelector<HTMLElement>(".unit-plate-condition")!,
@@ -792,9 +890,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         record.figure.setDead(true);
       }
 
-      const hpFraction = Math.max(0, unit.hp / Math.max(1, unit.maxHp));
+      const hp = hpFraction(unit);
       const shieldFraction = unit.shield === null ? 0 : Math.min(1, unit.shield.amount / Math.max(1, unit.maxHp));
-      record.plateHp.style.width = `${hpFraction * 100}%`;
+      record.plateHp.style.width = `${hp * 100}%`;
+      record.plateTrail.update(hp, snapAll);
       record.plateShield.style.width = `${shieldFraction * 100}%`;
       record.plate.hidden = !unit.alive;
       record.bubble.visible = unit.alive && unit.shield !== null;
@@ -900,6 +999,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       marker.seen = false;
     }
 
+    const spellKeys = new Set<string>();
+
     for (const impact of next.impacts) {
       const key = `impact-${impact.impactId}`;
       let marker = groundMarkers.get(key);
@@ -914,6 +1015,9 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       marker.seen = true;
       marker.mesh.material.opacity = 0.35 + 0.35 * Math.abs(Math.sin(next.tick / 3));
+      syncStateVisual(key, next.tick, spellKeys, () =>
+        impactVisual(impact.abilityId, stage.toScene(impact.center, 0), impact.radiusUnits, next.tick, impact.landsAtTick),
+      );
     }
 
     for (const zone of next.zones) {
@@ -929,6 +1033,22 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       marker.seen = true;
+      syncStateVisual(key, next.tick, spellKeys, () =>
+        zoneVisual(zone.abilityId, stage.toScene(zone.center, 0), zone.radiusUnits, zone.zoneId),
+      );
+    }
+
+    for (const [key, visual] of stateVisuals) {
+      if (spellKeys.has(key)) {
+        continue;
+      }
+
+      stateVisuals.delete(key);
+
+      if (visual !== null) {
+        visual.end();
+        spellVisuals.add(visual);
+      }
     }
 
     for (const [key, marker] of groundMarkers) {
@@ -1039,6 +1159,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       record.bubble.position.set(record.position.x, record.figure.height * 0.5, record.position.z);
       record.frost.position.set(record.position.x, 0.1, record.position.z);
       record.conditionRing.position.set(record.position.x, 0.14, record.position.z);
+      record.plateTrail.step(deltaSeconds);
 
       const platePoint = stage.toScreen(record.position.clone().setY(record.figure.height + PLATE_GAP_UNITS));
 
@@ -1066,6 +1187,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   const stopFrames = stage.onFrame((deltaSeconds) => {
     stepRecords(deltaSeconds);
     stepEffects(deltaSeconds);
+    stepSpells(deltaSeconds);
     updateSelection();
     updateTargetLines();
   });
@@ -1110,6 +1232,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       if (snapAll) {
         chainTargets.clear();
+        falling.reset();
       }
 
       syncRecords(next, snapAll);
@@ -1122,6 +1245,12 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       for (const event of latestEvents) {
         handleEvent(event);
       }
+
+      falling.sync(next.impacts, next.tick, (impactId) => {
+        const impact = next.impacts.find((candidate) => candidate.impactId === impactId);
+
+        return impact === undefined ? undefined : panAt(stage.toScene(impact.center, 0));
+      });
     },
 
     dispose() {
@@ -1133,6 +1262,18 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       effects.length = 0;
+
+      for (const visual of spellVisuals) {
+        visual.dispose();
+      }
+
+      spellVisuals.clear();
+
+      for (const visual of stateVisuals.values()) {
+        visual?.dispose();
+      }
+
+      stateVisuals.clear();
 
       for (const record of records.values()) {
         removeRecord(record);

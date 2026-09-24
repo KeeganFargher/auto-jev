@@ -41,6 +41,7 @@ export function createBattleLabScene(
   isReplay: boolean,
 ): BattleLabScene {
   void audio.preload("battle");
+  void audio.preload("voices");
 
   const barRoot = hudRoot.querySelector<HTMLElement>("#lab-bar")!;
   const unitRoot = hudRoot.querySelector<HTMLElement>("#lab-unit")!;

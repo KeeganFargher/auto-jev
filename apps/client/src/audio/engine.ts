@@ -7,6 +7,7 @@ import {
   SOUNDS,
   type Bus,
   type MusicId,
+  type OneShotBus,
   type PreloadGroup,
   type SoundDefinition,
   type SoundId,
@@ -29,13 +30,15 @@ export interface SoundStats {
 
 export interface AudioEngine {
   readonly settings: AudioSettingsStore;
-  play(id: SoundId, options?: PlayOptions): void;
+  play(id: SoundId, options?: PlayOptions): number;
+  stopBus(bus: OneShotBus): void;
   setMusic(id: MusicId | null): void;
   preload(group: PreloadGroup): Promise<void>;
   isUnlocked(): boolean;
   stats(): Readonly<Record<string, SoundStats>>;
   activeVoiceCount(): number;
   currentMusic(): MusicId | null;
+  lastEffectAt(): number;
 }
 
 interface Voice extends VoiceSlot {
@@ -98,6 +101,7 @@ export function createAudioEngine(): AudioEngine {
   const lastStartedAt = new Map<SoundId, number>();
   const soundStats = new Map<SoundId, SoundStats>();
   const tracks = new Map<MusicId, MusicTrack>();
+  let lastEffectStartedAt = Number.NEGATIVE_INFINITY;
   let requestedMusic: MusicId | null = null;
   let playingMusic: MusicId | null = null;
 
@@ -193,7 +197,7 @@ export function createAudioEngine(): AudioEngine {
     voice.source.stop(now + STEAL_FADE_SECONDS * 2);
   }
 
-  function startVoice(id: SoundId, buffer: AudioBuffer, options: PlayOptions): void {
+  function startVoice(id: SoundId, buffer: AudioBuffer, options: PlayOptions): number {
     const definition: SoundDefinition = SOUNDS[id];
     const source = context.createBufferSource();
     source.buffer = buffer;
@@ -219,7 +223,11 @@ export function createAudioEngine(): AudioEngine {
 
     if (definition.bus === "dialogue") {
       updateDuck();
+    } else {
+      lastEffectStartedAt = performance.now();
     }
+
+    return buffer.duration / source.playbackRate.value;
   }
 
   function trackFor(id: MusicId): MusicTrack {
@@ -320,11 +328,13 @@ export function createAudioEngine(): AudioEngine {
         stats.notReady += 1;
         void load(id, SOUNDS[id]);
 
-        return;
+        return 0;
       }
 
       const now = performance.now();
-      const decision = decideVoice(id, SOUNDS[id], voices, GLOBAL_VOICE_LIMIT, lastStartedAt.get(id), now);
+      const definition: SoundDefinition = SOUNDS[id];
+      const sameBus = voices.filter((voice) => voice.bus === definition.bus);
+      const decision = decideVoice(id, definition, sameBus, GLOBAL_VOICE_LIMIT, lastStartedAt.get(id), now);
 
       if (decision.kind === "skip") {
         if (decision.reason === "cooldown") {
@@ -333,7 +343,7 @@ export function createAudioEngine(): AudioEngine {
           stats.skippedLimit += 1;
         }
 
-        return;
+        return 0;
       }
 
       if (decision.kind === "steal") {
@@ -343,7 +353,14 @@ export function createAudioEngine(): AudioEngine {
 
       lastStartedAt.set(id, now);
       stats.started += 1;
-      startVoice(id, buffer, options);
+
+      return startVoice(id, buffer, options);
+    },
+
+    stopBus(bus) {
+      for (const voice of voices.filter((candidate) => candidate.bus === bus)) {
+        fadeOutVoice(voice);
+      }
     },
 
     setMusic(id) {
@@ -370,6 +387,10 @@ export function createAudioEngine(): AudioEngine {
 
     currentMusic() {
       return playingMusic;
+    },
+
+    lastEffectAt() {
+      return lastEffectStartedAt;
     },
   };
 }

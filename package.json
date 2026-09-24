@@ -23,7 +23,8 @@
     "models:build": "tsx scripts/models/build.ts",
     "models:check": "tsx scripts/models/check.ts",
     "icons:build": "tsx scripts/icons/build.ts",
-    "icons:check": "tsx scripts/icons/check.ts"
+    "icons:check": "tsx scripts/icons/check.ts",
+    "audio:check": "tsx scripts/audio/check.ts"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.0",

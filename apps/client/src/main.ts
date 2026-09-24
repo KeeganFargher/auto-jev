@@ -16,8 +16,12 @@ mountSettingsWindow(document.body, [createAudioTab(audio.settings)]);
 
 void audio.preload("boot");
 
+const CLICK_ALREADY_VOICED_MS = 30;
+
 document.addEventListener("click", (event) => {
-  if (event.target instanceof Element && event.target.closest("button, .menu-link, .pill-button") !== null) {
+  const voiced = performance.now() - audio.lastEffectAt() < CLICK_ALREADY_VOICED_MS;
+
+  if (!voiced && event.target instanceof Element && event.target.closest("button, .menu-link, .pill-button") !== null) {
     audio.play("ui-click");
   }
 });

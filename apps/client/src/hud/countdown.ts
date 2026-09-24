@@ -4,7 +4,7 @@ export interface Countdown {
   dispose(): void;
 }
 
-export function createCountdown(target: HTMLElement, seconds: number, onExpire: () => void): Countdown {
+export function createCountdown(target: HTMLElement, seconds: number, onExpire: () => void, onTick?: (remaining: number) => void): Countdown {
   let remaining = seconds;
 
   function render(): void {
@@ -31,6 +31,7 @@ export function createCountdown(target: HTMLElement, seconds: number, onExpire: 
     }
 
     render();
+    onTick?.(remaining);
   }, 1000);
 
   return {

@@ -43,6 +43,7 @@ export interface HeroFigure {
   setDead(dead: boolean): void;
   setGlow(amount: number): void;
   setChanneling(channeling: boolean): void;
+  setCelebrating(celebrating: boolean): void;
   update(deltaSeconds: number): void;
   dispose(): void;
 }
@@ -746,6 +747,7 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
   let teamColor: ColorRepresentation | null = null;
   let moving = false;
   let channeling = false;
+  let celebrating = false;
   let dead = false;
   let glow = 0;
   let disposed = false;
@@ -763,6 +765,7 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
 
     next.setMoving(moving);
     next.setChanneling(channeling);
+    next.setCelebrating(celebrating);
     next.setGlow(glow);
     placeholder.dispose();
     root.add(next.root);
@@ -779,7 +782,10 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
 
   return {
     root,
-    height: placeholder.height,
+
+    get height() {
+      return current.height;
+    },
 
     setTeamColor(color) {
       teamColor = color;
@@ -809,6 +815,11 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
     setChanneling(isChanneling) {
       channeling = isChanneling;
       current.setChanneling(isChanneling);
+    },
+
+    setCelebrating(isCelebrating) {
+      celebrating = isCelebrating;
+      current.setCelebrating(isCelebrating);
     },
 
     update(deltaSeconds) {
@@ -904,6 +915,8 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
     },
 
     setChanneling() {},
+
+    setCelebrating() {},
 
     update(deltaSeconds) {
       clock += deltaSeconds;

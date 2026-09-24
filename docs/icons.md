@@ -196,8 +196,8 @@ Rules the check enforces, from `scripts/icons/contract.ts`:
 
 - **Size.** Icons are exactly 192×192. The biggest place an icon
   appears is the reward disc at 62 CSS px, so 192 covers a 3× phone
-  screen. Portraits are 320×320; the biggest is the draft card, at most
-  184 CSS px wide. Faces are 128×128 for spots of 42 CSS px and less.
+  screen. Portraits are 320×320; the biggest is the hero tooltip card's
+  180 px bust. Faces are 128×128 for spots of 42 CSS px and less.
 - **Alpha.** Transparent background; the HUD draws the discs, sockets
   and rarity rings.
 - **Weight.** Icons at most 20 KB, portraits 40 KB, faces 12 KB. WebP
@@ -247,9 +247,8 @@ Rules the check enforces, from `scripts/icons/contract.ts`:
    bust, and `heroFaceArt(heroId)` gives an `<img class="face-art">`
    head crop. Both fall back to the hero's SVG glyph (`roleIcon`), so a
    summon or a new hero still draws something.
-   - The bust is used on the draft cards (cover-cropped to the head and
-     shoulders), the recruit reward disc (84 px) and the hero tooltip
-     card and unit inspector. On those cards the bust is 180 px (144 px
+   - The bust is used on the recruit reward disc (84 px) and the hero
+     tooltip card and unit inspector. On those cards the bust is 180 px (144 px
      in the live inspector), centred in the wide art band, so the whole
      head shows for every hero, even the ones with tall hats.
    - The face fills the ITEMS panel portrait (42 px), tooltip header
