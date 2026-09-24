@@ -1,4 +1,13 @@
-import { Color, CylinderGeometry, Mesh, MeshStandardMaterial } from "three";
+import {
+  CircleGeometry,
+  Color,
+  CylinderGeometry,
+  DataTexture,
+  LinearFilter,
+  Mesh,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+} from "three";
 
 export interface FigureBase {
   readonly mesh: Mesh;
@@ -30,6 +39,80 @@ export const DEAD_COLOR = new Color("#6b7280");
 
 const BASE_GLOW = 0.18;
 
+const CONTACT_SHADOW_REACH = 1.5;
+
+const CONTACT_SHADOW_OPACITY = 0.55;
+
+const CONTACT_SHADOW_LIFT = 0.03;
+
+const CONTACT_SHADOW_TEXELS = 64;
+
+const CONTACT_SHADOW_CORE = 0.55;
+
+interface ContactShadowKit {
+  geometry: CircleGeometry;
+  material: MeshBasicMaterial;
+}
+
+let contactShadow: ContactShadowKit | null = null;
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  const progress = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
+
+  return progress * progress * (3 - 2 * progress);
+}
+
+function contactShadowTexture(): DataTexture {
+  const size = CONTACT_SHADOW_TEXELS;
+  const texels = new Uint8Array(size * size * 4);
+
+  for (let row = 0; row < size; row += 1) {
+    for (let column = 0; column < size; column += 1) {
+      const x = ((column + 0.5) / size) * 2 - 1;
+      const y = ((row + 0.5) / size) * 2 - 1;
+      texels[(row * size + column) * 4 + 3] = Math.round(255 * smoothstep(1, CONTACT_SHADOW_CORE, Math.hypot(x, y)));
+    }
+  }
+
+  const texture = new DataTexture(texels, size, size);
+  texture.magFilter = LinearFilter;
+  texture.minFilter = LinearFilter;
+  texture.needsUpdate = true;
+
+  return texture;
+}
+
+function contactShadowKit(): ContactShadowKit {
+  if (contactShadow !== null) {
+    return contactShadow;
+  }
+
+  const geometry = new CircleGeometry(1, 32);
+  geometry.rotateX(-Math.PI / 2);
+
+  contactShadow = {
+    geometry,
+    material: new MeshBasicMaterial({
+      map: contactShadowTexture(),
+      transparent: true,
+      opacity: CONTACT_SHADOW_OPACITY,
+      depthWrite: false,
+    }),
+  };
+
+  return contactShadow;
+}
+
+function createContactShadow(): Mesh {
+  const kit = contactShadowKit();
+  const mesh = new Mesh(kit.geometry, kit.material);
+  mesh.scale.setScalar(BASE_RADIUS * CONTACT_SHADOW_REACH);
+  mesh.position.y = -BASE_HEIGHT / 2 + CONTACT_SHADOW_LIFT;
+  mesh.renderOrder = -1;
+
+  return mesh;
+}
+
 export function createFigureBase(): FigureBase {
   const material = new MeshStandardMaterial({
     color: "#ffffff",
@@ -43,6 +126,7 @@ export function createFigureBase(): FigureBase {
   mesh.position.y = BASE_HEIGHT / 2;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
+  mesh.add(createContactShadow());
 
   return {
     mesh,

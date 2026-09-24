@@ -12,7 +12,6 @@ import {
   Matrix4,
   Mesh,
   MeshStandardMaterial,
-  PCFSoftShadowMap,
   PerspectiveCamera,
   Plane,
   Raycaster,
@@ -25,6 +24,7 @@ import {
 } from "three";
 import type { BoardGrid, Vector2 } from "@jev-game/game";
 import { easeInOut } from "./easing.js";
+import { applyShadowQuality } from "./shadow-quality.js";
 
 export interface ViewportInsets {
   left: number;
@@ -383,8 +383,6 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = PCFSoftShadowMap;
 
   const canvas = renderer.domElement;
   canvas.classList.add("board-canvas");
@@ -396,6 +394,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   const scene = new Scene();
   const camera = new PerspectiveCamera(FIELD_OF_VIEW_DEGREES, 1, 1, 3000);
   const lights = createLights(scene);
+  applyShadowQuality(renderer.shadowMap, lights.key.shadow, "soft");
   const ground = createGround(scene);
   const raycaster = new Raycaster();
   const groundPlane = new Plane(new Vector3(0, 1, 0), 0);

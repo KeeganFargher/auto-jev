@@ -44,6 +44,7 @@ export interface HeroFigure {
   setGlow(amount: number): void;
   setChanneling(channeling: boolean): void;
   setCelebrating(celebrating: boolean): void;
+  setCastsShadow(castsShadow: boolean): void;
   update(deltaSeconds: number): void;
   dispose(): void;
 }
@@ -748,6 +749,7 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
   let moving = false;
   let channeling = false;
   let celebrating = false;
+  let castsShadow = true;
   let dead = false;
   let glow = 0;
   let disposed = false;
@@ -766,6 +768,7 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
     next.setMoving(moving);
     next.setChanneling(channeling);
     next.setCelebrating(celebrating);
+    next.setCastsShadow(castsShadow);
     next.setGlow(glow);
     placeholder.dispose();
     root.add(next.root);
@@ -820,6 +823,11 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
     setCelebrating(isCelebrating) {
       celebrating = isCelebrating;
       current.setCelebrating(isCelebrating);
+    },
+
+    setCastsShadow(isCasting) {
+      castsShadow = isCasting;
+      current.setCastsShadow(isCasting);
     },
 
     update(deltaSeconds) {
@@ -917,6 +925,14 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
     setChanneling() {},
 
     setCelebrating() {},
+
+    setCastsShadow(castsShadow) {
+      parts.body.traverse((node) => {
+        node.castShadow = castsShadow;
+      });
+
+      base.mesh.castShadow = castsShadow;
+    },
 
     update(deltaSeconds) {
       clock += deltaSeconds;

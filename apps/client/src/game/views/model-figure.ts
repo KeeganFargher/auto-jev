@@ -290,6 +290,14 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
       }
     },
 
+    setCastsShadow(castsShadow) {
+      instance.traverse((node) => {
+        node.castShadow = castsShadow;
+      });
+
+      base.mesh.castShadow = castsShadow;
+    },
+
     setChanneling(isChanneling) {
       if (isChanneling === channeling) {
         return;
