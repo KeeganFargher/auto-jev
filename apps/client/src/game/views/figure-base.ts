@@ -26,11 +26,9 @@ export const CHEST_FRACTION = 0.55;
 
 export const DEAD_COLOR = new Color("#6b7280");
 
-const BASE_RADIUS = 3.4;
-
 const TEXELS = 128;
 
-const CONTACT_SHADOW_REACH = 1.5;
+const CONTACT_SHADOW_RADIUS = 5.1;
 
 const CONTACT_SHADOW_OPACITY = 0.55;
 
@@ -38,13 +36,21 @@ const CONTACT_SHADOW_CORE = 0.55;
 
 const CONTACT_SHADOW_LIFT = 0.03;
 
+const RING_RADIUS = 2.9;
+
 const RING_LIFT = 0.06;
 
-const RING_INNER = 0.8;
+const RIM_INNER = 0.87;
 
-const RING_OUTER = 0.93;
+const RIM_OUTER = 0.93;
 
-const RING_EDGE = 0.025;
+const RIM_EDGE = 0.02;
+
+const GLOW_START = 0.45;
+
+const GLOW_ALPHA = 0.34;
+
+const HALO_ALPHA = 0.2;
 
 const RING_OPACITY = 0.95;
 
@@ -69,11 +75,11 @@ function contactShadowAlpha(radius: number): number {
 }
 
 function ringAlpha(radius: number): number {
-  const band = smoothstep(RING_INNER - RING_EDGE, RING_INNER, radius) * (1 - smoothstep(RING_OUTER, RING_OUTER + RING_EDGE, radius));
-  const pool = 0.1 + 0.2 * (Math.min(radius, RING_INNER) / RING_INNER) ** 2;
-  const halo = 0.3 * (1 - smoothstep(RING_OUTER, 1, radius));
+  const rim = smoothstep(RIM_INNER - RIM_EDGE, RIM_INNER, radius) * (1 - smoothstep(RIM_OUTER, RIM_OUTER + RIM_EDGE, radius));
+  const glow = GLOW_ALPHA * smoothstep(GLOW_START, RIM_INNER, radius) * (1 - smoothstep(RIM_OUTER, RIM_OUTER + RIM_EDGE, radius));
+  const halo = HALO_ALPHA * smoothstep(RIM_OUTER - 0.03, RIM_OUTER, radius) * (1 - smoothstep(RIM_OUTER, 1, radius));
 
-  return radius < RING_INNER ? Math.max(band, pool) : Math.max(band, halo);
+  return Math.max(rim, glow, halo);
 }
 
 function radialTexture(alpha: (radius: number) => number): DataTexture {
@@ -127,13 +133,13 @@ export function createFigureBase(): FigureBase {
   const root = new Group();
 
   const shadow = new Mesh(kit.geometry, kit.shadow);
-  shadow.scale.setScalar(BASE_RADIUS * CONTACT_SHADOW_REACH);
+  shadow.scale.setScalar(CONTACT_SHADOW_RADIUS);
   shadow.position.y = CONTACT_SHADOW_LIFT;
   shadow.renderOrder = -2;
 
   const material = new MeshBasicMaterial({ map: kit.ring, transparent: true, opacity: RING_OPACITY, depthWrite: false });
   const ring = new Mesh(kit.geometry, material);
-  ring.scale.setScalar(BASE_RADIUS);
+  ring.scale.setScalar(RING_RADIUS);
   ring.position.y = RING_LIFT;
   ring.renderOrder = -1;
   root.add(shadow, ring);

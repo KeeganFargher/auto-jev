@@ -3186,6 +3186,16 @@ Each layer is its own commit and a working game.
     states still come through `setTeamColor`.
   - `BASE_HEIGHT` was removed rather than set to zero. Models keep their
     on-board size.
+  - **Refined after a second look.** The user felt the first ring still
+    needed work. Three candidates were compared side by side on the cove
+    and ruins boards: a clean rim, the rim in four arcs, and a soft pool
+    with no rim.
+    - The clean rim won. The first ring's flat pool of colour had turned
+      murky over the contact shadow, and it was nearly a cell wide.
+    - The arcs' gaps disappear behind bodies at board distance. The pool
+      is weakest at telling teams apart, and cream on sand vanishes.
+    - It's now a thin crisp rim with a soft glow rising toward it and a
+      clear centre, 15% smaller (radius 2.9 in figure units).
 - **Particles** (`particles.ts`, owned by the stage).
   - Two instanced quads in ring buffers:
     - `solid`: alpha-blended, 2,048 particles.
