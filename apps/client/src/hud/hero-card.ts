@@ -189,6 +189,10 @@ function reachText(stats: CardStats | null): string | null {
   return stats.rangeCells <= MELEE_CELLS ? "Melee" : `${trimmed(stats.rangeCells)}-cell range`;
 }
 
+export function heroReach(build: HeroBuild): string | null {
+  return reachText(buildStats(build));
+}
+
 export function buildCard(heroId: string, build: HeroBuild, stats: CardStats | null, options: CardOptions): CardParts {
   const hero = heroDefinition(heroId);
   const badges: HTMLElement[] = [];

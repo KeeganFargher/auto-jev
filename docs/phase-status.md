@@ -806,9 +806,11 @@ Three.js renderer").
 
 ### Known gaps
 
-- Anvil and Gorrak have real models; every other hero is still a
-  placeholder shape. Gorrak's whirlwind plays his `channel` clip and a
-  code-drawn cyclone.
+- Anvil, Gorrak and Cinder have real models; every other hero is still
+  a placeholder shape. Gorrak's whirlwind plays his `channel` clip and a
+  code-drawn cyclone. Cinder's Meteor, Flame Ward and Firebolt have
+  code-drawn spell visuals; every other ability still uses the generic
+  rings, bolts and flashes.
 - A seat with a bye can't rearrange that round (it already counts as
   ready).
 - The 15-second preparing timer now also covers placement.

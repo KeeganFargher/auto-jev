@@ -148,9 +148,16 @@ halve it.
    - **Scale and base.** Each model stands on the same team-coloured base
      as the placeholder and is scaled to that hero's placeholder height.
      Health bars and on-board sizes stay where they were.
+   - **Board height.** When a placeholder's height is wrong for its model,
+     the catalogue entry sets `boardHeight` (on-board units, without the
+     base). Cinder's placeholder wears a tall hat, so `pyromancer` sets
+     8.3: her head sits a little under Gorrak's and Anvil's, her hair tips
+     level with their crests. Her health plate follows the model.
    - **Clips.** `idle` and `run` loop and crossfade. `attack`, `cast` and
      `hit` play over them, starting part-way in so the impact lands as
-     soon as the engine's hit does. `death` holds its last frame, then
+     soon as the engine's hit does. Every basic attack plays `attack`,
+     ranged ones included (Cinder's Firebolt throw); abilities play
+     `cast`. `death` holds its last frame, then
      the figure sinks.
    - **Channelling.** `setChanneling` on `HeroFigure` switches the loop to
      `channel` while the battle view reports a channel. Placeholders
@@ -162,6 +169,10 @@ halve it.
        and a dust ring.
      - glTF can't carry the Blender version's per-object alpha or
        additive blending, so effects like this live in code.
+   - **Spell visuals.** Signature abilities get code-drawn visuals in
+     `game/views/spell-visuals.ts`, looked up by ability id. See
+     `docs/architecture.md` for where the battle view calls it. Cinder's
+     are the first: Meteor, Flame Ward and Firebolt.
    - **Effects kept from the placeholders.** The attack lunge, the hit
      flash and the cast glow.
 5. **Instances.** Each figure is a `SkeletonUtils` copy.
@@ -226,6 +237,9 @@ pauses animation when it's hidden.
 
 ## Adding a hero model
 
+The `new-hero` skill (`.claude/skills/new-hero/SKILL.md`) is the order of
+work that Gorrak and Cinder went through. The minimal steps are:
+
 1. Run `pnpm models:new heroes <id>` and open the new file.
 2. Model it, or import an AI-generated model, inside the `<id>`
    collection.
@@ -258,7 +272,8 @@ pauses animation when it's hidden.
   - The style-test and paint scripts target the original single-file
     "Jev Props" layout.
 - **Explorations.** Files in `art/explorations/` are never exported. The
-  high-detail Gorrak there is the source his game model was baked from.
+  high-detail Gorrak and Cinder there are the sources their game models
+  were baked from.
 
 ## How Gorrak's game model was made
 
@@ -313,3 +328,56 @@ differs only by the GPU bake's run-to-run noise.
    - No clip goes below the floor, and every loop closes exactly.
 8. **Standard layout.** Scene and collection `ravager`, the `stage`, the
    exporter, and a showreel with markers.
+
+## How Cinder's game model was made
+
+Cinder is the second hero through the same recipe, and the first built
+from scratch for it.
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python art/generators/build_cinder.py -- save
+```
+
+```bash
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup art/explorations/cinder-hq.blend --python art/generators/build_pyromancer.py
+```
+
+The first writes the high-detail `art/explorations/cinder-hq.blend`
+(53 parts, 111k triangles, an 18-bone rig). The second bakes it into
+`art/models/heroes/pyromancer.blend`, which `pnpm models:build
+pyromancer` exports: 7,791 triangles, 3 draw calls, one 1024 px texture,
+7 clips, 697 KB.
+
+1. **Look.** She follows her portrait (`art/icons/heroes/pyromancer.png`)
+   rather than the placeholder's wizard hat: copper hair swept up like a
+   flame, orange eyes, freckles, a grin, a warm charcoal coat with brass
+   buttons and a burnt, glowing hem, and the flame in her left hand.
+2. **Sign-off preview.** `-- preview` renders the painted look the bake
+   will produce, next to the shipped Anvil and Gorrak from the game
+   camera. The user approved the look from that before any clips were
+   keyed.
+3. **Team colour.** The scarf, its tail and the sleeve cuffs. The
+   contract keeps `team` plain white, so a large team area would lose
+   the painted shading.
+4. **Face.** A face baked from everything around it picks up the hair
+   locks that hang in front of it. The recipe's `isolate` option bakes
+   the face parts (skull, eyes, brows, mouth, freckles) only from each
+   other. Three more settings keep it clean:
+   - The scalp under the hair is deleted, since it's never seen.
+   - `uv_boost` gives her skin three times the texture space.
+   - The `skin_soft` paint kind drops the weathered noise that suits
+     Gorrak.
+5. **Coat.** The skirt and its ember hem are smooth-weighted: hips at the
+   waist, blending to the thigh of the same side and a `coat` bone toward
+   the hem, at most four influences. The front opening and the back vent
+   give the stride room.
+6. **Glow.** The `glow` material uses the painted texture as its emission,
+   so the flame keeps its yellow-to-red gradient. The strength is 2.0, the
+   same value the preview renders.
+7. **Clips.** `idle` 3.0 s with a flickering flame (a `flame` bone's
+   scale), `run` 0.67 s, `attack` 0.7 s (a Firebolt throw released at
+   40%), `cast` 0.9 s (both arms up with a big flame at 50%), `hit`
+   0.3 s, `death` 1.2 s (the flame goes out, and she ends on her back),
+   `victory` 2.5 s. No clip goes below the floor, and every loop closes
+   exactly.
+

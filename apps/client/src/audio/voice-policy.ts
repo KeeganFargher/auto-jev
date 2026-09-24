@@ -39,7 +39,7 @@ export function decideVoice<V extends VoiceSlot>(
   }
 
   if (active.length >= globalLimit) {
-    return rules.onLimit === "skip" ? { kind: "skip", reason: "limit" } : { kind: "steal", victim: oldest(active) };
+    return { kind: "steal", victim: oldest(active) };
   }
 
   return { kind: "play" };

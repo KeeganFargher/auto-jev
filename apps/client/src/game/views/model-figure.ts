@@ -109,7 +109,8 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
   const base = createFigureBase();
   const instance = models.instantiate(model);
   const surfaces = adoptMaterials(instance);
-  instance.scale.setScalar(model.height > 0 ? (traits.height - BASE_HEIGHT) / model.height : 1);
+  const height = model.boardHeight === null ? traits.height : BASE_HEIGHT + model.boardHeight;
+  instance.scale.setScalar(model.height > 0 ? (height - BASE_HEIGHT) / model.height : 1);
 
   const body = new Group();
   body.position.y = BASE_HEIGHT;
@@ -146,6 +147,7 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
   let teamColor = new Color("#ffffff");
   let moving = false;
   let channeling = false;
+  let celebrating = false;
   let dead = false;
   let current: AnimationAction | null = null;
   let strike: AnimationAction | null = null;
@@ -157,9 +159,10 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
 
   function loopAction(): AnimationAction | null {
     const channel = channeling ? actions.get("channel") : undefined;
+    const victory = celebrating ? actions.get("victory") : undefined;
     const run = moving && !traits.rooted ? actions.get("run") : undefined;
 
-    return channel ?? run ?? actions.get("idle") ?? null;
+    return channel ?? victory ?? run ?? actions.get("idle") ?? null;
   }
 
   function play(next: AnimationAction | null, fadeSeconds: number, startAt = 0): void {
@@ -207,7 +210,7 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
 
   return {
     root,
-    height: traits.height * FIGURE_SCALE,
+    height: height * FIGURE_SCALE,
 
     setTeamColor(color) {
       teamColor = new Color(color);
@@ -273,6 +276,18 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
 
     setGlow(amount) {
       bodyGlow = Math.max(0, amount);
+    },
+
+    setCelebrating(isCelebrating) {
+      if (isCelebrating === celebrating) {
+        return;
+      }
+
+      celebrating = isCelebrating;
+
+      if (!dead && strike === null) {
+        settle();
+      }
     },
 
     setChanneling(isChanneling) {

@@ -12,7 +12,9 @@ and say so — wiring them into the UI is a code change, not part of the
 asset. 3D models (entries 8–9) are different: their listed path is a
 source under `art/`, and a build command writes what the game loads
 (`docs/models.md`). Item, rune and talent icons and hero portraits are
-all delivered; new ones go through `docs/icons.md`.
+all delivered; new ones go through `docs/icons.md`. Sound effects and
+hero voice lines are all delivered too; new ones go through
+`docs/audio.md`.
 
 ## Shared style guide
 
@@ -146,14 +148,6 @@ curl https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run
 - The camera looks down on everything, so tops of heads, shoulders and
   weapons matter more than faces.
 
-**Rules for sound effects** (entry 4):
-- Master: WAV, 48 kHz, 24-bit. Web copy: MP3, 192 kbps CBR, 48 kHz (plays
-  in every browser, including Safari).
-- Sound starts within 5 ms (no leading silence) and fades to true
-  silence at the end.
-- Peak-normalise stingers to −3 dBFS and the countdown tick to −12 dBFS.
-- No voice, no lyrics, no loops.
-
 **Rules for music** (entry 7):
 - Master: WAV, 48 kHz, 24-bit, stereo, trimmed so the last sample flows
   straight back into the first (a seamless loop, no fade-in or fade-out).
@@ -260,93 +254,6 @@ a 24x24 pixel grid, pixel-snapped, 1px rounded corners.
 **Avoid:** faces with detailed expressions, gradients, shadows, text.
 The robot must read as "baseline bot", not as a named AI character: the
 plan requires the UI to label these seats as baseline bots, not Jev.
-
----
-
-## 4. Result stingers and countdown tick (audio)
-
-**Used in:** the moments a run turns on — the round result after your
-battle, being eliminated, winning the run
-(`apps/client/src/game/scenes/match-scene.ts`'s `renderUpgrade` and
-`renderFinished`) — and the last 3 seconds of the 15-second round
-countdown (`apps/client/src/hud/countdown.ts`).
-
-**Delivered so far:** `round-won.mp3` (ElevenLabs Sound Effects v2,
-1.0 s, 44.1 kHz stereo, peaks at −4.6 dBFS rather than −3). It plays
-through the audio engine (`apps/client/src/audio/`) when your own battle
-ends in a win. The other four files are still missing and have no
-catalogue entry yet; add each to `SOUNDS` in
-`apps/client/src/audio/catalogue.ts` and to `RESULT_SOUNDS` in
-`match-scene.ts` as it lands.
-
-**Currently:** the rest are silent. Each moment already has a visual beat these
-should land on: a brush-stroke banner (gold "Victory", crimson "Defeat"
-or "Eliminated", gold "Victory!" for the run) fades in on the result
-screen, and the stone timer plate's number turns pale red and pulses
-for the last 3 seconds (`.round-plate-timer.is-urgent`).
-
-**Files to deliver** (masters as `.wav`, web copies as `.mp3`, same base
-name, per the audio rules above):
-
-| File | Length | Channels | Plays when |
-| --- | --- | --- | --- |
-| `apps/client/public/assets/audio/round-won.mp3` | 0.8 s | stereo | your battle ends in a win |
-| `apps/client/public/assets/audio/round-lost.mp3` | 0.8 s | stereo | your battle ends in a loss |
-| `apps/client/public/assets/audio/eliminated.mp3` | 2.0 s | stereo | the "You were eliminated" screen appears |
-| `apps/client/public/assets/audio/run-won.mp3` | 2.5 s | stereo | the "You won the run!" screen appears |
-| `apps/client/public/assets/audio/countdown-tick.mp3` | 0.08 s | mono | each of the last 3 seconds of a round timer |
-
-**Style:** clean, modern strategy-game UI sound: mallets, plucked synth
-and soft synth brass. Punchy transients, short tails. Win and run-won
-are a matched pair (same instruments, the run-won version bigger), and
-so are lost and eliminated.
-
-**Prompt — round-won:**
-
-```
-Short positive UI stinger for winning a round in a strategy
-auto-battler: two quick ascending bright mallet notes a perfect fifth
-apart, layered with a soft plucked synth, crisp transient, short airy
-reverb tail, no drums, no voice, 0.8 seconds.
-```
-
-**Prompt — round-lost:**
-
-```
-Short negative UI stinger for losing a round in a strategy
-auto-battler: two descending muted mallet notes a minor third apart
-over a soft low thud, dry and restrained, not comedic, no voice,
-0.8 seconds.
-```
-
-**Prompt — eliminated:**
-
-```
-Knockout stinger for being eliminated from a strategy game match: one
-low heavy impact, then a slow descending three-note minor motif on a
-dark synth-brass tone, fading into a cold airy tail, dramatic but not
-horror, no voice, 2 seconds.
-```
-
-**Prompt — run-won:**
-
-```
-Victory stinger for winning a whole strategy game match: a bright
-rising major arpeggio on mallets and warm synth brass, landing on a
-sustained major chord with a shimmering sparkle tail, triumphant but
-short, no voice, 2.5 seconds.
-```
-
-**Prompt — countdown-tick:**
-
-```
-Single soft wooden UI tick like a muted clock, very dry, no reverb,
-80 milliseconds.
-```
-
-**Avoid:** anything longer than the listed length, cartoon or
-slide-whistle sounds, heavy reverb that smears into the next screen,
-and music that loops.
 
 ---
 
@@ -532,10 +439,14 @@ busy they pull attention from the board.
 ## 8. Hero models (3D, rigged and animated)
 
 **Used in:** the 3D board, in every battle and on the placement board
-(`apps/client/src/game/views/`). Two models are delivered:
+(`apps/client/src/game/views/`). Three models are delivered:
 - Anvil: `bulwark.glb`, source `art/models/heroes/bulwark.blend`.
 - Gorrak: `ravager.glb`, source `art/models/heroes/ravager.blend`, built
   by `art/generators/build_ravager.py`.
+- Cinder: `pyromancer.glb`, source `art/models/heroes/pyromancer.blend`,
+  built by `art/generators/build_pyromancer.py` from the high-detail
+  `art/explorations/cinder-hq.blend` (`build_cinder.py`). Her look follows
+  her portrait, not the placeholder's hat.
 
 Every hero below is still a placeholder figure built from simple shapes.
 
@@ -545,7 +456,6 @@ Every hero below is still a placeholder figure built from simple shapes.
 | --- | --- |
 | `apps/client/public/assets/models/heroes/oathkeeper.glb` | Morrow, the Oathkeeper |
 | `apps/client/public/assets/models/heroes/duskblade.glb` | Vesper, the Duskblade |
-| `apps/client/public/assets/models/heroes/pyromancer.glb` | Cinder, the Pyromancer |
 | `apps/client/public/assets/models/heroes/frostweaver.glb` | Rime, the Frostweaver |
 | `apps/client/public/assets/models/heroes/hexbinder.glb` | Moira, the Hexbinder |
 | `apps/client/public/assets/models/heroes/blightmother.glb` | Nettle, the Blightmother |
@@ -616,7 +526,6 @@ T-pose, full body, clean topology, game-ready, no base, no background.
 
 - `oathkeeper` (Morrow, the Oathkeeper): a battle-priestess in white-and-gold plate with a two-handed warhammer whose head glows gold, a sun-disc halo behind her head, warm gold (#f2d27a) accents.
 - `duskblade` (Vesper, the Duskblade): a slim hooded assassin with twin curved daggers, face half in shadow, dark leathers with violet (#b58cff) trim.
-- `pyromancer` (Cinder, the Pyromancer): a young fire mage with ember-lit eyes and wild hair, a flame cupped in one hand, scorched robes with orange (#ff8a4c) glow.
 - `frostweaver` (Rime, the Frostweaver): a calm arctic sorceress in pale layered robes, frost in her long hair, ice crystals orbiting one hand, ice-blue (#9fe8ff) accents.
 - `hexbinder` (Moira, the Hexbinder): a tall fate-witch in a hooded robe with long sleeves, glowing violet threads and rings of light around her fingers, magenta (#c86bff) accents.
 - `blightmother` (Nettle, the Blightmother): a hunched marsh witch in a wide leafy skirt and mantle, swinging a censer that leaks green smoke, sickly green (#8fd14f) accents.
@@ -717,8 +626,9 @@ blurry noise that reads as dirt when small.
 
 **Used in:** the combo system designed in
 `docs/heroes-and-builds-design.md` §2: hero plates above each figure
-(`apps/client/src/game/views/battle-view.ts`), draft and recruit offer
-cards (`apps/client/src/game/scenes/match-scene.ts`), the COMBOS badge
+(`apps/client/src/game/views/battle-view.ts`), the draft nameplates
+(`apps/client/src/hud/draft.ts`), recruit offer cards
+(`apps/client/src/hud/rewards.ts`), the COMBOS badge
 grid in the right-hand panel and the combo tooltips
 (`apps/client/src/hud/loadout.ts`, `apps/client/src/hud/tips.ts`), and
 the condition badge above a unit's health bar in battle.
@@ -861,235 +771,6 @@ lettering (combo names are rendered by the game).
 
 ---
 
-## 14. Condition and combo sounds
-
-**Used in:** the 3D battle view, when a condition lands, when a combo
-detonates, and on crits. Designed in `docs/heroes-and-builds-design.md`
-§15.
-
-**Currently:** battles are silent.
-
-**Files to deliver** (masters as `.wav`, web copies as `.mp3`, same base
-name, per the audio rules above):
-
-| File | Length | Channels | Plays when |
-| --- | --- | --- | --- |
-| `apps/client/public/assets/audio/apply-staggered.mp3` | 0.3 s | mono | a unit becomes Staggered |
-| `apps/client/public/assets/audio/apply-brittle.mp3` | 0.3 s | mono | a unit becomes Brittle |
-| `apps/client/public/assets/audio/apply-disoriented.mp3` | 0.3 s | mono | a unit becomes Disoriented |
-| `apps/client/public/assets/audio/combo-overload.mp3` | 0.7 s | stereo | Overload detonates |
-| `apps/client/public/assets/audio/combo-shatter.mp3` | 0.7 s | stereo | Shatter detonates |
-| `apps/client/public/assets/audio/combo-crush.mp3` | 0.7 s | stereo | Crush detonates |
-| `apps/client/public/assets/audio/crit-hit.mp3` | 0.25 s | mono | a normal crit |
-| `apps/client/public/assets/audio/crit-heavy.mp3` | 0.5 s | mono | a hit worth 25% or more of the target's max HP |
-
-Apply sounds fire often, so peak-normalise them to −12 dBFS. Normalise
-the combos and `crit-heavy` to −3 dBFS and `crit-hit` to −6 dBFS.
-
-**Style:** punchy stylised fantasy combat, readable over music. Each
-condition's apply sound and its combo are a matched pair, the combo
-being the big version.
-
-**Prompt: apply-staggered:**
-
-```
-Short dull heavy thump with a wooden creak, like a shield blow knocking
-someone off balance, dry, no voice, 0.3 seconds.
-```
-
-**Prompt: apply-brittle:**
-
-```
-Short crisp crackle of ice forming over a surface, bright and glassy,
-no voice, 0.3 seconds.
-```
-
-**Prompt: apply-disoriented:**
-
-```
-Short woozy descending whoosh with a soft warble, dizzy but not comedic,
-no voice, 0.3 seconds.
-```
-
-**Prompt: combo-overload:**
-
-```
-Heavy impact followed by a sharp electric crack and a rumbling
-shockwave, powerful fantasy spell hit, short tail, no voice,
-0.7 seconds.
-```
-
-**Prompt: combo-shatter:**
-
-```
-Loud glassy ice explosion, shards scattering and tinkling outward,
-bright and satisfying, short tail, no voice, 0.7 seconds.
-```
-
-**Prompt: combo-crush:**
-
-```
-Deep inward whoomp like air collapsing into a point, then a heavy
-ground thud, dark and weighty, short tail, no voice, 0.7 seconds.
-```
-
-**Prompt: crit-hit:**
-
-```
-Sharp punchy metallic weapon hit with a bright transient, very short,
-no voice, 0.25 seconds.
-```
-
-**Prompt: crit-heavy:**
-
-```
-Massive weapon impact with a bass thump and a brief bright ring,
-satisfying and heavy, short tail, no voice, 0.5 seconds.
-```
-
-**Avoid:** anything longer than the listed length, cartoon sounds, long
-reverb tails that smear across a busy fight, and voices (Jev voice lines
-are a separate, later entry).
-
----
-
-## 19. Teleport sounds
-
-**Used in:** the 2-second teleport before every fight
-(`apps/client/src/game/views/teleport-view.ts`). When you're away, your
-heroes are pulled up into light beams, a white flash swaps boards, and
-they drop in beside the opponent. When you're home, the opponent's
-heroes drop in on your far side.
-
-**Currently:** silent. The visuals already have the beats these should
-land on: each hero's beam flaring, the flash, and each landing (a ring
-pulses out across the tiles).
-
-**Files to deliver** (masters as `.wav`, web copies as `.mp3`, same base
-name, per the audio rules above):
-
-| File | Length | Channels | Plays when |
-| --- | --- | --- | --- |
-| `apps/client/public/assets/audio/teleport-out.mp3` | 0.45 s | mono | one of your heroes is pulled up into its beam |
-| `apps/client/public/assets/audio/teleport-in.mp3` | 0.5 s | mono | a hero lands at the bottom of a beam |
-| `apps/client/public/assets/audio/teleport-warp.mp3` | 0.6 s | stereo | the white flash that swaps boards (away only) |
-
-Heroes land 80 ms apart, so peak-normalise `teleport-out` and
-`teleport-in` to −12 dBFS. Normalise `teleport-warp` to −6 dBFS.
-
-**Style:** bright, magical and quick, in the same family as the combat
-sounds: shimmering synth and chimes, no sci-fi lasers.
-
-**Prompt: teleport-out:**
-
-```
-Quick rising magical shimmer, like a figure being lifted into a beam of
-light, bright chime sparkle with an airy whoosh upward, no voice,
-0.45 seconds.
-```
-
-**Prompt: teleport-in:**
-
-```
-Quick descending magical shimmer ending in a soft landing thump, like a
-figure dropping out of a beam of light onto stone, sparkle then a
-gentle impact, no voice, 0.5 seconds.
-```
-
-**Prompt: teleport-warp:**
-
-```
-Short bright whoosh that swells into a soft white-noise flash and
-cuts off, magical travel between two places, airy and clean, no voice,
-0.6 seconds.
-```
-
-**Avoid:** laser zaps, long reverb tails (three heroes land in quick
-succession), and anything louder than the fight's impact sounds.
-
----
-
-## 20. Core combat and UI sounds (placeholders in place)
-
-**Used in:** every battle (`apps/client/src/game/fx/battle-sounds.ts`
-maps battle cues to sounds) and every button click
-(`apps/client/src/main.ts`). The audio engine limits how many copies of
-each play at once, so these fire freely during big fights.
-
-**Currently:** quick ElevenLabs Sound Effects v2 placeholders, not
-normalised or trimmed, each generated once from a one-line prompt. They
-work, but they should be replaced with a matched set.
-
-| File | Length | Channels | Plays when |
-| --- | --- | --- | --- |
-| `apps/client/public/assets/audio/attack-swing.mp3` | 0.3–0.5 s | mono | a melee basic attack starts |
-| `apps/client/public/assets/audio/hit-impact.mp3` | 0.3–0.5 s | mono | a non-DoT hit lands (on projectile arrival for ranged) |
-| `apps/client/public/assets/audio/spell-cast.mp3` | 0.5–0.8 s | mono | an ability or ranged attack is cast |
-| `apps/client/public/assets/audio/heal.mp3` | 0.6–0.8 s | mono | a unit is healed |
-| `apps/client/public/assets/audio/death.mp3` | 0.8–1.0 s | stereo | a unit dies |
-| `apps/client/public/assets/audio/ui-click.mp3` | 0.05–0.1 s | mono | any button is clicked |
-
-Peak-normalise swing, hit and click to −12 dBFS (they repeat constantly),
-spell-cast and heal to −9 dBFS, death to −6 dBFS. The engine pans each
-battle sound by where the unit is on screen and adds ±5–10% pitch
-variation, so keep the sounds centred and dry.
-
-**Style:** same world as entry 4: stylised fantasy, mallets and plucked
-tones where there's a pitched element, crisp transients, short tails.
-
-**Prompt: attack-swing:**
-
-```
-Single quick melee weapon swing whoosh for a stylised fantasy strategy
-game, short airy swish of a sword cutting air, crisp start, no impact,
-no voice, dry, 0.4 seconds.
-```
-
-**Prompt: hit-impact:**
-
-```
-Single punchy weapon hit impact on a lightly armoured fantasy character,
-meaty thud with a small metallic clank, short tail, stylised game sound,
-no voice, no grunt, 0.4 seconds.
-```
-
-**Prompt: spell-cast:**
-
-```
-Short magic spell cast for a stylised fantasy strategy game, quick
-rising arcane shimmer with a bright crackle at the end, playful rather
-than dark, no voice, 0.6 seconds.
-```
-
-**Prompt: heal:**
-
-```
-Gentle healing spell for a stylised fantasy strategy game, soft warm
-upward glockenspiel sparkle with a light airy shimmer, calm and
-positive, no voice, 0.7 seconds.
-```
-
-**Prompt: death:**
-
-```
-Fantasy game unit defeated: a soft body-fall thud onto the ground
-followed by a short descending two-note muted mallet tone, stylised and
-not gory, no voice, no scream, 1 second.
-```
-
-**Prompt: ui-click:**
-
-```
-Clean soft UI button click for a strategy game menu, a short wooden
-tick with a tiny bright mallet tone, very short, no reverb, no voice.
-```
-
-**Avoid:** voices and grunts (dialogue gets its own channel), long
-reverb tails, and anything with leading silence (it makes hits feel
-late).
-
----
-
 ## 21. Settings gear icon
 
 **Used in:** the settings button pinned top-right on every screen and
@@ -1128,6 +809,8 @@ optical weight across the set, pixel-snapped, crisp at 16px.
 
 **Avoid:** outlines-only styles, gradients, text labels, circular
 button backgrounds (the HUD supplies the button).
+
+---
 
 ## 22. Damage meter tab icons
 

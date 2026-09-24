@@ -794,25 +794,25 @@ raw power in the table.
 
 ## 15 Reading the fight: numbers, statuses and condition effects
 
-### Damage numbers (a proposal)
+### Damage numbers: only what matters
 
-- **Normal hits turn white** `#eef0f6`, which frees amber for Staggered.
-  Today they're orange `#ffb454`. A number's size depends on how big the
-  hit is compared with the target's max HP: small under 5%, largest at
-  20% and above.
-- **Crits** are about 1.6× bigger, pop in (scale 1.4 → 1.0) over a sharp
-  star-burst, and play a heavier sound. They aren't gold, because gold
-  means "you" and victory; size and motion do the work instead.
-- **Huge hits** (25% or more of max HP, which covers most Shatters) also
-  freeze that one figure for 60–80 ms and play a bigger sound. Only the
-  client does this; the simulation never waits for an animation.
-- **Combos** show the number in the condition's colour, the combo name
-  above it, and the condition icon bursting.
-- **DoT ticks merge** into one number per unit every 0.5 s. With 900 ms
-  floats at 2× playback, separate ticks would stack into an unreadable
-  pile. Poison is chartreuse `#c6e84a` and Burn is ember `#ff8a4c`.
-  Neither ever gets a "+"; only heals do, in green `#4ade80`.
-- At most about five floating numbers per unit; the smallest fade first.
+Numbers are for moments worth reading. Everything else shows on the
+health bar (decisions.md, 2026-09-24).
+
+- **Combos:** one callout, the combo name over the damage, in the
+  condition's colour.
+- **Crits:** gold with "!", and bigger at 20% of max HP or more.
+- **Big hits:** 20% or more of a hero's max HP in one hit. Hits on summons
+  don't count.
+- **Big heals:** green "+N" at 15% of max HP or more.
+- **No number** for basic attacks, smaller spell hits, echoes, DoT ticks,
+  shield absorbs, blood-price costs or small heals.
+- **White damage trail:** the lost chunk of a health bar turns white, holds
+  0.4 s after the last hit (never more than 1 s), then drains. Heals fill
+  instantly.
+- **Tick lines:** one per 250 HP for every unit, drawn only on the
+  coloured fill, so tankier units show more lines and a wounded unit shows
+  fewer.
 
 ### Status row (like Dota)
 
@@ -850,7 +850,8 @@ raw power in the table.
   - Each combo has its own sound, and the game renders the callout text.
 - None of these use team blue or enemy red.
 
-The assets for this section are entries 11–14 in `missing_assets.md`.
+The art for this section is entries 11–13 in `missing_assets.md`. The
+combo and crit sounds are delivered (`docs/audio.md`).
 
 ## 16 Balance survey (headless)
 
@@ -974,9 +975,9 @@ the first slice has full kits.
     and a status row (round frames for buffs, square for debuffs, stack
     counts);
   - a condition ring at the feet;
-  - gold crit numbers with a punch, and combo numbers in the condition's
-    colour with an "OVERLOAD!", "SHATTER!" or "CRUSH!" callout and a
-    burst;
+  - numbers only for combos, crits, big hits and big heals, with each
+    combo shown as one callout in the condition's colour plus a burst;
+  - a white damage trail on the unit plates' health bars;
   - Meteor's landing marker and burning ground.
 - **The balance survey** (§16): `pnpm survey`.
 
@@ -1106,8 +1107,9 @@ and they average 50%:
 
 - **The other six heroes:** built on 2026-09-23 (§18).
 - **Scouting** the next opponent's build.
-- **Art and audio** from `missing_assets.md` entries 11–14. The UI uses
-  inline SVG glyphs and colour until they arrive.
+- **Art** from `missing_assets.md` entries 11–13. The UI uses inline SVG
+  glyphs and colour until they arrive. The audio is delivered
+  (`docs/audio.md`).
 - **Jev personalities** (§12).
 
 ## 18 The ten heroes as built (2026-09-23)

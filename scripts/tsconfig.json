@@ -7,5 +7,5 @@
     "sourceMap": false,
     "types": ["node"]
   },
-  "include": ["balance-survey.ts", "simulate.ts", "survey/**/*.ts", "models/**/*.ts", "icons/**/*.ts"]
+  "include": ["balance-survey.ts", "simulate.ts", "survey/**/*.ts", "models/**/*.ts", "icons/**/*.ts", "audio/**/*.ts"]
 }

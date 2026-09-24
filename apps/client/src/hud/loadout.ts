@@ -446,3 +446,39 @@ export function renderTeamLoadout(root: HTMLElement, builds: readonly HeroBuild[
 
   root.replaceChildren(combosSection(teamTraits(builds, catalogue)), itemsSection(heroes, null, itemSlots));
 }
+
+function draftTeamHelp(picks: number): HTMLElement {
+  return tipCard({
+    icon: null,
+    accent: null,
+    title: "Your team",
+    subtitle: `Draft ${picks} heroes to start the run`,
+    tag: null,
+    sections: [
+      tipSection(null, tipText("Click a hero on the board to draft them. Click again to send them back.")),
+      tipHint("Combos light up once your picks cover both the setup and the detonation."),
+    ],
+  });
+}
+
+export function renderDraftLoadout(root: HTMLElement, builds: readonly HeroBuild[], picks: number, catalogue: Catalogue): void {
+  const slots = Array.from({ length: picks }, (_unused, slot) => {
+    const build = builds[slot];
+
+    if (build === undefined) {
+      return el("span", "loadout-portrait is-empty", el("span", "loadout-slot", String(slot + 1)));
+    }
+
+    const portrait = el("span", "loadout-portrait", heroFaceArt(build.heroId), el("span", "loadout-slot", String(slot + 1)));
+    portrait.dataset.role = build.heroId;
+    portrait.tabIndex = 0;
+    attachTip(portrait, { key: `draft-pick:${slot}`, side: "left", live: false, render: () => heroTip(build, slot, null) });
+
+    return portrait;
+  });
+
+  root.replaceChildren(
+    el("section", "hud-section draft-team", sectionHead("Your team", "draft-team", () => draftTeamHelp(picks)), el("div", "draft-picks", ...slots)),
+    combosSection(teamTraits(builds, catalogue)),
+  );
+}

@@ -1,11 +1,10 @@
-import { findSignatureAbilityId, type BattleResult } from "@jev-game/game";
+import type { BattleResult } from "@jev-game/game";
 import { boardArena } from "@jev-game/content";
 import {
   DEFAULT_RUN_RULES,
   lossCost,
   ROUND_END_PAUSE_SECONDS,
   TELEPORT_SECONDS,
-  type HeroOffer,
   type PlayerId,
   type PlayerView,
   type PublicSeat,
@@ -23,6 +22,7 @@ import {
 import { createBattleView, type BattleView } from "../views/battle-view.js";
 import { createBoardStage, type ViewportInsets } from "../views/board-stage.js";
 import { createFormationView, type FormationView } from "../views/formation-view.js";
+import { createDraftView, type DraftView } from "../views/draft-view.js";
 import { createTeleportView, type TeleportView } from "../views/teleport-view.js";
 import { mountEnvironment, type EnvironmentTheme, type MountedEnvironment } from "../environments/environment.js";
 import { boardThemeFor } from "../environments/board-choice.js";
@@ -31,13 +31,14 @@ import { createDamageMeter } from "../../hud/damage-meter.js";
 import { hideTip } from "../../hud/tooltip.js";
 import { createCountdown, type Countdown } from "../../hud/countdown.js";
 import { button, el } from "../../hud/dom.js";
-import { botSilhouette, checkIcon, heartIcon, humanSilhouette, roleIcon, skipIcon } from "../../hud/icons.js";
-import { heroArt } from "../../hud/icon-art.js";
-import { renderLoadout, renderTeamLoadout, type SelectedPiece } from "../../hud/loadout.js";
+import { botSilhouette, heartIcon, humanSilhouette, roleIcon, skipIcon } from "../../hud/icons.js";
+import { renderDraftLoadout, renderLoadout, renderTeamLoadout, type SelectedPiece } from "../../hud/loadout.js";
+import { createDraftPlate, type DraftPlate } from "../../hud/draft.js";
 import { renderRewardPanel } from "../../hud/rewards.js";
-import { abilityDefinition, gameCatalogue, heroDefinition, heroName } from "../catalogues.js";
+import { gameCatalogue } from "../catalogues.js";
 import { audio } from "../../audio/engine.js";
 import { MUSIC_FOR_SCREEN, type MusicScreen, type SoundId } from "../../audio/catalogue.js";
+import { heroVoices } from "../fx/hero-voices.js";
 
 export interface MatchScene {
   joinRoom(roomId: string): void;
@@ -62,6 +63,8 @@ const BATTLE_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 76, bott
 
 const PLACEMENT_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 76, bottom: 24 };
 
+const DRAFT_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 170, bottom: 150 };
+
 type BannerTone = "blue" | "gold" | "crimson" | "slate";
 
 const BANNER_TONE_CLASS: Record<BannerTone, string> = {
@@ -77,8 +80,12 @@ const RESULT_SOUNDS: Readonly<Record<SeatTone, SoundId | null>> = {
   neutral: null,
   live: null,
   won: "round-won",
-  lost: null,
+  lost: "round-lost",
 };
+
+const WIN_LINE_OVERLAP = 0.85;
+
+const BATTLE_START_TICKS = 6;
 
 interface SeatRow {
   seat: PublicSeat;
@@ -300,34 +307,6 @@ function createRoundPlate(): RoundPlate {
   };
 }
 
-function heroOfferCard(offer: HeroOffer, selected: boolean, disabled: boolean, onClick: () => void): HTMLButtonElement {
-  const hero = heroDefinition(offer.heroId);
-  const signatureId = hero === undefined ? null : (findSignatureAbilityId(hero, gameCatalogue) ?? hero.abilityIds[0] ?? hero.basicAttackId);
-  const signature = signatureId === null ? "" : (abilityDefinition(signatureId)?.name ?? "");
-  const stats = hero?.title ?? (hero === undefined ? "" : `${hero.maxHp} HP`);
-
-  const card = button(
-    "hero-card",
-    onClick,
-    el("div", "hero-card-art", heroArt(offer.heroId)),
-    el(
-      "div",
-      "hero-card-body",
-      el("div", "hero-card-name", heroName(offer.heroId)),
-      el("div", "hero-card-meta", signature),
-      el("div", "hero-card-meta", stats),
-    ),
-    el("span", "hero-card-check", checkIcon()),
-  );
-
-  card.dataset.role = offer.heroId;
-  card.classList.toggle("is-selected", selected);
-  card.disabled = disabled;
-  card.setAttribute("aria-pressed", String(selected));
-
-  return card;
-}
-
 function menuEmblem(heroId: string, left: string, top: string): HTMLElement {
   const emblem = el("div", "menu-art-emblem", roleIcon(heroId));
   emblem.dataset.role = heroId;
@@ -369,6 +348,7 @@ export interface MatchSceneOptions {
 
 export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOptions): MatchScene {
   void audio.preload("battle");
+  void audio.preload("voices");
 
   let session: MatchSession | null = null;
   let sessionUnsubscribe: (() => void) | null = null;
@@ -379,6 +359,9 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   let timerTotalSeconds = 0;
   let formationView: FormationView | null = null;
   let formationKey = "";
+  let draftView: DraftView | null = null;
+  let draftPlates: DraftPlate[] = [];
+  let draftKey = "";
   let watch: RoundWatch | null = null;
   let menuNotice: string | null = null;
   let connecting = false;
@@ -387,6 +370,8 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   let selectedPiece: SelectedPiece | null = null;
   const watchedRounds = new Set<number>();
   const announcedRounds = new Set<number>();
+  let finishAnnounced = false;
+  let winLineTimer = 0;
   const healthBeforeRound = new Map<string, number>();
 
   const seatRail = el("div", "seat-rail");
@@ -469,10 +454,49 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
 
     announcedRounds.add(round);
-    const sound = RESULT_SOUNDS[outcomeFor(battle.result, me())];
+    const outcome = outcomeFor(battle.result, me());
+    const sound = RESULT_SOUNDS[outcome];
+    const seconds = sound === null ? 0 : audio.play(sound);
 
-    if (sound !== null) {
-      audio.play(sound);
+    if (outcome === "won") {
+      const heroIds = session?.getView()?.you.heroBuilds.map((build) => build.heroId) ?? [];
+      window.clearTimeout(winLineTimer);
+      winLineTimer = window.setTimeout(() => heroVoices.win(heroIds), seconds * WIN_LINE_OVERLAP * 1000);
+    }
+  }
+
+  function announceFinish(view: PlayerView): void {
+    if (finishAnnounced || view.abortReason !== null) {
+      return;
+    }
+
+    finishAnnounced = true;
+
+    if (view.you.eliminated) {
+      audio.play("eliminated");
+    } else if ((view.winnerPlayerIds ?? []).includes(view.you.playerId)) {
+      audio.play("run-won");
+    }
+  }
+
+  function announceChoice(view: PlayerView, decisionId: string, offerId: string): void {
+    const offer = view.pendingDecisions
+      .find((decision) => decision.decisionId === decisionId)
+      ?.offers.find((candidate) => candidate.offerId === offerId);
+
+    if (offer?.kind === "recruit" && offer.heroId !== null) {
+      audio.play("recruit");
+      heroVoices.pick(offer.heroId);
+
+      return;
+    }
+
+    audio.play("reward-claim");
+  }
+
+  function countdownTick(remaining: number): void {
+    if (remaining <= URGENT_SECONDS) {
+      audio.play("countdown-tick");
     }
   }
 
@@ -505,7 +529,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     stopTimer();
     timerTotalSeconds = timerSeconds();
     timerStartedAt = Date.now();
-    activeCountdown = createCountdown(roundPlate.timer, timerTotalSeconds, onExpire);
+    activeCountdown = createCountdown(roundPlate.timer, timerTotalSeconds, onExpire, countdownTick);
     timerEpoch = epoch;
   }
 
@@ -669,6 +693,95 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
   }
 
+  function hideDraft(): void {
+    draftView?.dispose();
+    draftView = null;
+    draftPlates = [];
+    draftKey = "";
+    battleLayer.classList.remove("is-drafting");
+    stage.classList.remove("is-draft");
+  }
+
+  function draftLocked(view: PlayerView): boolean {
+    return view.you.ready || draftSubmittedEpoch === view.phaseEpoch;
+  }
+
+  function toggleDraftPick(offerId: string): void {
+    const view = session?.getView() ?? null;
+
+    if (view === null || view.phase !== "draft" || draftLocked(view)) {
+      return;
+    }
+
+    if (draftSelection.includes(offerId)) {
+      draftSelection = draftSelection.filter((id) => id !== offerId);
+      audio.play("draft-unpick");
+    } else if (draftSelection.length < view.rules.draftPicks) {
+      draftSelection = [...draftSelection, offerId];
+      audio.play("draft-pick");
+      const heroId = view.heroOffers.find((offer) => offer.offerId === offerId)?.heroId;
+
+      if (heroId !== undefined) {
+        heroVoices.pick(heroId);
+      }
+    }
+
+    render();
+  }
+
+  function lockedPicks(view: PlayerView): string[] {
+    const heroIds = view.you.heroBuilds.map((build) => build.heroId);
+
+    if (heroIds.length === 0) {
+      return draftSelection;
+    }
+
+    return heroIds.flatMap((heroId) => {
+      const offer = view.heroOffers.find((candidate) => candidate.heroId === heroId);
+
+      return offer === undefined ? [] : [offer.offerId];
+    });
+  }
+
+  function showDraftLineup(view: PlayerView, picked: readonly string[], locked: boolean): void {
+    dressBoard(boardThemeFor(view.you.playerId, view.you.playerId));
+    battleLayer.hidden = false;
+    battleHeader.hidden = true;
+    const key = `draft:${view.phaseEpoch}:${view.heroOffers.map((offer) => offer.offerId).join(",")}`;
+
+    if (draftView === null || draftKey !== key) {
+      hideDraft();
+      draftKey = key;
+      draftPlates = view.heroOffers.map((offer) => createDraftPlate(offer, gameCatalogue, () => toggleDraftPick(offer.offerId)));
+
+      draftView = createDraftView(boardStage, {
+        grid: boardArena,
+        insets: DRAFT_HUD_INSETS,
+        offers: view.heroOffers,
+        slots: new Map(draftPlates.map((plate) => [plate.offer.offerId, plate.slot])),
+        onRise: () => audio.play("draft-rise"),
+      });
+    }
+
+    battleLayer.classList.add("is-drafting");
+    stage.classList.add("is-draft");
+    const picks = view.rules.draftPicks;
+
+    const builds = picked.flatMap((offerId) => {
+      const plate = draftPlates.find((candidate) => candidate.offer.offerId === offerId);
+
+      return plate === undefined ? [] : [plate.build];
+    });
+
+    for (const plate of draftPlates) {
+      plate.sync({ picked, builds, picks, locked });
+    }
+
+    draftView.setState({ picked, full: picked.length >= picks, locked });
+    renderDraftLoadout(teamLoadout, builds, picks, gameCatalogue);
+    teamRail.hidden = false;
+  }
+
   function renderDraft(view: PlayerView, activeSession: MatchSession): void {
     roundPlate.set("Round 1", "Draft");
 
@@ -676,37 +789,25 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       startTimer(view.phaseEpoch, () => {});
     }
 
-    if (view.you.ready || draftSubmittedEpoch === view.phaseEpoch) {
+    const picks = view.rules.draftPicks;
+    const locked = draftLocked(view);
+    draftSelection = draftSelection.filter((offerId) => view.heroOffers.some((offer) => offer.offerId === offerId));
+    showDraftLineup(view, locked ? lockedPicks(view) : draftSelection, locked);
+
+    if (locked) {
       stage.append(banner("slate", "Team locked in", "Waiting for the other players to draft"));
 
       return;
     }
 
-    const picks = view.rules.draftPicks;
-
-    const cards = view.heroOffers.map((offer) => {
-      const selected = draftSelection.includes(offer.offerId);
-
-      return heroOfferCard(offer, selected, !selected && draftSelection.length >= picks, () => {
-        draftSelection = selected
-          ? draftSelection.filter((id) => id !== offer.offerId)
-          : [...draftSelection, offer.offerId];
-        render();
-      });
-    });
-
-    stage.append(
-      el("div", "stage-title", "Draft your team"),
-      el("div", "stage-subtitle", `Pick ${picks} heroes · ${draftSelection.length}/${picks} chosen`),
-      el("div", "offer-grid", ...cards),
-    );
+    stage.append(banner("blue", "Draft your team", `Pick ${picks} heroes · ${draftSelection.length}/${picks} chosen`));
 
     setAction(
       "Confirm",
       () => {
         draftSubmittedEpoch = view.phaseEpoch;
+        audio.play("draft-lock");
         activeSession.pickHeroes(draftSelection);
-        draftSelection = [];
         render();
       },
       draftSelection.length !== picks,
@@ -763,9 +864,10 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       return;
     }
 
-    const panel = renderRewardPanel(stage, view, gameCatalogue, (decisionId, offerId) =>
-      activeSession.chooseOffer(decisionId, offerId, null),
-    );
+    const panel = renderRewardPanel(stage, view, gameCatalogue, (decisionId, offerId) => {
+      announceChoice(view, decisionId, offerId);
+      activeSession.chooseOffer(decisionId, offerId, null);
+    });
 
     panel?.append(timerBar());
   }
@@ -800,6 +902,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   function renderFinished(view: PlayerView, activeSession: MatchSession): void {
     roundPlate.set(roundLabel(view.currentRound?.round ?? 0), "Finished");
     setAction("Menu", () => endMatch(), false);
+    announceFinish(view);
 
     if (view.abortReason !== null) {
       stage.append(banner("crimson", "Aborted", view.abortReason));
@@ -992,6 +1095,10 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
         insets: BATTLE_HUD_INSETS,
       });
     } else {
+      if (active.playback.tick() <= BATTLE_START_TICKS) {
+        audio.play("battle-start");
+      }
+
       active.battleView = createBattleView(boardStage, {
         friendlyTeamId: active.focusPlayerId,
         viewSide,
@@ -1250,6 +1357,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     if (session === null) {
       stopTimer();
       hidePlacementBoard();
+      hideDraft();
       connectionBanner.hidden = true;
       showMenu();
 
@@ -1270,6 +1378,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     if (view === null) {
       stopTimer();
       hidePlacementBoard();
+      hideDraft();
       showMatch();
       stage.replaceChildren();
       actionButton.hidden = true;
@@ -1290,6 +1399,11 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     if ((view.phase !== "preparing" && view.phase !== "reward") || view.you.eliminated) {
       hidePlacementBoard();
+    }
+
+    if (view.phase !== "draft" || view.you.eliminated) {
+      hideDraft();
+      draftSelection = [];
     }
 
     const latest = activeSession.getLatestRound();
@@ -1390,6 +1504,8 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     releaseSession();
     watchedRounds.clear();
     announcedRounds.clear();
+    finishAnnounced = false;
+    window.clearTimeout(winLineTimer);
     healthBeforeRound.clear();
     draftSubmittedEpoch = -1;
     lastRenderedEpoch = -1;
@@ -1481,9 +1597,11 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     dispose() {
       disposed = true;
+      window.clearTimeout(winLineTimer);
       audio.setMusic(null);
       disposeRoundWatch();
       formationView?.dispose();
+      hideDraft();
       stopTimer();
       damageMeter.dispose();
       hideTip();

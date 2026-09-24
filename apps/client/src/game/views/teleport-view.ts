@@ -16,6 +16,7 @@ import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
 import { snapshotGrid } from "./battle-view.js";
 import { easeInOut, easeOut } from "./easing.js";
 import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
+import { playTeleport } from "../fx/battle-sounds.js";
 
 export interface TeleportView {
   readonly warpSeconds: number | null;
@@ -53,6 +54,8 @@ const DEPART_START_SECONDS = 0.12;
 const DEPART_SECONDS = 0.45;
 
 const ARRIVE_SECONDS = 0.55;
+
+const BEAT_SKIP_SECONDS = 0.25;
 
 const SETTLE_SECONDS = 0.35;
 
@@ -418,6 +421,37 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
     };
   }
 
+  function crossed(beat: number | null, from: number, to: number): boolean {
+    return beat !== null && from < beat && beat <= to;
+  }
+
+  function panAt(position: Vector3): number | undefined {
+    const point = stage.toScreen(position);
+    const width = stage.canvas.clientWidth;
+
+    return point === null || width === 0 ? undefined : (point.x / width) * 2 - 1;
+  }
+
+  function playBeats(from: number, to: number): void {
+    if (to <= from || to - from > BEAT_SKIP_SECONDS) {
+      return;
+    }
+
+    for (const traveller of travellers) {
+      if (crossed(traveller.departAt, from, to)) {
+        playTeleport("out", panAt(traveller.rest));
+      }
+
+      if (crossed(traveller.arriveAt === null ? null : traveller.arriveAt + TOUCHDOWN_SECONDS, from, to)) {
+        playTeleport("in", panAt(traveller.rest));
+      }
+    }
+
+    if (isAway && crossed(warpPeak, from, to)) {
+      playTeleport("warp", undefined);
+    }
+  }
+
   function poseOf(traveller: Traveller): Pose {
     if (traveller.arriveAt !== null && time >= traveller.arriveAt) {
       return arrivalPose(time - traveller.arriveAt);
@@ -542,7 +576,9 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
     warpSeconds: isAway ? warpPeak : null,
 
     seek(seconds) {
+      const previous = time;
       time = Math.min(options.seconds, Math.max(0, seconds));
+      playBeats(previous, time);
     },
 
     dispose() {
