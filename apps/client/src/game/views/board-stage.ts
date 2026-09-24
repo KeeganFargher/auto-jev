@@ -24,6 +24,7 @@ import {
 } from "three";
 import type { BoardGrid, Vector2 } from "@jev-game/game";
 import { easeInOut } from "./easing.js";
+import { createParticleSystem, type ParticleSystem } from "./particles.js";
 import { applyShadowQuality } from "./shadow-quality.js";
 
 export interface ViewportInsets {
@@ -141,6 +142,7 @@ export interface BoardStage {
   readonly scene: Scene;
   readonly canvas: HTMLCanvasElement;
   readonly overlay: HTMLElement;
+  readonly particles: ParticleSystem;
   showBoard(grid: BoardGrid, side: ViewSide, insets: ViewportInsets): void;
   frame(shot: StageShot | null): void;
   setOrbit(radians: number): void;
@@ -396,6 +398,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   const lights = createLights(scene);
   applyShadowQuality(renderer.shadowMap, lights.key.shadow, "soft");
   const ground = createGround(scene);
+  const particles = createParticleSystem(scene);
   const raycaster = new Raycaster();
   const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
   const listeners = new Set<(deltaSeconds: number) => void>();
@@ -620,6 +623,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     const deltaSeconds = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
     stepGlide(deltaSeconds);
+    particles.update(deltaSeconds);
 
     for (const listener of listeners) {
       listener(deltaSeconds);
@@ -638,6 +642,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     scene,
     canvas,
     overlay,
+    particles,
 
     showBoard(nextGrid, nextSide, nextInsets) {
       if (!sameGrid(grid, nextGrid) || side !== nextSide || board === null) {
@@ -769,6 +774,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
         disposeTree(board);
       }
 
+      particles.dispose();
       ground.geometry.dispose();
       ground.material.map?.dispose();
       ground.material.dispose();

@@ -1,9 +1,9 @@
 import {
   AdditiveBlending,
   BufferGeometry,
+  Color,
   DynamicDrawUsage,
   Float32BufferAttribute,
-  IcosahedronGeometry,
   Line,
   LineBasicMaterial,
   LineDashedMaterial,
@@ -33,6 +33,8 @@ import { comboName } from "../../hud/tips.js";
 import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
 import { createHealthTrail, type HealthTrail } from "./health-trail.js";
 import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
+import { emitHit, hitKind, hitTint, trailStyle } from "./hit-effects.js";
+import { createTrail, type ParticleStyle } from "./particles.js";
 import {
   createFallingTracker,
   playCast,
@@ -68,10 +70,6 @@ const ENEMY_COLOR = "#ff6b6b";
 
 const SELECTION_COLOR = "#e2bd5c";
 
-const BOLT_COLOR = "#67e8f9";
-
-const SPARK_COLOR = "#ffd08a";
-
 const HEAL_COLOR = "#4ade80";
 
 const SHIELD_COLOR = "#60a5fa";
@@ -98,11 +96,57 @@ const PROJECTILE_SECONDS = 0.16;
 
 const ARC_SECONDS = 0.22;
 
-const SPARK_SECONDS = 0.22;
+const UP = new Vector3(0, 1, 0);
 
-const HEAL_SECONDS = 0.8;
+const SPRAY_LIFT = 0.7;
 
-const HEAL_MOTES = 6;
+const TRAIL_SPACING_UNITS = 1.1;
+
+const HEAL_MOTE_COUNT = 14;
+
+const HEAL_MOTE_HEIGHT = 1.5;
+
+const COMBO_SPARK_COUNT = 18;
+
+const SPAWN_MOTE_COUNT = 16;
+
+const DEATH_DUST_COUNT = 10;
+
+const IMPACT_DUST_PER_UNIT = 0.8;
+
+const HEAL_MOTES: ParticleStyle = {
+  blend: "solid",
+  from: new Color("#dcfce7"),
+  to: new Color(HEAL_COLOR),
+  brightness: 1,
+  opacity: 0.95,
+  size: [1.8, 0.5],
+  life: [0.6, 1],
+  speed: [1, 4],
+  cone: 0.5,
+  spread: 2.2,
+  gravity: -9,
+  drag: 1.5,
+  stretch: 0,
+  softness: 0.4,
+};
+
+const DEATH_DUST: ParticleStyle = {
+  blend: "solid",
+  from: new Color("#cbbfa8"),
+  to: new Color("#8c8068"),
+  brightness: 1,
+  opacity: 0.45,
+  size: [2.5, 7],
+  life: [0.6, 1.2],
+  speed: [3, 8],
+  cone: 1.2,
+  spread: 2,
+  gravity: -1,
+  drag: 2.5,
+  stretch: 0,
+  softness: 1,
+};
 
 const FLOAT_NUMBER_MILLISECONDS = 900;
 
@@ -134,6 +178,41 @@ const HEXED_SCALE = 0.55;
 
 const SPAWN_COLOR = "#9fe0d0";
 
+const SPAWN_MOTES: ParticleStyle = {
+  ...HEAL_MOTES,
+  from: new Color("#ecfffa"),
+  to: new Color(SPAWN_COLOR),
+  spread: 3,
+  speed: [2, 6],
+};
+
+const IMPACT_DUST: ParticleStyle = {
+  ...DEATH_DUST,
+  opacity: 0.4,
+  cone: 1.35,
+  spread: 1.5,
+  life: [0.5, 1],
+};
+
+function comboSparks(color: string): ParticleStyle {
+  return {
+    blend: "solid",
+    from: new Color("#ffffff"),
+    to: new Color(color),
+    brightness: 1,
+    opacity: 1,
+    size: [2.2, 0.5],
+    life: [0.3, 0.55],
+    speed: [12, 26],
+    cone: Math.PI,
+    spread: 0.6,
+    gravity: 12,
+    drag: 3.5,
+    stretch: 0.04,
+    softness: 0.2,
+  };
+}
+
 function zoneColor(abilityId: string): string {
   switch (abilityId) {
     case "plague-cloud":
@@ -149,6 +228,12 @@ function zoneColor(abilityId: string): string {
       return IMPACT_COLOR;
   }
 }
+
+const COMBO_SPARKS: Readonly<Record<ConditionKind, ParticleStyle>> = {
+  staggered: comboSparks(CONDITION_COLORS.staggered),
+  brittle: comboSparks(CONDITION_COLORS.brittle),
+  disoriented: comboSparks(CONDITION_COLORS.disoriented),
+};
 
 const COMBO_BURST_SECONDS = 0.55;
 
@@ -288,7 +373,6 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   const frostGeometry = new RingGeometry(4.9, 5.8, 32);
   const sparkGeometry = new OctahedronGeometry(1, 0);
   const boltGeometry = new OctahedronGeometry(0.7, 0);
-  const moteGeometry = new IcosahedronGeometry(0.45, 0);
   const selectionGeometry = new RingGeometry(5.2, 6.1, 40);
 
   const selectionRing = new Mesh(
@@ -391,7 +475,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
           surface.dispose();
         }
 
-        if (object.geometry !== sparkGeometry && object.geometry !== boltGeometry && object.geometry !== moteGeometry) {
+        if (object.geometry !== sparkGeometry && object.geometry !== boltGeometry) {
           object.geometry.dispose();
         }
       }
@@ -416,26 +500,16 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     return element;
   }
 
-  function spark(record: UnitRecord): void {
-    const mesh = new Mesh(
-      sparkGeometry,
-      new MeshBasicMaterial({ color: SPARK_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
-    );
+  function sprayHit(event: DamageDealtEvent, record: UnitRecord, heavy: boolean): void {
+    const source = records.get(event.sourceUnitId);
+    const heading = source === undefined ? new Vector3() : record.position.clone().sub(source.position).setY(0);
 
-    const center = chestOf(record);
+    if (heading.lengthSq() > 0.01) {
+      heading.normalize();
+    }
 
-    addEffect({
-      objects: [mesh],
-      age: 0,
-      duration: SPARK_SECONDS,
-      onDone: null,
-      step(progress) {
-        mesh.position.copy(center);
-        mesh.scale.setScalar(0.6 + progress * 2.6);
-        mesh.rotation.y = progress * 2;
-        mesh.material.opacity = 1 - progress;
-      },
-    });
+    heading.y += SPRAY_LIFT;
+    emitHit(stage.particles, hitKind(event.abilityId), chestOf(record), heading.normalize(), heavy);
   }
 
   function landHit(event: DamageDealtEvent): void {
@@ -445,13 +519,14 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       return;
     }
 
+    const total = event.amount + event.shieldAbsorbed;
+    const big = total >= record.state.maxHp * BIG_HIT_FRACTION;
+
     if (event.dot === undefined) {
       record.figure.trigger("hit");
-      spark(record);
-      playHit(event, event.amount + event.shieldAbsorbed >= record.state.maxHp * BIG_HIT_FRACTION, panOf(record));
+      sprayHit(event, record, big || event.crit === true);
+      playHit(event, big, panOf(record));
     }
-
-    const total = event.amount + event.shieldAbsorbed;
 
     if (event.combo !== undefined) {
       const callout = floatNumber(record, total > 0 ? String(total) : "", "combo");
@@ -467,8 +542,6 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     if (event.dot !== undefined || total <= 0) {
       return;
     }
-
-    const big = total >= record.state.maxHp * BIG_HIT_FRACTION;
 
     if (event.crit === true) {
       floatNumber(record, String(total), big ? "crit is-huge" : "crit");
@@ -505,6 +578,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     );
 
     const center = chestOf(record);
+    stage.particles.emit(COMBO_SPARKS[condition], center, UP, COMBO_SPARK_COUNT);
 
     addEffect({
       objects: [ring, flash],
@@ -547,11 +621,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       return;
     }
 
-    const visual = projectileVisual(abilityId);
+    const from = chestOf(source);
+    const visual = projectileVisual(stage.particles, abilityId, from);
 
     if (visual !== null) {
-      const from = chestOf(source);
-
       addEffect({
         objects: visual.objects,
         age: 0,
@@ -565,13 +638,15 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       return;
     }
 
+    const kind = hitKind(abilityId);
+
     const mesh = new Mesh(
       boltGeometry,
-      new MeshBasicMaterial({ color: BOLT_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+      new MeshBasicMaterial({ color: hitTint(kind), transparent: true, blending: AdditiveBlending, depthWrite: false }),
     );
 
     mesh.scale.set(0.8, 0.8, 3.2);
-    const start = chestOf(source);
+    const trail = createTrail(stage.particles, trailStyle(kind), TRAIL_SPACING_UNITS, from);
 
     addEffect({
       objects: [mesh],
@@ -580,13 +655,14 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       onDone,
       step(progress) {
         const end = chestOf(target);
-        mesh.position.lerpVectors(start, end, progress);
+        mesh.position.lerpVectors(from, end, progress);
         mesh.lookAt(end);
+        trail.follow(mesh.position);
       },
     });
   }
 
-  function arc(fromId: string, toId: string, onDone: () => void): void {
+  function arc(fromId: string, toId: string, abilityId: string, onDone: () => void): void {
     const from = records.get(fromId);
     const to = records.get(toId);
 
@@ -612,7 +688,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     const line = new Line(
       geometry,
-      new LineBasicMaterial({ color: BOLT_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
+      new LineBasicMaterial({ color: hitTint(hitKind(abilityId)), transparent: true, blending: AdditiveBlending, depthWrite: false }),
     );
 
     let landed = false;
@@ -634,35 +710,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   }
 
   function healBurst(record: UnitRecord, amount: number): void {
-    const motes: Mesh<IcosahedronGeometry, MeshBasicMaterial>[] = [];
-
-    for (let index = 0; index < HEAL_MOTES; index += 1) {
-      motes.push(
-        new Mesh(
-          moteGeometry,
-          new MeshBasicMaterial({ color: HEAL_COLOR, transparent: true, blending: AdditiveBlending, depthWrite: false }),
-        ),
-      );
-    }
-
-    addEffect({
-      objects: motes,
-      age: 0,
-      duration: HEAL_SECONDS,
-      onDone: null,
-      step(progress) {
-        motes.forEach((mote, index) => {
-          const angle = (index / HEAL_MOTES) * Math.PI * 2 + progress * 3;
-          const radius = 2.6 - progress;
-          mote.position.set(
-            record.position.x + Math.cos(angle) * radius,
-            1 + progress * record.figure.height,
-            record.position.z + Math.sin(angle) * radius,
-          );
-          mote.material.opacity = 1 - progress;
-        });
-      },
-    });
+    stage.particles.emit(HEAL_MOTES, record.position.clone().setY(HEAL_MOTE_HEIGHT), UP, HEAL_MOTE_COUNT);
 
     if (amount >= record.state.maxHp * BIG_HEAL_FRACTION) {
       floatNumber(record, `+${amount}`, "heal");
@@ -702,7 +750,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       record.figure.trigger(event.isBasicAttack ? "attack" : "cast");
       playCast(event, sourceOf(record), panOf(record));
-      const flourish = castVisual(event.abilityId, record.position, areaRadius(event.abilityId));
+      const flourish = castVisual(stage.particles, event.abilityId, record.position, areaRadius(event.abilityId));
 
       if (flourish !== null) {
         showSpell(flourish);
@@ -722,6 +770,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     if (event.kind === "unit-spawned") {
       const center = stage.toScene(event.position, 0);
       impactFlash(center.x, center.z, 8, SPAWN_COLOR);
+      stage.particles.emit(SPAWN_MOTES, center.clone().setY(1), UP, SPAWN_MOTE_COUNT);
       playSpawn(event.heroId, panAt(center));
 
       return;
@@ -730,10 +779,11 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     if (event.kind === "impact-landed") {
       const center = stage.toScene(event.center, 0);
       playLanding(event.abilityId, panAt(center));
-      const landing = landingVisual(event.abilityId, center, event.radiusUnits);
+      const landing = landingVisual(stage.particles, event.abilityId, center, event.radiusUnits);
 
       if (landing === null) {
         impactFlash(center.x, center.z, event.radiusUnits, IMPACT_COLOR);
+        stage.particles.emit(IMPACT_DUST, center, UP, Math.round(event.radiusUnits * IMPACT_DUST_PER_UNIT));
       } else {
         showSpell(landing);
       }
@@ -756,7 +806,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       if (previousTarget === undefined) {
         projectile(event.sourceUnitId, event.targetUnitId, event.abilityId, land);
       } else {
-        arc(previousTarget, event.targetUnitId, land);
+        arc(previousTarget, event.targetUnitId, event.abilityId, land);
       }
 
       return;
@@ -788,6 +838,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       if (record !== undefined) {
         record.figure.setDead(true);
+        stage.particles.emit(DEATH_DUST, record.position.clone().setY(0.6), UP, DEATH_DUST_COUNT);
         playDeath(sourceOf(record), panOf(record));
       }
     }
@@ -1016,7 +1067,14 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       marker.seen = true;
       marker.mesh.material.opacity = 0.35 + 0.35 * Math.abs(Math.sin(next.tick / 3));
       syncStateVisual(key, next.tick, spellKeys, () =>
-        impactVisual(impact.abilityId, stage.toScene(impact.center, 0), impact.radiusUnits, next.tick, impact.landsAtTick),
+        impactVisual(
+          stage.particles,
+          impact.abilityId,
+          stage.toScene(impact.center, 0),
+          impact.radiusUnits,
+          next.tick,
+          impact.landsAtTick,
+        ),
       );
     }
 
@@ -1034,7 +1092,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       marker.seen = true;
       syncStateVisual(key, next.tick, spellKeys, () =>
-        zoneVisual(zone.abilityId, stage.toScene(zone.center, 0), zone.radiusUnits, zone.zoneId),
+        zoneVisual(stage.particles, zone.abilityId, stage.toScene(zone.center, 0), zone.radiusUnits, zone.zoneId),
       );
     }
 
@@ -1233,6 +1291,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       if (snapAll) {
         chainTargets.clear();
         falling.reset();
+        stage.particles.clear();
       }
 
       syncRecords(next, snapAll);
@@ -1256,6 +1315,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     dispose() {
       stopFrames();
       stage.canvas.removeEventListener("click", handleClick);
+      stage.particles.clear();
 
       for (const effect of effects) {
         disposeEffectObjects(effect);
@@ -1297,7 +1357,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       targetLineGeometry.dispose();
       targetLines.material.dispose();
 
-      for (const geometry of [bubbleGeometry, frostGeometry, sparkGeometry, boltGeometry, moteGeometry, selectionGeometry]) {
+      for (const geometry of [bubbleGeometry, frostGeometry, sparkGeometry, boltGeometry, selectionGeometry]) {
         geometry.dispose();
       }
 

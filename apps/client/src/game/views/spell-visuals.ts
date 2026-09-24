@@ -18,6 +18,7 @@ import {
   Vector3,
   type Material,
 } from "three";
+import { createTrail, type ParticleStyle, type ParticleSystem } from "./particles.js";
 
 export interface SpellVisual {
   readonly root: Group;
@@ -72,11 +73,19 @@ interface GroundFlame {
   speed: number;
 }
 
-type ImpactFactory = (center: Vector3, radius: number, tick: number, landsAtTick: number) => TickedVisual;
+type ImpactFactory = (
+  particles: ParticleSystem,
+  center: Vector3,
+  radius: number,
+  tick: number,
+  landsAtTick: number,
+) => TickedVisual;
 
-type AreaFactory = (center: Vector3, radius: number) => SpellVisual;
+type AreaFactory = (particles: ParticleSystem, center: Vector3, radius: number) => SpellVisual;
 
-type ZoneFactory = (center: Vector3, radius: number, seed: number) => TickedVisual;
+type ZoneFactory = (particles: ParticleSystem, center: Vector3, radius: number, seed: number) => TickedVisual;
+
+type ProjectileFactory = (particles: ParticleSystem, from: Vector3) => ProjectileVisual;
 
 const FIRE = new Color("#ff7a2a");
 
@@ -113,6 +122,97 @@ const BLAST_TONGUES = 10;
 const BLAST_DEBRIS = 8;
 
 const WARD_TONGUES = 16;
+
+const BLAST_EMBERS = 56;
+
+const BLAST_SMOKE = 16;
+
+const WARD_EMBER_RAYS = 28;
+
+const FIREBALL_EMBER_SPACING = 0.9;
+
+const FIREBALL_SMOKE_SPACING = 2.6;
+
+const METEOR_EMBER_SPACING = 1.4;
+
+const METEOR_SMOKE_SPACING = 3.2;
+
+const GROUND_EMBERS_PER_SECOND = 4;
+
+const GROUND_EMBERS_PER_UNIT = 0.6;
+
+const GROUND_SMOKE_PER_SECOND = 1.2;
+
+const EMBERS: ParticleStyle = {
+  blend: "solid",
+  from: GOLD,
+  to: EMBER,
+  brightness: 1,
+  opacity: 1,
+  size: [1.8, 0.5],
+  life: [0.5, 1],
+  speed: [6, 16],
+  cone: 0.9,
+  spread: 0.6,
+  gravity: -7,
+  drag: 2.2,
+  stretch: 0.02,
+  softness: 0.3,
+};
+
+const SMOKE: ParticleStyle = {
+  blend: "solid",
+  from: new Color("#3d302b"),
+  to: new Color("#6f6560"),
+  brightness: 1,
+  opacity: 0.4,
+  size: [2.5, 7.5],
+  life: [0.9, 1.6],
+  speed: [2, 5],
+  cone: 0.7,
+  spread: 1.2,
+  gravity: -4,
+  drag: 1.4,
+  stretch: 0,
+  softness: 1,
+};
+
+const TRAIL_EMBERS: ParticleStyle = {
+  ...EMBERS,
+  size: [2, 0.4],
+  life: [0.25, 0.45],
+  speed: [1, 4],
+  cone: 0.5,
+  spread: 0.5,
+  gravity: -3,
+};
+
+const TRAIL_SMOKE: ParticleStyle = {
+  ...SMOKE,
+  opacity: 0.3,
+  size: [1.8, 4.5],
+  life: [0.5, 0.9],
+  speed: [0.5, 2],
+};
+
+const GROUND_EMBERS: ParticleStyle = {
+  ...EMBERS,
+  size: [1.3, 0.3],
+  life: [0.6, 1.2],
+  speed: [2, 5],
+  cone: 0.35,
+  spread: 0,
+  gravity: -9,
+  drag: 1.8,
+};
+
+const GROUND_SMOKE: ParticleStyle = {
+  ...SMOKE,
+  opacity: 0.22,
+  speed: [1, 3],
+  cone: 0.3,
+  spread: 0.5,
+};
 
 let shared: SpellGeometry | null = null;
 
@@ -347,7 +447,13 @@ function tilted(mesh: Mesh, angle: number, lean: number): void {
   mesh.quaternion.setFromAxisAngle(tangent, -lean);
 }
 
-function meteorFall(center: Vector3, radius: number, tick: number, landsAtTick: number): TickedVisual {
+function meteorFall(
+  particles: ParticleSystem,
+  center: Vector3,
+  radius: number,
+  tick: number,
+  landsAtTick: number,
+): TickedVisual {
   const kit = geometries();
   const size = radius / METEOR_REFERENCE_RADIUS;
   const clock = tickClock(tick);
@@ -373,6 +479,8 @@ function meteorFall(center: Vector3, radius: number, tick: number, landsAtTick: 
   const target = new Vector3(center.x, 1.2 * size, center.z);
   const start = target.clone().addScaledVector(FALL_FROM, size);
   const back = start.clone().sub(target).normalize();
+  const embers = createTrail(particles, TRAIL_EMBERS, METEOR_EMBER_SPACING, start);
+  const smoke = createTrail(particles, TRAIL_SMOKE, METEOR_SMOKE_SPACING, start);
   trail.quaternion.setFromUnitVectors(UP, back);
   trail.scale.set(0.95, 7, 0.95);
   trail.position.copy(back).multiplyScalar(3.5);
@@ -397,6 +505,12 @@ function meteorFall(center: Vector3, radius: number, tick: number, landsAtTick: 
       const fall = clamp01((progress - FALL_STARTS_AT) / (1 - FALL_STARTS_AT));
       body.visible = !ended && progress >= FALL_STARTS_AT && progress < 1;
       body.position.lerpVectors(start, target, fall * fall);
+
+      if (body.visible) {
+        embers.follow(body.position);
+        smoke.follow(body.position);
+      }
+
       rock.rotation.x += deltaSeconds * 2.6;
       rock.rotation.y += deltaSeconds * 3.1;
       shadowSurface.opacity = ended ? 0 : 0.12 + 0.38 * fall;
@@ -419,7 +533,7 @@ function meteorFall(center: Vector3, radius: number, tick: number, landsAtTick: 
   };
 }
 
-function meteorBlast(center: Vector3, radius: number): SpellVisual {
+function meteorBlast(particles: ParticleSystem, center: Vector3, radius: number): SpellVisual {
   const kit = geometries();
   const next = random(center.x * 7 + center.z * 13);
   const domeSurface = glowMaterial(FIRE, 0.9);
@@ -437,6 +551,9 @@ function meteorBlast(center: Vector3, radius: number): SpellVisual {
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.25;
   root.add(dome, flash, ring);
+  const origin = new Vector3(center.x, 1, center.z);
+  particles.emit({ ...EMBERS, speed: [radius * 0.9, radius * 2.2], cone: 1.1 }, origin, UP, BLAST_EMBERS);
+  particles.emit({ ...SMOKE, spread: radius * 0.35, speed: [radius * 0.2, radius * 0.5] }, origin, UP, BLAST_SMOKE);
 
   for (let index = 0; index < BLAST_TONGUES; index += 1) {
     const angle = (index / BLAST_TONGUES) * Math.PI * 2 + next() * 0.4;
@@ -498,7 +615,7 @@ function meteorBlast(center: Vector3, radius: number): SpellVisual {
   };
 }
 
-function burningGround(center: Vector3, radius: number, seed: number): TickedVisual {
+function burningGround(particles: ParticleSystem, center: Vector3, radius: number, seed: number): TickedVisual {
   const kit = geometries();
   const next = random(seed * 977 + 31);
   const scorchGeometry = jaggedDisc(radius * 0.92, next);
@@ -532,6 +649,16 @@ function burningGround(center: Vector3, radius: number, seed: number): TickedVis
   let strength = 0;
   let ending = false;
   let time = 0;
+  let emberDebt = 0;
+  let smokeDebt = 0;
+  const spot = new Vector3();
+
+  function scatter(style: ParticleStyle): void {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.sqrt(Math.random()) * radius * 0.8;
+    spot.set(center.x + Math.cos(angle) * distance, 0.4, center.z + Math.sin(angle) * distance);
+    particles.emit(style, spot, UP, 1);
+  }
 
   return {
     root,
@@ -545,6 +672,19 @@ function burningGround(center: Vector3, radius: number, seed: number): TickedVis
         : Math.min(1, strength + deltaSeconds / GROUND_FADE_IN_SECONDS);
       scorchSurface.opacity = 0.62 * strength;
       fireSurface.opacity = 0.95 * strength;
+      emberDebt += deltaSeconds * strength * (GROUND_EMBERS_PER_SECOND + radius * GROUND_EMBERS_PER_UNIT);
+      smokeDebt += deltaSeconds * strength * GROUND_SMOKE_PER_SECOND;
+
+      while (emberDebt >= 1) {
+        emberDebt -= 1;
+        scatter(GROUND_EMBERS);
+      }
+
+      while (smokeDebt >= 1) {
+        smokeDebt -= 1;
+        scatter(GROUND_SMOKE);
+      }
+
       glowSurface.opacity = 0.22 * strength * (0.85 + 0.15 * Math.sin(time * 9));
 
       for (const flame of flames) {
@@ -577,7 +717,7 @@ function burningGround(center: Vector3, radius: number, seed: number): TickedVis
   };
 }
 
-function flameWardBurst(center: Vector3, radius: number): SpellVisual {
+function flameWardBurst(particles: ParticleSystem, center: Vector3, radius: number): SpellVisual {
   const kit = geometries();
   const tongueSurface = flameMaterial(1);
   const ringSurface = glowMaterial(FIRE, 0.85);
@@ -590,6 +730,14 @@ function flameWardBurst(center: Vector3, radius: number): SpellVisual {
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = 0.25;
   root.add(ring, flash);
+  const origin = new Vector3(center.x, 1.2, center.z);
+  const ray = new Vector3();
+  const rayEmbers: ParticleStyle = { ...EMBERS, speed: [radius * 2.4, radius * 3.2], cone: 0.25, drag: 3, gravity: -4 };
+
+  for (let index = 0; index < WARD_EMBER_RAYS; index += 1) {
+    const angle = (index / WARD_EMBER_RAYS) * Math.PI * 2;
+    particles.emit(rayEmbers, origin, ray.set(Math.cos(angle), 0.25, Math.sin(angle)).normalize(), 2);
+  }
 
   for (let index = 0; index < WARD_TONGUES; index += 1) {
     const mesh = new Mesh(kit.flame, tongueSurface);
@@ -631,11 +779,13 @@ function flameWardBurst(center: Vector3, radius: number): SpellVisual {
   };
 }
 
-function fireball(): ProjectileVisual {
+function fireball(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
   const core = new Mesh(new SphereGeometry(1.2, 12, 8), new MeshBasicMaterial({ color: GOLD }));
   const shell = new Mesh(new SphereGeometry(2, 12, 8), glowMaterial(FIRE, 0.8));
   const tail = new Mesh(trailGeometry(), flameMaterial(0.9));
   const heading = new Vector3();
+  const embers = createTrail(particles, TRAIL_EMBERS, FIREBALL_EMBER_SPACING, launch);
+  const smoke = createTrail(particles, TRAIL_SMOKE, FIREBALL_SMOKE_SPACING, launch);
 
   return {
     objects: [core, shell, tail],
@@ -647,6 +797,8 @@ function fireball(): ProjectileVisual {
       tail.quaternion.setFromUnitVectors(UP, heading);
       tail.scale.set(1.3, 6, 1.3);
       tail.position.copy(core.position).addScaledVector(heading, 3);
+      embers.follow(core.position);
+      smoke.follow(core.position);
     },
   };
 }
@@ -659,30 +811,37 @@ const ZONES = new Map<string, ZoneFactory>([[meteor.id, burningGround]]);
 
 const CASTS = new Map<string, AreaFactory>([[flameWard.id, flameWardBurst]]);
 
-const PROJECTILES = new Map<string, () => ProjectileVisual>([[firebolt.id, fireball]]);
+const PROJECTILES = new Map<string, ProjectileFactory>([[firebolt.id, fireball]]);
 
 export function impactVisual(
+  particles: ParticleSystem,
   abilityId: string,
   center: Vector3,
   radius: number,
   tick: number,
   landsAtTick: number,
 ): TickedVisual | null {
-  return IMPACTS.get(abilityId)?.(center, radius, tick, landsAtTick) ?? null;
+  return IMPACTS.get(abilityId)?.(particles, center, radius, tick, landsAtTick) ?? null;
 }
 
-export function landingVisual(abilityId: string, center: Vector3, radius: number): SpellVisual | null {
-  return LANDINGS.get(abilityId)?.(center, radius) ?? null;
+export function landingVisual(particles: ParticleSystem, abilityId: string, center: Vector3, radius: number): SpellVisual | null {
+  return LANDINGS.get(abilityId)?.(particles, center, radius) ?? null;
 }
 
-export function zoneVisual(abilityId: string, center: Vector3, radius: number, seed: number): TickedVisual | null {
-  return ZONES.get(abilityId)?.(center, radius, seed) ?? null;
+export function zoneVisual(
+  particles: ParticleSystem,
+  abilityId: string,
+  center: Vector3,
+  radius: number,
+  seed: number,
+): TickedVisual | null {
+  return ZONES.get(abilityId)?.(particles, center, radius, seed) ?? null;
 }
 
-export function castVisual(abilityId: string, center: Vector3, radius: number): SpellVisual | null {
-  return CASTS.get(abilityId)?.(center, radius) ?? null;
+export function castVisual(particles: ParticleSystem, abilityId: string, center: Vector3, radius: number): SpellVisual | null {
+  return CASTS.get(abilityId)?.(particles, center, radius) ?? null;
 }
 
-export function projectileVisual(abilityId: string): ProjectileVisual | null {
-  return PROJECTILES.get(abilityId)?.() ?? null;
+export function projectileVisual(particles: ParticleSystem, abilityId: string, from: Vector3): ProjectileVisual | null {
+  return PROJECTILES.get(abilityId)?.(particles, from) ?? null;
 }
