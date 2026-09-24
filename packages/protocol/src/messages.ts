@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { PlayerView } from "@jev-game/run";
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export const MATCH_ROOM_NAME = "match";
 
@@ -23,6 +23,7 @@ const boardCell = z.object({
 const heroSlot = z.number().int().min(0).max(15).nullable();
 
 export const commandIntent = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("select-heroes"), offerIds: z.array(identifier).max(16) }),
   z.object({ kind: z.literal("commit-draft"), offerIds: z.array(identifier).max(16) }),
   z.object({ kind: z.literal("confirm-ready") }),
   z.object({ kind: z.literal("place-heroes"), formation: z.array(boardCell).max(16) }),

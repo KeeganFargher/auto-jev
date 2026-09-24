@@ -700,10 +700,15 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     return view.you.ready || draftSubmittedEpoch === view.phaseEpoch;
   }
 
-  function toggleDraftPick(offerId: string): void {
-    const view = session?.getView() ?? null;
+  function draftLockedByTimer(view: PlayerView): boolean {
+    return draftView !== null && draftSubmittedEpoch !== lastRenderedEpoch && draftSelection.length === view.rules.draftPicks;
+  }
 
-    if (view === null || view.phase !== "draft" || draftLocked(view)) {
+  function toggleDraftPick(offerId: string): void {
+    const activeSession = session;
+    const view = activeSession?.getView() ?? null;
+
+    if (activeSession === null || view === null || view.phase !== "draft" || draftLocked(view)) {
       return;
     }
 
@@ -720,6 +725,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       }
     }
 
+    activeSession.selectHeroes(draftSelection);
     render();
   }
 
@@ -785,7 +791,6 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     const picks = view.rules.draftPicks;
     const locked = draftLocked(view);
-    draftSelection = draftSelection.filter((offerId) => view.heroOffers.some((offer) => offer.offerId === offerId));
     showDraftLineup(view, locked ? lockedPicks(view) : draftSelection, locked);
 
     if (locked) {
@@ -1396,8 +1401,11 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
 
     if (view.phase !== "draft" || view.you.eliminated) {
+      if (draftLockedByTimer(view)) {
+        audio.play("draft-lock");
+      }
+
       hideDraft();
-      draftSelection = [];
     }
 
     const latest = activeSession.getLatestRound();
@@ -1417,6 +1425,11 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     const entering = view.phaseEpoch !== lastRenderedEpoch;
     lastRenderedEpoch = view.phaseEpoch;
+
+    if (entering) {
+      draftSelection = [...view.draftSelection];
+    }
+
     stage.replaceChildren();
     stage.classList.toggle("is-entering", entering);
     stage.classList.toggle("is-reward", view.phase === "reward" && !view.you.eliminated);
@@ -1503,7 +1516,6 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     healthBeforeRound.clear();
     draftSubmittedEpoch = -1;
     lastRenderedEpoch = -1;
-    draftSelection = [];
     selectedPiece = null;
     menuNotice = null;
     session = next;

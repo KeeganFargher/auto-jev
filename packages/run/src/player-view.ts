@@ -40,6 +40,7 @@ export interface PlayerView {
   players: Record<PlayerId, PublicSeat>;
   currentRound: RoundState | null;
   heroOffers: HeroOffer[];
+  draftSelection: string[];
   pendingDecisions: PendingDecision[];
   winnerPlayerIds: PlayerId[] | null;
   abortReason: string | null;
@@ -86,6 +87,7 @@ export function getPlayerView(state: RunState, playerId: PlayerId): PlayerView |
     players,
     currentRound: state.currentRound,
     heroOffers: state.heroOffersByPlayer[playerId] ?? [],
+    draftSelection: state.draftSelectionByPlayer[playerId] ?? [],
     pendingDecisions: state.pendingDecisionsByPlayer[playerId] ?? [],
     winnerPlayerIds: state.winnerPlayerIds,
     abortReason: state.abortReason,

@@ -39,6 +39,7 @@ export interface MatchSession {
   getLatestRound(): ResolvedRound | null;
   subscribe(listener: () => void): () => void;
   startMatch(): void;
+  selectHeroes(offerIds: readonly string[]): void;
   pickHeroes(offerIds: readonly string[]): void;
   chooseOffer(decisionId: string, offerId: string, heroSlot: number | null): void;
   moveItem(instanceId: string, heroSlot: number | null): void;

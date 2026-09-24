@@ -50,6 +50,7 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
   let connection: ConnectionState = "connected";
   let leaving = false;
   let lastViewKey = "";
+  let latestSelection: string[] | null = null;
 
   function notify(): void {
     for (const listener of listeners) {
@@ -119,6 +120,11 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
     connection = "connected";
     saveResumeToken(room.reconnectionToken);
     room.send(CLIENT_MESSAGES.sync, {});
+
+    if (latestSelection !== null && view?.phase === "draft" && !view.you.ready) {
+      send({ kind: "select-heroes", offerIds: latestSelection });
+    }
+
     notify();
   });
 
@@ -192,6 +198,11 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
 
     startMatch() {
       room.send(CLIENT_MESSAGES.start, {});
+    },
+
+    selectHeroes(offerIds) {
+      latestSelection = [...offerIds];
+      send({ kind: "select-heroes", offerIds: latestSelection });
     },
 
     pickHeroes(offerIds) {
