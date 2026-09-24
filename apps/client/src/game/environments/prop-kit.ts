@@ -1,17 +1,18 @@
 import {
-  BufferGeometry,
   Color,
   DoubleSide,
   FrontSide,
   Group,
   Mesh,
   MeshStandardMaterial,
+  type BufferGeometry,
   type ColorRepresentation,
   type Material,
   type Object3D,
   type Texture,
 } from "three";
 import { createRng, nextFloat } from "@jev-game/game";
+import { mergeStaticMeshes } from "../views/merge-static.js";
 
 export interface SurfaceOptions {
   emissive?: ColorRepresentation;
@@ -39,8 +40,9 @@ export interface PropKit {
   random(): number;
   between(min: number, max: number): number;
   pick<T>(items: readonly T[]): T;
-  animate(animator: Animator): void;
+  animate(targets: readonly Object3D[], animator: Animator): void;
   tick(seconds: number): void;
+  mergeStatic(root: Object3D): void;
   dispose(): void;
 }
 
@@ -64,6 +66,7 @@ export function createPropKit(seed: number): PropKit {
   const surfaces = new Map<string, MeshStandardMaterial>();
   const resources = new Set<Disposable>();
   const animators: Animator[] = [];
+  const animated = new Set<Object3D>();
 
   function random(): number {
     return nextFloat(rng);
@@ -139,13 +142,25 @@ export function createPropKit(seed: number): PropKit {
       return items[Math.floor(random() * items.length)]!;
     },
 
-    animate(animator) {
+    animate(targets, animator) {
+      for (const target of targets) {
+        animated.add(target);
+      }
+
       animators.push(animator);
     },
 
     tick(seconds) {
       for (const animator of animators) {
         animator(seconds);
+      }
+    },
+
+    mergeStatic(root) {
+      for (const island of [root, ...animated]) {
+        for (const merged of mergeStaticMeshes(island, animated)) {
+          resources.add(merged);
+        }
       }
     },
 
@@ -161,6 +176,7 @@ export function createPropKit(seed: number): PropKit {
       resources.clear();
       surfaces.clear();
       animators.length = 0;
+      animated.clear();
     },
   };
 }

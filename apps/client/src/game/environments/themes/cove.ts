@@ -88,7 +88,7 @@ export const coveTheme: EnvironmentTheme = {
   build(kit) {
     const boat = place(rowboat(kit), 98, WATER_LEVEL + 0.8, 30, 0.3);
 
-    kit.animate((seconds) => {
+    kit.animate([boat], (seconds) => {
       boat.position.y = WATER_LEVEL + 0.8 + Math.sin(seconds * 1.3) * 0.35;
       boat.rotation.z = Math.sin(seconds * 1.1) * 0.04;
     });

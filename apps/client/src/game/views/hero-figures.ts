@@ -31,6 +31,7 @@ import {
   SINK_UNITS,
   createFigureBase,
 } from "./figure-base.js";
+import { mergeStaticMeshes } from "./merge-static.js";
 import { createModelFigure } from "./model-figure.js";
 
 export type FigureAction = "attack" | "cast" | "hit";
@@ -852,6 +853,12 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
   const root = new Group();
   const builder: PartBuilder = { materials: [], geometries: [], body: new Group() };
   const parts = buildFigureParts(heroId, builder);
+  const spinning = new Set<Object3D>(parts.rotor === undefined ? [] : [parts.rotor]);
+
+  for (const island of [parts.body, ...spinning]) {
+    builder.geometries.push(...mergeStaticMeshes(island, spinning));
+  }
+
   const rooted = parts.rooted === true;
   const base = createFigureBase();
 

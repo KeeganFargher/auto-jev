@@ -128,7 +128,7 @@ export function palmTree(kit: PropKit, height: number, lean: number): Group {
     );
   }
 
-  kit.animate((seconds) => {
+  kit.animate([tree], (seconds) => {
     tree.rotation.z = Math.sin(seconds * 0.9 + top.x) * 0.012;
   });
 
@@ -359,7 +359,7 @@ export function flag(kit: PropKit, height: number, cloth: ColorRepresentation, t
   const position = sheet.getAttribute("position");
   const rest = Float32Array.from(position.array);
 
-  kit.animate((seconds) => {
+  kit.animate([banner], (seconds) => {
     for (let index = 0; index < position.count; index += 1) {
       const x = rest[index * 3]!;
       const reach = x / width;
@@ -402,7 +402,7 @@ export function fire(kit: PropKit, size: number, light: number): Group {
 
   const phase = kit.between(0, 10);
 
-  kit.animate((seconds) => {
+  kit.animate([flame, core], (seconds) => {
     const flicker = Math.sin(seconds * 13 + phase) * 0.08 + Math.sin(seconds * 7.3 + phase * 2) * 0.06;
     flame.scale.set(1 - flicker, 1 + flicker * 2, 1 - flicker);
     core.scale.set(1 + flicker, 1 - flicker, 1 + flicker);
@@ -619,7 +619,7 @@ export function drift(kit: PropKit, options: DriftOptions): Points {
   cloud.frustumCulled = false;
   const height = options.ceiling - options.floor;
 
-  kit.animate((seconds) => {
+  kit.animate([cloud], (seconds) => {
     for (let index = 0; index < options.count; index += 1) {
       const x = seeds[index * 4]!;
       const z = seeds[index * 4 + 1]!;
@@ -699,7 +699,7 @@ export function banner(kit: PropKit, height: number, cloth: ColorRepresentation,
   const rest = Float32Array.from(position.array);
   const phase = kit.between(0, 6);
 
-  kit.animate((seconds) => {
+  kit.animate([hang], (seconds) => {
     for (let index = 0; index < position.count; index += 1) {
       const y = rest[index * 3 + 1]!;
       const reach = -y / drop;
@@ -709,7 +709,7 @@ export function banner(kit: PropKit, height: number, cloth: ColorRepresentation,
     position.needsUpdate = true;
   });
 
-  kit.animate((seconds) => {
+  kit.animate([hem], (seconds) => {
     hem.position.z = 0.5 + Math.sin(seconds * 1.8 + phase - drop * 0.23) * 0.8;
   });
 
