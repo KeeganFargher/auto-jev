@@ -7,6 +7,7 @@ import { applyRewardOffer } from "./rewards.js";
 import { hasStashRoom, itemCanGoOn, runeCanGoOn } from "./inventory.js";
 
 export type RunCommand =
+  | { kind: "select-heroes"; playerId: PlayerId; offerIds: readonly string[]; expectedRevision: number }
   | { kind: "commit-draft"; playerId: PlayerId; offerIds: readonly string[]; expectedRevision: number }
   | { kind: "confirm-ready"; playerId: PlayerId; expectedRevision: number }
   | { kind: "place-heroes"; playerId: PlayerId; formation: readonly BoardCell[]; expectedRevision: number }
@@ -44,6 +45,7 @@ export type RunCommandResult =
   | { accepted: false; reason: RunCommandRejectionReason };
 
 const COMMAND_PHASES: Record<RunCommand["kind"], readonly RunPhase[]> = {
+  "select-heroes": ["draft"],
   "commit-draft": ["draft"],
   "confirm-ready": ["preparing"],
   "place-heroes": ["preparing"],
@@ -65,6 +67,43 @@ function reject(reason: RunCommandRejectionReason): RunCommandResult {
   return { accepted: false, reason };
 }
 
+type DraftOffers = { accepted: true; offers: HeroOffer[] } | { accepted: false; reason: RunCommandRejectionReason };
+
+function resolveDraftOffers(state: RunState, seat: PlayerSeat, offerIds: readonly string[]): DraftOffers {
+  if (new Set(offerIds).size !== offerIds.length) {
+    return { accepted: false, reason: "duplicate-offer" };
+  }
+
+  const offers = state.heroOffersByPlayer[seat.playerId] ?? [];
+  const chosen: HeroOffer[] = [];
+
+  for (const offerId of offerIds) {
+    const offer = offers.find((candidate) => candidate.offerId === offerId);
+
+    if (offer === undefined) {
+      return { accepted: false, reason: "unknown-offer" };
+    }
+
+    chosen.push(offer);
+  }
+
+  return { accepted: true, offers: chosen };
+}
+
+function applySelectHeroes(state: RunState, seat: PlayerSeat, offerIds: readonly string[]): RunCommandResult {
+  if (offerIds.length > state.rules.draftPicks) {
+    return reject("invalid-offer-count");
+  }
+
+  const selected = resolveDraftOffers(state, seat, offerIds);
+
+  if (!selected.accepted) {
+    return reject(selected.reason);
+  }
+
+  return accept({ ...state, draftSelectionByPlayer: { ...state.draftSelectionByPlayer, [seat.playerId]: [...offerIds] } });
+}
+
 function applyCommitDraft(
   state: RunState,
   seat: PlayerSeat,
@@ -75,28 +114,17 @@ function applyCommitDraft(
     return reject("invalid-offer-count");
   }
 
-  if (new Set(offerIds).size !== offerIds.length) {
-    return reject("duplicate-offer");
+  const chosen = resolveDraftOffers(state, seat, offerIds);
+
+  if (!chosen.accepted) {
+    return reject(chosen.reason);
   }
 
-  const offers = state.heroOffersByPlayer[seat.playerId] ?? [];
-  const chosen: HeroOffer[] = [];
-
-  for (const offerId of offerIds) {
-    const offer = offers.find((candidate) => candidate.offerId === offerId);
-
-    if (offer === undefined) {
-      return reject("unknown-offer");
-    }
-
-    chosen.push(offer);
-  }
-
-  const heroBuilds = chosen.map((offer, index) =>
+  const heroBuilds = chosen.offers.map((offer, index) =>
     createHeroBuild(`${seat.playerId}-${index}`, offer.heroId, [], catalogue),
   );
 
-  const formation = defaultFormation(chosen.map((offer) => offer.heroId));
+  const formation = defaultFormation(chosen.offers.map((offer) => offer.heroId));
 
   return accept(withSeat(state, { ...seat, heroBuilds, formation, decisionRevision: seat.decisionRevision + 1 }));
 }
@@ -227,6 +255,9 @@ export function applyCommand(
   }
 
   switch (command.kind) {
+    case "select-heroes":
+      return applySelectHeroes(state, seat, command.offerIds);
+
     case "commit-draft":
       return applyCommitDraft(state, seat, command.offerIds, catalogue);
 

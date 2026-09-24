@@ -56,6 +56,7 @@ export function createRun(
     currentRound: null,
     readyThresholdByPlayer: {},
     heroOffersByPlayer: {},
+    draftSelectionByPlayer: {},
     pendingDecisionsByPlayer: {},
     lastRoundLoserIds: [],
     winnerPlayerIds: null,
@@ -115,6 +116,7 @@ function enterPreparingPhase(state: RunState): RunState {
     pairingHistory: recordPairingRound(state.pairingHistory, pairingResult),
     currentRound: { round, battles, byePlayerId: pairingResult.byePlayerId },
     heroOffersByPlayer: {},
+    draftSelectionByPlayer: {},
     pendingDecisionsByPlayer: {},
   };
 

@@ -2833,3 +2833,40 @@ quality). They replace the glyph wherever it's big enough to read.
   - The face is used in the ITEMS panel, the damage meter, the reward
     role chips and the tooltip header icons.
 - Nothing was committed.
+
+
+## Draft picks survive the timer (2026-09-24)
+
+A player who picked three heroes but didn't press Confirm got a random
+team when the draft timer ran out. The picks lived only in the client,
+and the server's deadline fallback drafts at random.
+
+- **The server holds the selection, the way it holds a placement.** A
+  new `select-heroes` command carries the whole selection each time a
+  card is toggled. It checks the revision but doesn't bump it, so the
+  seat stays open, and it is rejected once the seat is ready. The
+  selection is kept per player in `draftSelectionByPlayer`, shown only
+  to its owner as `view.draftSelection`, and cleared when preparing
+  starts.
+- **The deadline commits it.** The draft fallback commits the selection
+  and fills any missing picks at random from the other offers, using the
+  seat's controller seed. With nothing selected, that is the same random
+  draft as before. Bots still draft from nothing.
+- **Why not submit when the client's countdown ends.** The countdown is
+  the server deadline rounded up to whole seconds, so it ends at or after
+  the deadline, and the server checks the deadline every 200 ms. Tried
+  against an offline server, the picks survived 1 of 2 runs on localhost
+  and 0 of 2 with 80 ms of latency each way. Anything the client sends at
+  expiry loses that race.
+- **The client seeds its selection from the view** on the first render
+  of each phase, so a reload mid-draft shows the same picks. The resets
+  on Confirm and on adopting a session went, since the seed covers them.
+- `PROTOCOL_VERSION` is 4: a new intent and a new view field.
+- **Verified.**
+  - Three new server tests: a selection committed at the deadline, a
+    partial one filled, and one that stays open, private and validated
+    until Confirm. All 20 server tests pass.
+  - In the browser against an isolated offline server, full and partial
+    selections survived the timer on localhost and through an 80 ms
+    proxy, Confirm still commits at once, and a reload mid-draft kept
+    the picks.

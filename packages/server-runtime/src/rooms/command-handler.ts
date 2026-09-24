@@ -11,6 +11,9 @@ export interface CommandOutcome {
 
 function toRunCommand(playerId: string, expectedRevision: number, intent: CommandIntent): RunCommand {
   switch (intent.kind) {
+    case "select-heroes":
+      return { kind: "select-heroes", playerId, offerIds: intent.offerIds, expectedRevision };
+
     case "commit-draft":
       return { kind: "commit-draft", playerId, offerIds: intent.offerIds, expectedRevision };
 

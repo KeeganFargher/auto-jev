@@ -194,6 +194,10 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
       room.send(CLIENT_MESSAGES.start, {});
     },
 
+    selectHeroes(offerIds) {
+      send({ kind: "select-heroes", offerIds: [...offerIds] });
+    },
+
     pickHeroes(offerIds) {
       send({ kind: "commit-draft", offerIds: [...offerIds] });
     },

@@ -109,6 +109,18 @@ function equipStash(view: PlayerView, catalogue: Catalogue): RunCommand | null {
   return null;
 }
 
+function commitDraft(view: PlayerView, controllerSeed: number, selected: readonly string[]): RunCommand | null {
+  const picks = view.rules.draftPicks;
+  const unselected = view.heroOffers.map((offer) => offer.offerId).filter((offerId) => !selected.includes(offerId));
+  const chosen = [...selected, ...pickRandomOffers(unselected, controllerSeed, picks - selected.length)];
+
+  if (chosen.length !== picks) {
+    return null;
+  }
+
+  return { kind: "commit-draft", playerId: view.you.playerId, offerIds: chosen, expectedRevision: view.you.decisionRevision };
+}
+
 export function decideBotCommand(view: PlayerView, controllerSeed: number, catalogue: Catalogue): RunCommand | null {
   const { playerId, decisionRevision, eliminated } = view.you;
 
@@ -117,19 +129,7 @@ export function decideBotCommand(view: PlayerView, controllerSeed: number, catal
   }
 
   if (view.phase === "draft") {
-    const picks = view.rules.draftPicks;
-
-    const chosen = pickRandomOffers(
-      view.heroOffers.map((offer) => offer.offerId),
-      controllerSeed,
-      picks,
-    );
-
-    if (chosen.length !== picks) {
-      return null;
-    }
-
-    return { kind: "commit-draft", playerId, offerIds: chosen, expectedRevision: decisionRevision };
+    return commitDraft(view, controllerSeed, []);
   }
 
   if (view.phase === "reward") {
@@ -164,6 +164,10 @@ export function decideBotCommand(view: PlayerView, controllerSeed: number, catal
 }
 
 export function decideFallbackCommand(view: PlayerView, controllerSeed: number, catalogue: Catalogue): RunCommand | null {
+  if (view.phase === "draft") {
+    return view.you.eliminated ? null : commitDraft(view, controllerSeed, view.draftSelection);
+  }
+
   if (view.phase === "preparing") {
     return view.you.eliminated
       ? null
@@ -176,7 +180,7 @@ export function decideFallbackCommand(view: PlayerView, controllerSeed: number, 
     return view.you.eliminated || decision === undefined ? null : chooseOffer(view, decision, 0, catalogue);
   }
 
-  return decideBotCommand(view, controllerSeed, catalogue);
+  return null;
 }
 
 type SeatPolicy = (view: PlayerView, controllerSeed: number, catalogue: Catalogue) => RunCommand | null;

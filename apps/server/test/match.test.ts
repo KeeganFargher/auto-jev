@@ -161,6 +161,75 @@ describe("online match room", function () {
     assert.strictEqual(bob.view!.you.heroBuilds.length, 0);
   });
 
+  it("drafts the heroes a player selected but never confirmed when the draft runs out", async () => {
+    const room = await colyseus.createRoom<MatchRoom>("match", { solo: true });
+    const solo = track(room, await colyseus.connectTo(room, { solo: true }));
+    await until(() => solo.view?.phase === "draft");
+
+    const offers = solo.view!.heroOffers;
+    const selected = [offers[3]!, offers[0]!, offers[2]!];
+    const selection = send(solo, { kind: "select-heroes", offerIds: selected.map((offer) => offer.offerId) });
+    await until(() => solo.view!.you.heroBuilds.length === 3, 5000);
+
+    assert.deepStrictEqual(
+      solo.view!.you.heroBuilds.map((build) => build.heroId),
+      selected.map((offer) => offer.heroId),
+    );
+    assert.strictEqual((await selection).accepted, true);
+  });
+
+  it("fills a partial selection with random offers when the draft runs out", async () => {
+    const room = await colyseus.createRoom<MatchRoom>("match", { solo: true });
+    const solo = track(room, await colyseus.connectTo(room, { solo: true }));
+    await until(() => solo.view?.phase === "draft");
+
+    const offers = solo.view!.heroOffers;
+    const selection = send(solo, { kind: "select-heroes", offerIds: [offers[4]!.offerId] });
+    await until(() => solo.view!.you.heroBuilds.length === 3, 5000);
+
+    const team = solo.view!.you.heroBuilds.map((build) => build.heroId);
+    assert.strictEqual(team[0], offers[4]!.heroId);
+    assert.strictEqual(new Set(team).size, 3);
+    assert.ok(team.every((heroId) => offers.some((offer) => offer.heroId === heroId)));
+    assert.strictEqual((await selection).accepted, true);
+  });
+
+  it("keeps a selection open and private until the player confirms", async () => {
+    const room = await colyseus.createRoom<MatchRoom>("match", {});
+    const alice = track(room, await colyseus.connectTo(room));
+    const bob = track(room, await colyseus.connectTo(room));
+    alice.room.send("start", {});
+    await until(() => alice.view?.phase === "draft" && bob.view?.phase === "draft");
+
+    const offers = alice.view!.heroOffers.map((offer) => offer.offerId);
+    const epoch = alice.view!.phaseEpoch;
+    const bobViewsBefore = bob.views.length;
+
+    assert.strictEqual((await send(alice, { kind: "select-heroes", offerIds: offers.slice(0, 3) })).accepted, true);
+    await until(() => alice.view!.draftSelection.length === 3);
+    assert.strictEqual(alice.view!.you.ready, false);
+    assert.strictEqual(room.currentRun()!.phase, "draft");
+
+    const changed = [offers[4]!, offers[1]!];
+    assert.strictEqual((await send(alice, { kind: "select-heroes", offerIds: changed })).accepted, true);
+    await until(() => alice.view!.draftSelection.join() === changed.join());
+
+    const tooMany = await send(alice, { kind: "select-heroes", offerIds: offers.slice(0, 4) });
+    assert.deepStrictEqual([tooMany.accepted, tooMany.reason], [false, "invalid-offer-count"]);
+    const twice = await send(alice, { kind: "select-heroes", offerIds: [offers[0]!, offers[0]!] });
+    assert.deepStrictEqual([twice.accepted, twice.reason], [false, "duplicate-offer"]);
+    const stolen = await send(alice, { kind: "select-heroes", offerIds: [bob.view!.heroOffers[0]!.offerId] });
+    assert.deepStrictEqual([stolen.accepted, stolen.reason], [false, "unknown-offer"]);
+
+    assert.strictEqual((await send(alice, { kind: "commit-draft", offerIds: offers.slice(0, 3) })).accepted, true);
+    await until(() => alice.view!.you.ready);
+    const late = await send(alice, { kind: "select-heroes", offerIds: changed });
+    assert.deepStrictEqual([late.accepted, late.reason], [false, "already-decided"]);
+
+    assert.deepStrictEqual(bob.view!.draftSelection, []);
+    assert.strictEqual(bob.views.slice(bobViewsBefore).filter((message) => message.view.phaseEpoch === epoch).length, 0);
+  });
+
   it("returns the original result for a duplicate command and rejects stale ones", async () => {
     const room = await colyseus.createRoom<MatchRoom>("match", {});
     const alice = track(room, await colyseus.connectTo(room));

@@ -97,6 +97,7 @@ export interface RunState {
   currentRound: RoundState | null;
   readyThresholdByPlayer: Record<PlayerId, number>;
   heroOffersByPlayer: Record<PlayerId, HeroOffer[]>;
+  draftSelectionByPlayer: Record<PlayerId, string[]>;
   pendingDecisionsByPlayer: Record<PlayerId, PendingDecision[]>;
   lastRoundLoserIds: PlayerId[];
   winnerPlayerIds: PlayerId[] | null;
