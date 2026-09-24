@@ -3292,3 +3292,130 @@ Each layer is its own commit and a working game.
     51 → 51 over 12 rebuilds).
   - Frame rates can't be judged here: software WebGL runs at about
     2 FPS.
+
+## Frame drops mid-fight (2026-09-24)
+
+The user saw the frame rate fall below 60, "especially in the middle of a
+fight", and still dip to 30–40 FPS after lowering Resolution to Balanced.
+Lowering the resolution only helping a little meant most of the cost
+didn't scale with pixels.
+
+- **How it was measured.** A headless Chromium script plays a real local
+  match: draft, ready, fight.
+  - It reaches three.js through its devtools hook, so no game code
+    changed. It counts draw calls per pass and per kind of object, times
+    the render calls, and logs shader programs as three creates and
+    deletes them.
+  - A Chrome trace splits the main thread's time.
+  - Software WebGL makes absolute frame rates meaningless, so the
+    measures are draw calls, shader compiles and main-thread work.
+- **What it found**, worst first:
+  1. **Shaders were recompiled mid-fight.**
+     - Meteor, Flame Ward, fireballs, bolts, arcs, combo bursts and
+       impact rings made their own materials and disposed them when done.
+     - Disposing the last material of a shader makes three delete it, so
+       the next cast compiled it again, blocking the frame.
+     - The log showed programs deleted and rebuilt every 3 to 8 seconds.
+       Each compile took 0.25–1.4 s in software; on a GPU it's tens to
+       hundreds of milliseconds, worst on Windows, where ANGLE compiles to
+       HLSL.
+     - Gorrak's cyclone compiled the first time he channelled.
+  2. **Draw calls.**
+     - A fight frame was 667 to 1,000 draw calls.
+     - About three quarters were static environment props, drawn one by
+       one in the main pass and again for the shadow map. The shadow pass
+       drew props off screen too, because the sun's view covers the whole
+       arena.
+     - Placeholder heroes were 15 to 30 meshes each, and summons add more
+       as a fight goes on.
+  3. **The match loop redid work every frame.**
+     - It updated the battle view 60 times a second, though the battle
+       ticks 30 times.
+     - Each update measured the stage's container, which forces a layout
+       after the plates move. Every hit sound read the canvas width for
+       its pan, forcing another.
+     - The round timer, round and phase were rewritten every frame, which
+       replaces their text nodes. The damage meter read scroll sizes on
+       every render.
+- **Fixes.**
+  - **Pooled, warmed effect materials** (`effect-materials.ts`).
+    - Materials are taken and released by kind, never disposed.
+    - The stage draws one tiny mesh of each kind for a frame at start, on
+      graphics changes and on theme changes, so the shaders exist before
+      the first cast.
+    - Found by the warm-up test: three r186 keys a shader on whether the
+      geometry has normals. The scorch disc and the cyclone gained
+      normals, and the warm-up's line has none, like the arcs.
+    - Additive double-sided kinds draw in one pass (`forceSinglePass`).
+      three otherwise draws them twice and re-derives the shader key each
+      time, and added light doesn't depend on draw order.
+  - **Battle effects** moved out of the battle view into
+    `battle-effects.ts`. Rings share geometry, arcs reuse theirs, and the
+    fireball stopped building three meshes per shot.
+  - **Static merging** (`merge-static.ts`).
+    - Environments merge their static props per material and shadow
+      setting when they mount.
+    - `kit.animate` now names what each animator moves. Those stay live,
+      and their own parts merge inside them.
+    - Transparent props stay separate so three still sorts them.
+    - Placeholder heroes merge their parts per material.
+  - **No idle updates, no layout reads.**
+    - The battle view ignores an update with the same snapshot and
+      selection and no events.
+    - `showBoard` returns early when nothing changed, and `screenPan`
+      pans sounds from the stage's cached size.
+    - HUD text is written only when it changes (`setText`), and the unit
+      inspector skips repeats.
+    - The damage meter watches its size with a `ResizeObserver` instead
+      of reading it.
+- **Result.** The same harness and settings were run twice each, before
+  and after.
+  - Draw calls per fight frame: 667–695 → 181–209. With glow on at full
+    resolution, the frame stats read 263–359 in fights, against 700–780
+    before.
+  - Environment lab draw calls (arena, board and five heroes): cove
+    682 → 298, bazaar → 243, ruins → 197, frost → 208.
+  - Shader programs created or deleted after a fight starts: one every
+    few seconds → none, over three rounds.
+  - Median script time per frame: 5.8–7.3 → 3.5–4.4 ms. Render call:
+    3.9–4.6 → 2.2–3.1 ms. Both are software WebGL at 50% resolution with
+    glow off.
+- **Why pools rather than shared materials.** Effects fade their own
+  opacity and colour, so each needs its own material. The pool keeps
+  those instances alive, and three shares the compiled shader between
+  them.
+- **Why merging rather than instancing or `BatchedMesh`.** Props never
+  move, so a merged mesh is the cheapest draw: one per material, with no
+  per-object state. `BatchedMesh` keeps per-prop culling, but needs its
+  capacities sized up front and the multi-draw extension. Culling saves
+  little here: a whole arena is 30k to 80k vertices.
+- **Not done.**
+  - Themes use 33 to 50 prop colours, so they still draw 33 to 50
+    batches each. Baking colour into vertex colours would batch props by
+    finish instead. Measure first.
+  - Switching board themes between rounds still recompiles lit shaders
+    when the number of fire lights changes. It happens between fights,
+    not in one.
+  - The teleport between rounds still makes and disposes its textured
+    beam materials, so it compiles their shaders again at every round
+    start.
+  - `compileAsync` with `KHR_parallel_shader_compile` could take even
+    the warm-up off the frame.
+  - The glow composer's cost on weak GPUs can't be measured with
+    software WebGL. Turning Glow off or lowering Resolution is still the
+    lever for fill-bound machines.
+- **Verified.**
+  - 46 client tests pass. Each new test failed first:
+    - materials disposed when an effect finished;
+    - the fireball had no way to hand its materials back;
+    - three shader variants missing from the warm-up;
+    - heroes drawing a material more than once;
+    - props not merged;
+    - HUD text rewritten every frame;
+    - additive effects drawn twice.
+  - Lint, the client, test and scripts typechecks, and the client build
+    pass.
+  - Before-and-after screenshots of all four themes, wide and at game
+    distance, and of the heroes, match.
+  - Three rounds of a local match played through with no console errors
+    or warnings.
