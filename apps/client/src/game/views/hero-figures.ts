@@ -8,6 +8,7 @@ import {
   IcosahedronGeometry,
   Mesh,
   MeshStandardMaterial,
+  Object3D,
   SphereGeometry,
   TorusGeometry,
   Vector3,
@@ -21,6 +22,7 @@ import {
   ATTACK_SECONDS,
   BASE_HEIGHT,
   CAST_SECONDS,
+  CHEST_FRACTION,
   DEAD_COLOR,
   DEATH_SECONDS,
   FIGURE_SCALE,
@@ -45,6 +47,7 @@ export interface HeroFigure {
   setChanneling(channeling: boolean): void;
   setCelebrating(celebrating: boolean): void;
   setCastsShadow(castsShadow: boolean): void;
+  castOrigin(out: Vector3): Vector3;
   update(deltaSeconds: number): void;
   dispose(): void;
 }
@@ -830,6 +833,10 @@ function upgradeWhenLoaded(heroId: ModelId, placeholder: HeroFigure): HeroFigure
       current.setCastsShadow(isCasting);
     },
 
+    castOrigin(out) {
+      return current.castOrigin(out);
+    },
+
     update(deltaSeconds) {
       current.update(deltaSeconds);
     },
@@ -853,6 +860,10 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
   model.scale.setScalar(FIGURE_SCALE);
   model.add(base.mesh, parts.body);
   root.add(model);
+
+  const socket = new Object3D();
+  socket.position.y = parts.height * CHEST_FRACTION;
+  parts.body.add(socket);
 
   const flashMaterials = builder.materials;
   let teamColor = new Color("#ffffff");
@@ -932,6 +943,10 @@ export function createPlaceholderFigure(heroId: string): HeroFigure {
       });
 
       base.mesh.castShadow = castsShadow;
+    },
+
+    castOrigin(out) {
+      return socket.getWorldPosition(out);
     },
 
     update(deltaSeconds) {

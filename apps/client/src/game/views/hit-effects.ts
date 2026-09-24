@@ -1,4 +1,4 @@
-import { Color, type Vector3 } from "three";
+import { Color, Vector3 } from "three";
 import type { ParticleStyle, ParticleSystem } from "./particles.js";
 
 export type HitKind = "strike" | "blunt" | "blade" | "fire" | "frost" | "dark" | "thorn" | "rivet" | "holy";
@@ -13,6 +13,8 @@ const ABILITY_HITS = {
   "shield-bash": "blunt",
   "oath-hammer": "blunt",
   consecrate: "holy",
+  mend: "holy",
+  "ward-bell": "holy",
   "ravager-axes": "blade",
   leap: "blunt",
   "dusk-strike": "blade",
@@ -23,12 +25,16 @@ const ABILITY_HITS = {
   "frost-bolt": "frost",
   "glacial-lance": "frost",
   "spite-bolt": "dark",
+  "shared-fate": "dark",
+  hex: "dark",
   thornshot: "thorn",
   "caustic-spit": "thorn",
+  "plague-cloud": "thorn",
   "thrall-blade": "blade",
   "golem-slam": "blunt",
   "grave-bolt": "dark",
   "corpse-explosion": "dark",
+  "raise-dead": "dark",
   "turret-shot": "rivet",
   "rivet-gun": "rivet",
   flashbang: "rivet",
@@ -47,6 +53,8 @@ const HIT_TINTS: Readonly<Record<HitKind, string>> = {
 };
 
 const HEAVY_BURST = 1.8;
+
+const UP = new Vector3(0, 1, 0);
 
 const SPARKS: ParticleStyle = {
   blend: "solid",
@@ -167,6 +175,21 @@ const HIT_BURSTS: Readonly<Record<HitKind, readonly HitBurst[]>> = {
   holy: [{ style: { ...tinted(MOTES, "#fff1a8", "#d99a00"), gravity: -10 }, count: 10 }, flash(HIT_TINTS.holy)],
 };
 
+const RELEASE_COUNT = 8;
+
+const RELEASE: ParticleStyle = {
+  ...MOTES,
+  size: [1.6, 0.3],
+  life: [0.14, 0.26],
+  speed: [4, 10],
+  cone: Math.PI,
+  spread: 0.2,
+  gravity: 0,
+  drag: 5,
+};
+
+const RELEASE_FLASH: ParticleStyle = { ...FLASH, size: [2.6, 3.2], opacity: 0.7 };
+
 const TRAIL: ParticleStyle = {
   ...MOTES,
   size: [1.8, 0.3],
@@ -209,4 +232,10 @@ export function emitHit(particles: ParticleSystem, kind: HitKind, point: Vector3
 
 export function trailStyle(kind: HitKind): ParticleStyle {
   return TRAILS[kind];
+}
+
+export function emitRelease(particles: ParticleSystem, kind: HitKind, point: Vector3): void {
+  const trail = TRAILS[kind];
+  particles.emit({ ...RELEASE, from: trail.from, to: trail.to }, point, UP, RELEASE_COUNT);
+  particles.emit({ ...RELEASE_FLASH, to: trail.to }, point, UP, 1);
 }

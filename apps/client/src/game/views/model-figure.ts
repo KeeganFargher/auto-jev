@@ -6,16 +6,17 @@ import {
   LoopRepeat,
   Mesh,
   MeshStandardMaterial,
+  Object3D,
   type AnimationAction,
   type AnimationMixerEventMap,
   type Material,
-  type Object3D,
 } from "three";
 import { models, type LoadedModel } from "../../models/library.js";
 import {
   ATTACK_SECONDS,
   BASE_HEIGHT,
   CAST_SECONDS,
+  CHEST_FRACTION,
   DEAD_COLOR,
   FIGURE_SCALE,
   HIT_SECONDS,
@@ -104,6 +105,24 @@ function adoptMaterials(instance: Object3D): FigureSurfaces {
   return surfaces;
 }
 
+function castSocket(model: LoadedModel, instance: Object3D, body: Object3D, height: number): Object3D {
+  if (model.castBone === null) {
+    const chest = new Object3D();
+    chest.position.y = height * CHEST_FRACTION - BASE_HEIGHT;
+    body.add(chest);
+
+    return chest;
+  }
+
+  const bone = instance.getObjectByName(model.castBone);
+
+  if (bone === undefined) {
+    throw new Error(`model "${model.id}" has no "${model.castBone}" node for its castBone`);
+  }
+
+  return bone;
+}
+
 export function createModelFigure(model: LoadedModel, traits: FigureTraits): HeroFigure {
   const root = new Group();
   const base = createFigureBase();
@@ -115,6 +134,7 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
   const body = new Group();
   body.position.y = BASE_HEIGHT;
   body.add(instance);
+  const socket = castSocket(model, instance, body, height);
 
   const cyclone = model.channelEffect === "cyclone" ? createCycloneEffect() : null;
 
@@ -296,6 +316,10 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
       });
 
       base.mesh.castShadow = castsShadow;
+    },
+
+    castOrigin(out) {
+      return socket.getWorldPosition(out);
     },
 
     setChanneling(isChanneling) {

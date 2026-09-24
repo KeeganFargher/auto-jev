@@ -7,6 +7,7 @@ export interface ModelDefinition {
   kind: ModelKind;
   channelEffect?: ChannelEffect;
   boardHeight?: number;
+  castBone?: string;
 }
 
 const MODEL_ROOT = "/assets/models";
@@ -14,7 +15,7 @@ const MODEL_ROOT = "/assets/models";
 export const MODELS = {
   bulwark: { url: `${MODEL_ROOT}/heroes/bulwark.glb`, kind: "heroes" },
   ravager: { url: `${MODEL_ROOT}/heroes/ravager.glb`, kind: "heroes", channelEffect: "cyclone" },
-  pyromancer: { url: `${MODEL_ROOT}/heroes/pyromancer.glb`, kind: "heroes", boardHeight: 8.3 },
+  pyromancer: { url: `${MODEL_ROOT}/heroes/pyromancer.glb`, kind: "heroes", boardHeight: 8.3, castBone: "flame" },
   crate: { url: `${MODEL_ROOT}/props/crate.glb`, kind: "props" },
   barrel: { url: `${MODEL_ROOT}/props/barrel.glb`, kind: "props" },
 } as const satisfies Record<string, ModelDefinition>;

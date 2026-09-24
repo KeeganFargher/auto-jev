@@ -31,9 +31,10 @@ import {
 import { conditionIcon, statusIcon } from "../../hud/icons.js";
 import { comboName } from "../../hud/tips.js";
 import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
+import { CHEST_FRACTION } from "./figure-base.js";
 import { createHealthTrail, type HealthTrail } from "./health-trail.js";
 import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
-import { emitHit, hitKind, hitTint, trailStyle } from "./hit-effects.js";
+import { emitHit, emitRelease, hitKind, hitTint, trailStyle } from "./hit-effects.js";
 import { createTrail, type ParticleStyle } from "./particles.js";
 import {
   createFallingTracker,
@@ -89,8 +90,6 @@ const TICK_JUMP_FOR_SNAP = 20;
 const PICK_RADIUS_PIXELS = 44;
 
 const PLATE_GAP_UNITS = 1.8;
-
-const CHEST_FRACTION = 0.55;
 
 const PROJECTILE_SECONDS = 0.16;
 
@@ -621,7 +620,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       return;
     }
 
-    const from = chestOf(source);
+    const from = source.figure.castOrigin(new Vector3());
     const visual = projectileVisual(stage.particles, abilityId, from);
 
     if (visual !== null) {
@@ -750,6 +749,11 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       record.figure.trigger(event.isBasicAttack ? "attack" : "cast");
       playCast(event, sourceOf(record), panOf(record));
+
+      if (isRangedAbility(event.abilityId)) {
+        emitRelease(stage.particles, hitKind(event.abilityId), record.figure.castOrigin(new Vector3()));
+      }
+
       const flourish = castVisual(stage.particles, event.abilityId, record.position, areaRadius(event.abilityId));
 
       if (flourish !== null) {

@@ -31,6 +31,7 @@ export interface ModelReport {
   textures: TextureReport[];
   skins: number;
   joints: number;
+  nodes: string[];
   clips: ClipReport[];
   height: number;
   floor: number;
@@ -150,6 +151,7 @@ export async function inspectModel(path: string): Promise<ModelReport> {
     textures,
     skins: skins.length,
     joints: Math.max(0, ...skins.map((skin) => skin.listJoints().length)),
+    nodes: root.listNodes().map((node) => node.getName()),
     clips,
     height: bounds === null ? 0 : bounds.max[1] - bounds.min[1],
     floor: bounds === null ? 0 : bounds.min[1],

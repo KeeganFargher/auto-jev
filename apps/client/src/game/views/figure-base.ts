@@ -35,6 +35,8 @@ export const SINK_UNITS = 10;
 
 export const LUNGE_UNITS = 2.2;
 
+export const CHEST_FRACTION = 0.55;
+
 export const DEAD_COLOR = new Color("#6b7280");
 
 const BASE_GLOW = 0.18;
