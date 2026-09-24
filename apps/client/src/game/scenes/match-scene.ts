@@ -24,14 +24,15 @@ import { createBoardStage, type ViewportInsets } from "../views/board-stage.js";
 import { createFormationView, type FormationView } from "../views/formation-view.js";
 import { createDraftView, type DraftView } from "../views/draft-view.js";
 import { createTeleportView, type TeleportView } from "../views/teleport-view.js";
+import { createMenuView, type MenuView } from "../views/menu-view.js";
 import { mountEnvironment, type EnvironmentTheme, type MountedEnvironment } from "../environments/environment.js";
-import { boardThemeFor } from "../environments/board-choice.js";
+import { boardThemeFor, savedBoardTheme } from "../environments/board-choice.js";
 import { createUnitInspectorView, type UnitInspectorView } from "../../hud/unit-inspector.js";
 import { createDamageMeter } from "../../hud/damage-meter.js";
 import { hideTip } from "../../hud/tooltip.js";
 import { createCountdown, type Countdown } from "../../hud/countdown.js";
 import { button, el } from "../../hud/dom.js";
-import { botSilhouette, heartIcon, humanSilhouette, roleIcon, skipIcon } from "../../hud/icons.js";
+import { botSilhouette, heartIcon, humanSilhouette, skipIcon } from "../../hud/icons.js";
 import { renderDraftLoadout, renderLoadout, renderTeamLoadout, type SelectedPiece } from "../../hud/loadout.js";
 import { createDraftPlate, type DraftPlate } from "../../hud/draft.js";
 import { renderRewardPanel } from "../../hud/rewards.js";
@@ -64,6 +65,8 @@ const BATTLE_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 76, bott
 const PLACEMENT_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 76, bottom: 24 };
 
 const DRAFT_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 170, bottom: 150 };
+
+const MENU_INSETS: ViewportInsets = { left: 360, right: 40, top: 80, bottom: 200 };
 
 type BannerTone = "blue" | "gold" | "crimson" | "slate";
 
@@ -307,15 +310,6 @@ function createRoundPlate(): RoundPlate {
   };
 }
 
-function menuEmblem(heroId: string, left: string, top: string): HTMLElement {
-  const emblem = el("div", "menu-art-emblem", roleIcon(heroId));
-  emblem.dataset.role = heroId;
-  emblem.style.left = left;
-  emblem.style.top = top;
-
-  return emblem;
-}
-
 interface RoundWatch {
   resolved: ResolvedRound;
   playback: RoundPlayback;
@@ -363,6 +357,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   let draftPlates: DraftPlate[] = [];
   let draftKey = "";
   let watch: RoundWatch | null = null;
+  let menuView: MenuView | null = null;
   let menuNotice: string | null = null;
   let connecting = false;
   let draftSubmittedEpoch = -1;
@@ -651,6 +646,12 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       region.hidden = true;
     }
 
+    dressBoard(savedBoardTheme());
+    battleLayer.hidden = false;
+    battleLayer.classList.remove("is-dimmed");
+    battleLayer.classList.add("is-menu");
+    menuView ??= createMenuView(boardStage, { grid: boardArena, insets: MENU_INSETS });
+
     const brand = el(
       "div",
       "brush-banner menu-brand",
@@ -667,24 +668,17 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     const onlineButton = button("menu-link", () => startOnline({ kind: "quick" }), connecting ? "Connecting…" : "Play online");
     onlineButton.disabled = connecting;
     const notice = menuNotice === null ? null : el("div", "menu-notice", menuNotice);
-
-    const art = el(
-      "div",
-      "menu-art",
-      el("div", "menu-art-glow"),
-      menuEmblem("frostweaver", "31%", "2%"),
-      menuEmblem("bulwark", "4%", "50%"),
-      menuEmblem("duskblade", "58%", "50%"),
-    );
-
     const fight = button("menu-fight-button", () => startMatch(), el("span", "brush-banner menu-fight", "Fight!"));
     fight.disabled = connecting;
 
-    menuLayer.replaceChildren(brand, el("nav", "menu-nav", onlineButton, labLink, boardsLink, notice), art, fight);
+    menuLayer.replaceChildren(brand, el("nav", "menu-nav", onlineButton, labLink, boardsLink, notice), fight);
     menuLayer.hidden = false;
   }
 
   function showMatch(): void {
+    menuView?.dispose();
+    menuView = null;
+    battleLayer.classList.remove("is-menu");
     menuLayer.hidden = true;
     menuLayer.replaceChildren();
 
@@ -1612,6 +1606,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       window.clearTimeout(winLineTimer);
       audio.setMusic(null);
       disposeRoundWatch();
+      menuView?.dispose();
       formationView?.dispose();
       hideDraft();
       stopTimer();

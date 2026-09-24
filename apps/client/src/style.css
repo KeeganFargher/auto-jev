@@ -1766,6 +1766,18 @@
     z-index: 15;
   }
 
+  .battle-layer.is-menu::after {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgb(12 11 29 / 0.82), rgb(12 11 29 / 0.4) 30%, transparent 52%),
+      linear-gradient(180deg, rgb(12 11 29 / 0.4), transparent 24%),
+      linear-gradient(0deg, rgb(12 11 29 / 0.55), transparent 30%),
+      radial-gradient(ellipse 90% 80% at 62% 48%, transparent 55%, rgb(12 11 29 / 0.45));
+    pointer-events: none;
+    content: "";
+  }
+
   .menu-brand {
     position: absolute;
     top: 6%;
@@ -1814,38 +1826,6 @@
   .menu-link:hover {
     color: var(--color-gold-200);
     transform: translateX(4px);
-  }
-
-  .menu-art {
-    position: absolute;
-    right: 8%;
-    top: 50%;
-    width: min(42vw, 480px);
-    aspect-ratio: 1;
-    transform: translateY(-55%);
-    pointer-events: none;
-  }
-
-  .menu-art-glow {
-    position: absolute;
-    inset: 8%;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgb(120 104 230 / 0.45), transparent 68%);
-  }
-
-  .menu-art-emblem {
-    position: absolute;
-    width: 38%;
-    height: 38%;
-    display: grid;
-    place-items: center;
-  }
-
-  .menu-art-emblem svg {
-    width: 100%;
-    height: 100%;
-    color: var(--role);
-    filter: drop-shadow(0 0 24px var(--role)) drop-shadow(0 8px 0 rgb(0 0 0 / 0.35));
   }
 
   .menu-fight-button {
