@@ -307,49 +307,6 @@ lighting on the stone (it's tiled and would show seams).
 
 ---
 
-## 6. Main menu key art (optional)
-
-**Used in:** the right half of the main menu
-(`apps/client/src/game/scenes/match-scene.ts`'s `showMenu`, CSS class
-`menu-art`, shown at up to 480×480 CSS px, vertically centred), in the
-same spot the reference screenshot's menu puts its featured hero.
-
-**Currently:** three hero emblems (`menuEmblem`) glowing in their hero
-colours over a soft purple glow: Rime's snowflake at the top, Anvil's
-shield bottom left and Vesper's dagger bottom right. Pure placeholder.
-
-**Files to deliver:**
-
-| File | Size | Format |
-| --- | --- | --- |
-| `apps/client/public/assets/menu/key-art.png` | 1440×1440 px | PNG, transparent |
-
-1440 px covers 480 CSS px at 3×. The page's twilight backdrop and
-perspective floor grid show around and behind it, so no background. The
-Cloudflare model tops out at 1024×1024 for a square, which still covers
-480 CSS px at 2×.
-
-**Prompt:**
-
-```
-Stylised game key art of three fantasy heroes posed together as a trio,
-full body to the knees: a towering armoured shield-bearer in heavy
-plate with a huge tower shield and gold trim at the front left, a calm
-arctic sorceress in pale layered robes with ice crystals orbiting one
-raised hand at the back centre, and a slim hooded assassin with twin
-curved daggers and violet trim at the front right. Confident poses,
-chunky exaggerated proportions, bold readable silhouettes, painted
-3D-rendered look, gold, ice-blue and violet rim lights matching each
-hero, dusky purple ambient light, transparent background, square
-composition, no text, no logo.
-```
-
-**Avoid:** a baked-in background scene (the menu supplies it), text or
-logos, blue `#4ea1ff` or red `#ff6b6b` as a dominant colour, more than
-three characters.
-
----
-
 ## 7. Background music (three seamless loops)
 
 **Used in:** the main menu, the between-battle screens (draft,
