@@ -206,7 +206,7 @@ function waterfall(kit: PropKit, width: number, height: number): Group {
   foam.rotation.x = -Math.PI / 2;
   foam.castShadow = false;
 
-  kit.animate((seconds) => {
+  kit.animate([foam], (seconds) => {
     flow.offset.y = seconds * 1.6;
     foam.scale.setScalar(1 + Math.sin(seconds * 5) * 0.06);
   });

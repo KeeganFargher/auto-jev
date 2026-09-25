@@ -33,20 +33,16 @@ import {
 } from "@jev-game/content";
 import { BLESSED_BURST, PLAGUE_BURST, TICK_SECONDS } from "@jev-game/game";
 import {
-  AdditiveBlending,
   BoxGeometry,
   BufferGeometry,
   CircleGeometry,
   Color,
   ConeGeometry,
   CylinderGeometry,
-  DoubleSide,
   Float32BufferAttribute,
   Group,
   IcosahedronGeometry,
   Mesh,
-  MeshBasicMaterial,
-  MeshStandardMaterial,
   OctahedronGeometry,
   PlaneGeometry,
   Quaternion,
@@ -54,8 +50,12 @@ import {
   SphereGeometry,
   TorusGeometry,
   Vector3,
+  type ColorRepresentation,
   type Material,
+  type MeshBasicMaterial,
+  type MeshStandardMaterial,
 } from "three";
+import { effectMaterials, releaseEffectMaterial, type MaterialPool } from "./effect-materials.js";
 import { evilEye, fatePulse, fateWeb, hexHop, knellToll, omenEcho, SPITE_WINDUP_SECONDS, spiteNeedle, weaverSurge } from "./fate-visuals.js";
 import { createTrail, type ParticleStyle, type ParticleSystem } from "./particles.js";
 
@@ -75,6 +75,7 @@ export interface ProjectileVisual {
   readonly objects: Mesh[];
   readonly seconds?: number;
   place(from: Vector3, to: Vector3, progress: number): void;
+  dispose(): void;
 }
 
 export interface EmitterMotion {
@@ -91,6 +92,18 @@ interface SpellGeometry {
   ring: BufferGeometry;
   flame: BufferGeometry;
   disc: BufferGeometry;
+  core: BufferGeometry;
+  corona: BufferGeometry;
+}
+
+interface SolidLook {
+  color: ColorRepresentation;
+  roughness: number;
+  metalness?: number;
+  emissive?: ColorRepresentation;
+  emissiveIntensity?: number;
+  opacity?: number;
+  depthWrite?: boolean;
 }
 
 interface TickClock {
@@ -1003,6 +1016,7 @@ function jaggedDisc(radius: number, next: () => number): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
+  geometry.computeVertexNormals();
 
   return geometry;
 }
@@ -1016,41 +1030,89 @@ function geometries(): SpellGeometry {
     ring: new RingGeometry(0.82, 1, 48),
     flame: flameGeometry(),
     disc: new CircleGeometry(1, 40),
+    core: new SphereGeometry(1.2, 12, 8),
+    corona: new SphereGeometry(2, 12, 8),
   };
 
   return shared;
 }
 
 function glowMaterial(color: Color, opacity: number): MeshBasicMaterial {
-  return new MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    side: DoubleSide,
-  });
+  const material = effectMaterials.glow.take();
+  material.color.copy(color);
+  material.opacity = opacity;
+
+  return material;
 }
 
 function flameMaterial(opacity: number): MeshBasicMaterial {
-  return new MeshBasicMaterial({ vertexColors: true, transparent: true, opacity, depthWrite: false, side: DoubleSide });
+  const material = effectMaterials.flame.take();
+  material.opacity = opacity;
+
+  return material;
 }
 
 function rockMaterial(glow: number): MeshStandardMaterial {
-  return new MeshStandardMaterial({
-    color: ROCK,
-    emissive: EMBER,
-    emissiveIntensity: glow,
-    flatShading: true,
-    roughness: 0.95,
-  });
+  const material = effectMaterials.rock.take();
+  material.color.set(ROCK);
+  material.emissive.copy(EMBER);
+  material.emissiveIntensity = glow;
+
+  return material;
 }
 
-function disposeAll(root: Group, materials: readonly Material[]): void {
+function scorchMaterial(color: ColorRepresentation, opacity: number): MeshBasicMaterial {
+  const material = effectMaterials.scorch.take();
+  material.color.set(color);
+  material.opacity = opacity;
+
+  return material;
+}
+
+function veilMaterial(color: ColorRepresentation, opacity: number): MeshBasicMaterial {
+  const material = effectMaterials.veil.take();
+  material.color.set(color);
+  material.opacity = opacity;
+
+  return material;
+}
+
+function coreMaterial(color: ColorRepresentation): MeshBasicMaterial {
+  const material = effectMaterials.core.take();
+  material.color.set(color);
+
+  return material;
+}
+
+function solidMaterial(kind: MaterialPool<MeshStandardMaterial>, look: SolidLook): MeshStandardMaterial {
+  const material = kind.take();
+  material.color.set(look.color);
+  material.roughness = look.roughness;
+  material.metalness = look.metalness ?? 0;
+  material.emissive.set(look.emissive ?? 0);
+  material.emissiveIntensity = look.emissiveIntensity ?? 1;
+  material.opacity = look.opacity ?? 1;
+  material.depthWrite = look.depthWrite ?? true;
+
+  return material;
+}
+
+function retire(root: Group, materials: readonly Material[]): void {
   root.removeFromParent();
 
   for (const material of materials) {
-    material.dispose();
+    releaseEffectMaterial(material);
+  }
+}
+
+function retireProjectile(meshes: readonly Mesh<BufferGeometry, Material>[], owned: readonly BufferGeometry[]): void {
+  for (const mesh of meshes) {
+    mesh.removeFromParent();
+    releaseEffectMaterial(mesh.material);
+  }
+
+  for (const geometry of owned) {
+    geometry.dispose();
   }
 }
 
@@ -1103,15 +1165,8 @@ function meteorFall(
   const stone = rockMaterial(0.55);
   const shellSurface = glowMaterial(FIRE, 0.7);
 
-  const trailSurface = new MeshBasicMaterial({
-    vertexColors: true,
-    transparent: true,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    side: DoubleSide,
-  });
-
-  const shadowSurface = new MeshBasicMaterial({ color: SCORCH, transparent: true, opacity: 0, depthWrite: false });
+  const trailSurface = effectMaterials.trail.take();
+  const shadowSurface = scorchMaterial(SCORCH, 0);
   const rock = new Mesh(kit.rock, stone);
   const shell = new Mesh(kit.shell, shellSurface);
   const trail = new Mesh(kit.trail, trailSurface);
@@ -1170,7 +1225,7 @@ function meteorFall(
     },
 
     dispose() {
-      disposeAll(root, [stone, shellSurface, trailSurface, shadowSurface]);
+      retire(root, [stone, shellSurface, trailSurface, shadowSurface]);
     },
   };
 }
@@ -1252,7 +1307,7 @@ function meteorBlast(particles: ParticleSystem, center: Vector3, radius: number)
     },
 
     dispose() {
-      disposeAll(root, [domeSurface, flashSurface, ringSurface, tongueSurface, debrisSurface]);
+      retire(root, [domeSurface, flashSurface, ringSurface, tongueSurface, debrisSurface]);
     },
   };
 }
@@ -1261,7 +1316,7 @@ function burningGround(particles: ParticleSystem, center: Vector3, radius: numbe
   const kit = geometries();
   const next = random(seed * 977 + 31);
   const scorchGeometry = jaggedDisc(radius * 0.92, next);
-  const scorchSurface = new MeshBasicMaterial({ color: SCORCH, transparent: true, opacity: 0, depthWrite: false });
+  const scorchSurface = scorchMaterial(SCORCH, 0);
   const fireSurface = flameMaterial(0);
   const glowSurface = glowMaterial(FIRE, 0);
   const root = new Group();
@@ -1354,7 +1409,7 @@ function burningGround(particles: ParticleSystem, center: Vector3, radius: numbe
 
     dispose() {
       scorchGeometry.dispose();
-      disposeAll(root, [scorchSurface, fireSurface, glowSurface]);
+      retire(root, [scorchSurface, fireSurface, glowSurface]);
     },
   };
 }
@@ -1416,15 +1471,16 @@ function infernoBurst(particles: ParticleSystem, center: Vector3, radius: number
     },
 
     dispose() {
-      disposeAll(root, [tongueSurface, ringSurface, flashSurface]);
+      retire(root, [tongueSurface, ringSurface, flashSurface]);
     },
   };
 }
 
 function fireballProjectile(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
-  const core = new Mesh(new SphereGeometry(1.2, 12, 8), new MeshBasicMaterial({ color: GOLD }));
-  const shell = new Mesh(new SphereGeometry(2, 12, 8), glowMaterial(FIRE, 0.8));
-  const tail = new Mesh(trailGeometry(), flameMaterial(0.9));
+  const kit = geometries();
+  const core = new Mesh(kit.core, coreMaterial(GOLD));
+  const shell = new Mesh(kit.corona, glowMaterial(FIRE, 0.8));
+  const tail = new Mesh(kit.trail, flameMaterial(0.9));
   const heading = new Vector3();
   const embers = createTrail(particles, TRAIL_EMBERS, FIREBALL_EMBER_SPACING, launch);
   const smoke = createTrail(particles, TRAIL_SMOKE, FIREBALL_SMOKE_SPACING, launch);
@@ -1442,6 +1498,10 @@ function fireballProjectile(particles: ParticleSystem, launch: Vector3): Project
       embers.follow(core.position);
       smoke.follow(core.position);
     },
+
+    dispose() {
+      retireProjectile([core, shell, tail], []);
+    },
   };
 }
 
@@ -1451,14 +1511,14 @@ function shockwave(flashColor: Color): AreaFactory {
 
 function groundShockwave(center: Vector3, radius: number, flashColor: Color): SpellVisual {
   const next = random(center.x * 11 + center.z * 5);
-  const ringGeometry = new RingGeometry(0.82, 1, 48);
+  const kit = geometries();
   const puffGeometry = new IcosahedronGeometry(1, 0);
-  const dustSurface = new MeshBasicMaterial({ color: DUST, transparent: true, opacity: 0.75, depthWrite: false, side: DoubleSide });
+  const dustSurface = veilMaterial(DUST, 0.75);
   const flashSurface = glowMaterial(flashColor, 0.85);
-  const puffSurface = new MeshStandardMaterial({ color: DUST, transparent: true, opacity: 0.9, flatShading: true, roughness: 1 });
+  const puffSurface = solidMaterial(effectMaterials.fadingRock, { color: DUST, roughness: 1, opacity: 0.9 });
   const root = new Group();
-  const dust = new Mesh(ringGeometry, dustSurface);
-  const flash = new Mesh(ringGeometry, flashSurface);
+  const dust = new Mesh(kit.ring, dustSurface);
+  const flash = new Mesh(kit.ring, flashSurface);
   const puffs: Debris[] = [];
   root.position.set(center.x, 0, center.z);
   dust.rotation.x = -Math.PI / 2;
@@ -1502,16 +1562,15 @@ function groundShockwave(center: Vector3, radius: number, flashColor: Color): Sp
     },
 
     dispose() {
-      ringGeometry.dispose();
       puffGeometry.dispose();
-      disposeAll(root, [dustSurface, flashSurface, puffSurface]);
+      retire(root, [dustSurface, flashSurface, puffSurface]);
     },
   };
 }
 
 function shieldDisc(): ProjectileVisual {
-  const face = new Mesh(new CylinderGeometry(1.9, 1.9, 0.45, 18), new MeshStandardMaterial({ color: SHIELD_FACE, metalness: 0.45, roughness: 0.45 }));
-  const rim = new Mesh(new TorusGeometry(1.95, 0.32, 6, 18), new MeshStandardMaterial({ color: OATH_GOLD, emissive: OATH_GOLD, emissiveIntensity: 0.25, roughness: 0.5 }));
+  const face = new Mesh(new CylinderGeometry(1.9, 1.9, 0.45, 18), solidMaterial(effectMaterials.solid, { color: SHIELD_FACE, metalness: 0.45, roughness: 0.45 }));
+  const rim = new Mesh(new TorusGeometry(1.95, 0.32, 6, 18), solidMaterial(effectMaterials.solid, { color: OATH_GOLD, emissive: OATH_GOLD, emissiveIntensity: 0.25, roughness: 0.5 }));
   const glint = new Mesh(new SphereGeometry(0.7, 8, 6), glowMaterial(OATH_GOLD, 0.7));
   rim.rotation.x = Math.PI / 2;
 
@@ -1526,6 +1585,10 @@ function shieldDisc(): ProjectileVisual {
       face.rotation.y = progress * Math.PI * 2 * SHIELD_SPINS;
       rim.rotation.z = face.rotation.y;
     },
+
+    dispose() {
+      retireProjectile([face, rim, glint], [face.geometry, rim.geometry, glint.geometry]);
+    },
   };
 }
 
@@ -1533,8 +1596,8 @@ function bladeVortex(center: Vector3, radius: number, seed: number): TickedVisua
   const handleGeometry = new BoxGeometry(0.55, 0.55, 4.8);
   const bladeGeometry = new BoxGeometry(3.8, 0.34, 2.7);
   const trailGeometry = new RingGeometry(radius * 0.66, radius * 0.9, 40, 1, 0, Math.PI * 0.55);
-  const steelSurface = new MeshStandardMaterial({ color: STEEL, emissive: GHOST, emissiveIntensity: 0.18, metalness: 0.5, roughness: 0.4, transparent: true, opacity: 0 });
-  const woodSurface = new MeshStandardMaterial({ color: WOOD, roughness: 0.9, transparent: true, opacity: 0 });
+  const steelSurface = solidMaterial(effectMaterials.fadingSolid, { color: STEEL, emissive: GHOST, emissiveIntensity: 0.18, metalness: 0.5, roughness: 0.4, opacity: 0 });
+  const woodSurface = solidMaterial(effectMaterials.fadingSolid, { color: WOOD, roughness: 0.9, opacity: 0 });
   const trailSurface = glowMaterial(GHOST, 0);
   const root = new Group();
   const spinner = new Group();
@@ -1596,14 +1659,14 @@ function bladeVortex(center: Vector3, radius: number, seed: number): TickedVisua
       handleGeometry.dispose();
       bladeGeometry.dispose();
       trailGeometry.dispose();
-      disposeAll(root, [steelSurface, woodSurface, trailSurface]);
+      retire(root, [steelSurface, woodSurface, trailSurface]);
     },
   };
 }
 
 function iceMissile(length: number, girth: number): ProjectileFactory {
   return (particles, launch) => {
-    const crystal = new Mesh(new OctahedronGeometry(1, 0), new MeshBasicMaterial({ color: ICE_WHITE }));
+    const crystal = new Mesh(new OctahedronGeometry(1, 0), coreMaterial(ICE_WHITE));
     const halo = new Mesh(new OctahedronGeometry(1, 0), glowMaterial(ICE, 0.5));
     const mist = createTrail(particles, FROST_TRAIL, Math.max(0.5, girth * 1.4), launch);
     crystal.scale.set(girth, girth, length);
@@ -1620,6 +1683,10 @@ function iceMissile(length: number, girth: number): ProjectileFactory {
         halo.quaternion.copy(crystal.quaternion);
         mist.follow(crystal.position);
       },
+
+      dispose() {
+        retireProjectile([crystal, halo], [crystal.geometry, halo.geometry]);
+      },
     };
   };
 }
@@ -1629,20 +1696,10 @@ function frozenOrbVisual(particles: ParticleSystem, motion: EmitterMotion, seed:
   const coreGeometry = new IcosahedronGeometry(1.5, 1);
   const shellGeometry = new IcosahedronGeometry(2.7, 0);
   const shardGeometry = new OctahedronGeometry(1, 0);
-  const coreSurface = new MeshBasicMaterial({ color: ICE_WHITE, transparent: true, opacity: 0 });
+  const coreSurface = scorchMaterial(ICE_WHITE, 0);
   const shellSurface = glowMaterial(ICE, 0);
-
-  const shardSurface = new MeshStandardMaterial({
-    color: ICE_BODY,
-    emissive: ICE_DEEP,
-    emissiveIntensity: 0.5,
-    roughness: 0.2,
-    flatShading: true,
-    transparent: true,
-    opacity: 0,
-  });
-
-  const shadowSurface = new MeshBasicMaterial({ color: ICE_DEEP, transparent: true, opacity: 0, depthWrite: false });
+  const shardSurface = solidMaterial(effectMaterials.fadingRock, { color: ICE_BODY, emissive: ICE_DEEP, emissiveIntensity: 0.5, roughness: 0.2, opacity: 0 });
+  const shadowSurface = scorchMaterial(ICE_DEEP, 0);
   const root = new Group();
   const body = new Group();
   const ring = new Group();
@@ -1729,7 +1786,7 @@ function frozenOrbVisual(particles: ParticleSystem, motion: EmitterMotion, seed:
       coreGeometry.dispose();
       shellGeometry.dispose();
       shardGeometry.dispose();
-      disposeAll(root, [coreSurface, shellSurface, shardSurface, shadowSurface]);
+      retire(root, [coreSurface, shellSurface, shardSurface, shadowSurface]);
     },
   };
 }
@@ -1738,18 +1795,16 @@ function hailCloud(particles: ParticleSystem, motion: EmitterMotion, seed: numbe
   const next = random(seed * 389 + 5);
   const puffGeometry = new IcosahedronGeometry(1, 1);
 
-  const cloudSurface = new MeshStandardMaterial({
+  const cloudSurface = solidMaterial(effectMaterials.fadingRock, {
     color: STORM_CLOUD,
     emissive: STORM_SHADE,
     emissiveIntensity: 0.5,
     roughness: 1,
-    flatShading: true,
-    transparent: true,
     opacity: 0,
     depthWrite: false,
   });
 
-  const shadowSurface = new MeshBasicMaterial({ color: STORM_SHADE, transparent: true, opacity: 0, depthWrite: false });
+  const shadowSurface = scorchMaterial(STORM_SHADE, 0);
   const root = new Group();
   const cloud = new Group();
   const shadow = new Mesh(geometries().disc, shadowSurface);
@@ -1810,7 +1865,7 @@ function hailCloud(particles: ParticleSystem, motion: EmitterMotion, seed: numbe
 
     dispose() {
       puffGeometry.dispose();
-      disposeAll(root, [cloudSurface, shadowSurface]);
+      retire(root, [cloudSurface, shadowSurface]);
     },
   };
 }
@@ -1820,16 +1875,8 @@ function glacialEruption(particles: ParticleSystem, center: Vector3, radius: num
   const spikeGeometry = new ConeGeometry(1, 1, 5, 1).translate(0, 0.5, 0);
   const frostGeometry = jaggedDisc(radius, next);
 
-  const iceSurface = new MeshStandardMaterial({
-    color: ICE_BODY,
-    emissive: ICE_DEEP,
-    emissiveIntensity: 0.45,
-    roughness: 0.25,
-    metalness: 0.05,
-    flatShading: true,
-  });
-
-  const frostSurface = new MeshBasicMaterial({ color: RIME, transparent: true, opacity: 0, depthWrite: false });
+  const iceSurface = solidMaterial(effectMaterials.rock, { color: ICE_BODY, emissive: ICE_DEEP, emissiveIntensity: 0.45, roughness: 0.25, metalness: 0.05 });
+  const frostSurface = scorchMaterial(RIME, 0);
   const ringSurface = glowMaterial(ICE, 0.9);
   const root = new Group();
   const frost = new Mesh(frostGeometry, frostSurface);
@@ -1884,7 +1931,7 @@ function glacialEruption(particles: ParticleSystem, center: Vector3, radius: num
     dispose() {
       spikeGeometry.dispose();
       frostGeometry.dispose();
-      disposeAll(root, [iceSurface, frostSurface, ringSurface]);
+      retire(root, [iceSurface, frostSurface, ringSurface]);
     },
   };
 }
@@ -1895,11 +1942,11 @@ function plagueFlower(particles: ParticleSystem, center: Vector3, radius: number
   const leaf = petalGeometry();
   const bulbGeometry = new IcosahedronGeometry(1, 1);
   const stainGeometry = jaggedDisc(radius * 0.8, next);
-  const petalSurface = new MeshStandardMaterial({ color: PETAL, emissive: PETAL_SHADE, emissiveIntensity: 0.6, roughness: 0.85, flatShading: true });
-  const innerSurface = new MeshStandardMaterial({ color: PETAL_INNER, emissive: PETAL_SHADE, emissiveIntensity: 0.6, roughness: 0.8, flatShading: true });
+  const petalSurface = solidMaterial(effectMaterials.rock, { color: PETAL, emissive: PETAL_SHADE, emissiveIntensity: 0.6, roughness: 0.85 });
+  const innerSurface = solidMaterial(effectMaterials.rock, { color: PETAL_INNER, emissive: PETAL_SHADE, emissiveIntensity: 0.6, roughness: 0.8 });
   const bulbSurface = glowMaterial(TOXIC, 0);
-  const coreSurface = new MeshBasicMaterial({ color: TOXIC_PALE });
-  const stainSurface = new MeshBasicMaterial({ color: SLUDGE, transparent: true, opacity: 0, depthWrite: false });
+  const coreSurface = coreMaterial(TOXIC_PALE);
+  const stainSurface = scorchMaterial(SLUDGE, 0);
   const root = new Group();
   const bloom = new Group();
   const bulb = new Mesh(bulbGeometry, bulbSurface);
@@ -2001,7 +2048,7 @@ function plagueFlower(particles: ParticleSystem, center: Vector3, radius: number
       leaf.dispose();
       bulbGeometry.dispose();
       stainGeometry.dispose();
-      disposeAll(root, [petalSurface, innerSurface, bulbSurface, coreSurface, stainSurface]);
+      retire(root, [petalSurface, innerSurface, bulbSurface, coreSurface, stainSurface]);
     },
   };
 }
@@ -2016,7 +2063,7 @@ function plagueBurst(particles: ParticleSystem, center: Vector3, radius: number)
   const coreSurface = glowMaterial(TOXIC_PALE, 1);
   const ringSurface = glowMaterial(TOXIC, 0.9);
   const hazeSurface = glowMaterial(BLIGHT, 0.45);
-  const splatSurface = new MeshBasicMaterial({ color: SLUDGE, transparent: true, opacity: 0, depthWrite: false });
+  const splatSurface = scorchMaterial(SLUDGE, 0);
   const root = new Group();
   const blob = new Mesh(blobGeometry, blobSurface);
   const core = new Mesh(blobGeometry, coreSurface);
@@ -2065,7 +2112,7 @@ function plagueBurst(particles: ParticleSystem, center: Vector3, radius: number)
     dispose() {
       blobGeometry.dispose();
       splatGeometry.dispose();
-      disposeAll(root, [blobSurface, coreSurface, ringSurface, hazeSurface, splatSurface]);
+      retire(root, [blobSurface, coreSurface, ringSurface, hazeSurface, splatSurface]);
     },
   };
 }
@@ -2121,14 +2168,14 @@ function pandemicWave(particles: ParticleSystem, center: Vector3, radius: number
     dispose() {
       frontGeometry.dispose();
       hazeGeometry.dispose();
-      disposeAll(root, [frontSurface, hazeSurface, flashSurface]);
+      retire(root, [frontSurface, hazeSurface, flashSurface]);
     },
   };
 }
 
 function plagueGlob(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
   const blob = new Mesh(new IcosahedronGeometry(1.1, 1), glowMaterial(TOXIC, 0.9));
-  const core = new Mesh(new IcosahedronGeometry(0.55, 0), new MeshBasicMaterial({ color: TOXIC_DEEP }));
+  const core = new Mesh(new IcosahedronGeometry(0.55, 0), coreMaterial(TOXIC_DEEP));
   const drip = createTrail(particles, GLOB_DRIP, 0.9, launch);
 
   return {
@@ -2142,16 +2189,20 @@ function plagueGlob(particles: ParticleSystem, launch: Vector3): ProjectileVisua
       core.position.copy(blob.position);
       drip.follow(blob.position);
     },
+
+    dispose() {
+      retireProjectile([blob, core], [blob.geometry, core.geometry]);
+    },
   };
 }
 
 function hammerMissile(size: number): ProjectileFactory {
   return (particles, launch) => {
-    const stone = new MeshStandardMaterial({ color: HAMMER_STONE, emissive: HOLY_DEEP, emissiveIntensity: 0.3, roughness: 0.75, flatShading: true });
-    const gold = new MeshStandardMaterial({ color: OATH_GOLD, emissive: OATH_GOLD, emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.4 });
+    const stone = solidMaterial(effectMaterials.rock, { color: HAMMER_STONE, emissive: HOLY_DEEP, emissiveIntensity: 0.3, roughness: 0.75 });
+    const gold = solidMaterial(effectMaterials.solid, { color: OATH_GOLD, emissive: OATH_GOLD, emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.4 });
     const head = new Mesh(new BoxGeometry(1.9 * size, 1.15 * size, 1.15 * size), stone);
     const band = new Mesh(new BoxGeometry(0.45 * size, 1.3 * size, 1.3 * size), gold);
-    const handle = new Mesh(new CylinderGeometry(0.2 * size, 0.24 * size, 2.8 * size, 6), new MeshStandardMaterial({ color: WOOD, roughness: 0.9 }));
+    const handle = new Mesh(new CylinderGeometry(0.2 * size, 0.24 * size, 2.8 * size, 6), solidMaterial(effectMaterials.solid, { color: WOOD, roughness: 0.9 }));
     const halo = new Mesh(new SphereGeometry(1.2 * size, 10, 8), glowMaterial(HOLY_DEEP, 0.3));
     const trail = createTrail(particles, HOLY_TRAIL, HAMMER_TRAIL_SPACING, launch);
     const headOffset = new Vector3(0, 0.45 * size, 0);
@@ -2184,6 +2235,10 @@ function hammerMissile(size: number): ProjectileFactory {
         mount(handle, handleOffset);
         halo.position.copy(head.position);
         trail.follow(head.position);
+      },
+
+      dispose() {
+        retireProjectile([handle, head, band, halo], [handle.geometry, head.geometry, band.geometry, halo.geometry]);
       },
     };
   };
@@ -2230,7 +2285,7 @@ function holyNova(particles: ParticleSystem, center: Vector3, radius: number): S
     },
 
     dispose() {
-      disposeAll(root, [ringSurface, hazeSurface, flashSurface]);
+      retire(root, [ringSurface, hazeSurface, flashSurface]);
     },
   };
 }
@@ -2280,7 +2335,7 @@ function holyPillar(particles: ParticleSystem, center: Vector3, radius: number):
 
     dispose() {
       beamGeometry.dispose();
-      disposeAll(root, [beamSurface, coreSurface, ringSurface]);
+      retire(root, [beamSurface, coreSurface, ringSurface]);
     },
   };
 }
@@ -2359,7 +2414,7 @@ function hallowedGround(particles: ParticleSystem, center: Vector3, radius: numb
 
     dispose() {
       rayGeometry.dispose();
-      disposeAll(root, [glowSurface, ringSurface, raySurface]);
+      retire(root, [glowSurface, ringSurface, raySurface]);
     },
   };
 }
@@ -2406,7 +2461,7 @@ function curseNova(particles: ParticleSystem, center: Vector3, radius: number): 
     },
 
     dispose() {
-      disposeAll(root, [ringSurface, hazeSurface, flashSurface]);
+      retire(root, [ringSurface, hazeSurface, flashSurface]);
     },
   };
 }
@@ -2419,7 +2474,7 @@ function boneBlast(particles: ParticleSystem, center: Vector3, radius: number): 
   const domeSurface = glowMaterial(GRAVE, 0.42);
   const flashSurface = glowMaterial(GRAVE, 0.6);
   const ringSurface = glowMaterial(BONE, 0.55);
-  const shardSurface = new MeshStandardMaterial({ color: BONE, roughness: 0.8, emissive: GRAVE_DEEP, emissiveIntensity: 0.4 });
+  const shardSurface = solidMaterial(effectMaterials.solid, { color: BONE, roughness: 0.8, emissive: GRAVE_DEEP, emissiveIntensity: 0.4 });
   const root = new Group();
   const dome = new Mesh(kit.dome, domeSurface);
   const flash = new Mesh(kit.dome, flashSurface);
@@ -2475,7 +2530,7 @@ function boneBlast(particles: ParticleSystem, center: Vector3, radius: number): 
 
     dispose() {
       shardGeometry.dispose();
-      disposeAll(root, [domeSurface, flashSurface, ringSurface, shardSurface]);
+      retire(root, [domeSurface, flashSurface, ringSurface, shardSurface]);
     },
   };
 }
@@ -2525,7 +2580,7 @@ function graveRise(particles: ParticleSystem, center: Vector3, radius: number): 
 
     dispose() {
       beamGeometry.dispose();
-      disposeAll(root, [beamSurface, coreSurface, ringSurface]);
+      retire(root, [beamSurface, coreSurface, ringSurface]);
     },
   };
 }
@@ -2565,14 +2620,14 @@ function graveNova(particles: ParticleSystem, center: Vector3, radius: number): 
     },
 
     dispose() {
-      disposeAll(root, [ringSurface, hazeSurface]);
+      retire(root, [ringSurface, hazeSurface]);
     },
   };
 }
 
 function soulBolt(size: number, seconds: number, arc: number): ProjectileFactory {
   return (particles, launch) => {
-    const core = new Mesh(new IcosahedronGeometry(0.55 * size, 0), new MeshBasicMaterial({ color: GRAVE_PALE }));
+    const core = new Mesh(new IcosahedronGeometry(0.55 * size, 0), coreMaterial(GRAVE_PALE));
     const halo = new Mesh(new IcosahedronGeometry(1.3 * size, 1), glowMaterial(GRAVE, 0.45));
     const trail = createTrail(particles, GRAVE_TRAIL, GRAVE_TRAIL_SPACING, launch);
 
@@ -2588,6 +2643,10 @@ function soulBolt(size: number, seconds: number, arc: number): ProjectileFactory
         halo.scale.setScalar(1 + Math.sin(progress * Math.PI * 6) * 0.15);
         trail.follow(core.position);
       },
+
+      dispose() {
+        retireProjectile([core, halo], [core.geometry, halo.geometry]);
+      },
     };
   };
 }
@@ -2599,9 +2658,9 @@ export function risenVisual(particles: ParticleSystem, center: Vector3, radius: 
 const IMPACTS = new Map<string, ImpactFactory>([[meteor.id, meteorFall]]);
 
 function rocketProjectile(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
-  const body = new Mesh(new CylinderGeometry(0.35, 0.35, 2.2, 8), new MeshStandardMaterial({ color: IRON, metalness: 0.5, roughness: 0.5 }));
-  const nose = new Mesh(new ConeGeometry(0.36, 0.9, 8), new MeshStandardMaterial({ color: BRASS, metalness: 0.6, roughness: 0.4 }));
-  const exhaust = new Mesh(trailGeometry(), flameMaterial(0.9));
+  const body = new Mesh(new CylinderGeometry(0.35, 0.35, 2.2, 8), solidMaterial(effectMaterials.solid, { color: IRON, metalness: 0.5, roughness: 0.5 }));
+  const nose = new Mesh(new ConeGeometry(0.36, 0.9, 8), solidMaterial(effectMaterials.solid, { color: BRASS, metalness: 0.6, roughness: 0.4 }));
+  const exhaust = new Mesh(geometries().trail, flameMaterial(0.9));
   const heading = new Vector3();
   const backward = new Vector3();
   const position = new Vector3();
@@ -2629,6 +2688,10 @@ function rocketProjectile(particles: ParticleSystem, launch: Vector3): Projectil
       embers.follow(position);
       smoke.follow(position);
     },
+
+    dispose() {
+      retireProjectile([body, nose, exhaust], [body.geometry, nose.geometry]);
+    },
   };
 }
 
@@ -2642,8 +2705,8 @@ function shrapnelBlast(gearCount: number): AreaFactory {
     const domeSurface = glowMaterial(FIRE, 0.4);
     const flashSurface = glowMaterial(BRASS_HOT, 0.5);
     const ringSurface = glowMaterial(BRASS, 0.55);
-    const shardSurface = new MeshStandardMaterial({ color: IRON, metalness: 0.5, roughness: 0.6, emissive: EMBER, emissiveIntensity: 0.3 });
-    const gearSurface = new MeshStandardMaterial({ color: BRASS, metalness: 0.6, roughness: 0.4, flatShading: true });
+    const shardSurface = solidMaterial(effectMaterials.solid, { color: IRON, metalness: 0.5, roughness: 0.6, emissive: EMBER, emissiveIntensity: 0.3 });
+    const gearSurface = solidMaterial(effectMaterials.rock, { color: BRASS, metalness: 0.6, roughness: 0.4 });
     const root = new Group();
     const dome = new Mesh(kit.dome, domeSurface);
     const flash = new Mesh(kit.dome, flashSurface);
@@ -2700,7 +2763,7 @@ function shrapnelBlast(gearCount: number): AreaFactory {
       dispose() {
         shardGeometry.dispose();
         gearGeometry.dispose();
-        disposeAll(root, [domeSurface, flashSurface, ringSurface, shardSurface, gearSurface]);
+        retire(root, [domeSurface, flashSurface, ringSurface, shardSurface, gearSurface]);
       },
     };
   };
@@ -2710,7 +2773,7 @@ function mechAssemble(particles: ParticleSystem, center: Vector3, radius: number
   const reach = Math.max(SHRAPNEL_MIN_RADIUS, radius);
   const next = random(center.x * 5 + center.z * 19);
   const plateGeometry = new BoxGeometry(1.6, 1.1, 0.25);
-  const plateSurface = new MeshStandardMaterial({ color: BRASS, metalness: 0.65, roughness: 0.35, emissive: BRASS, emissiveIntensity: 0.25 });
+  const plateSurface = solidMaterial(effectMaterials.solid, { color: BRASS, metalness: 0.65, roughness: 0.35, emissive: BRASS, emissiveIntensity: 0.25 });
   const ringSurface = glowMaterial(BRASS, 0.5);
   const root = new Group();
   const ring = new Mesh(geometries().ring, ringSurface);
@@ -2758,7 +2821,7 @@ function mechAssemble(particles: ParticleSystem, center: Vector3, radius: number
 
     dispose() {
       plateGeometry.dispose();
-      disposeAll(root, [plateSurface, ringSurface]);
+      retire(root, [plateSurface, ringSurface]);
     },
   };
 }
@@ -2792,7 +2855,7 @@ function turretDrop(particles: ParticleSystem, center: Vector3, radius: number):
     },
 
     dispose() {
-      disposeAll(root, [ringSurface]);
+      retire(root, [ringSurface]);
     },
   };
 }

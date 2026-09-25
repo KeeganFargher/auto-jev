@@ -31,7 +31,7 @@ import { createUnitInspectorView, type UnitInspectorView } from "../../hud/unit-
 import { createDamageMeter } from "../../hud/damage-meter.js";
 import { hideTip } from "../../hud/tooltip.js";
 import { createCountdown, type Countdown } from "../../hud/countdown.js";
-import { button, el } from "../../hud/dom.js";
+import { button, el, setText } from "../../hud/dom.js";
 import { botSilhouette, heartIcon, humanSilhouette, skipIcon } from "../../hud/icons.js";
 import { renderDraftLoadout, renderLoadout, renderTeamLoadout, type SelectedPiece } from "../../hud/loadout.js";
 import { buildLevel } from "../../hud/levels.js";
@@ -305,8 +305,8 @@ function createRoundPlate(): RoundPlate {
     root: el("div", "round-plate", timer, el("div", "round-plate-label", round, phase)),
     timer,
     set(roundText, phaseText) {
-      round.textContent = roundText;
-      phase.textContent = phaseText;
+      setText(round, roundText);
+      setText(phase, phaseText);
     },
   };
 }
@@ -1008,7 +1008,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     teleportView.seek(active.clock);
     battleSkip.hidden = false;
     roundPlate.set(roundLabel(active.resolved.round), "Teleport");
-    roundPlate.timer.textContent = "";
+    setText(roundPlate.timer, "");
     roundPlate.timer.classList.remove("is-urgent");
   }
 
@@ -1035,7 +1035,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     if (!roundDone) {
       const secondsLeft = Math.ceil(playback.secondsLeft(frame.snapshot.tickLimit));
       roundPlate.set(roundLabel(active.resolved.round), "Battle");
-      roundPlate.timer.textContent = String(secondsLeft);
+      setText(roundPlate.timer, String(secondsLeft));
       roundPlate.timer.classList.toggle("is-urgent", secondsLeft <= URGENT_SECONDS);
     } else if (active.endCountdown === null) {
       roundPlate.set(roundLabel(active.resolved.round), "Round over");

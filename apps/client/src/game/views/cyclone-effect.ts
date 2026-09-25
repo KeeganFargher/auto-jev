@@ -1,13 +1,5 @@
-import {
-  AdditiveBlending,
-  BufferGeometry,
-  Color,
-  DoubleSide,
-  Float32BufferAttribute,
-  Group,
-  Mesh,
-  MeshBasicMaterial,
-} from "three";
+import { BufferGeometry, Color, Float32BufferAttribute, Group, Mesh, type MeshBasicMaterial } from "three";
+import { effectMaterials, releaseEffectMaterial } from "./effect-materials.js";
 
 export interface CycloneEffect {
   readonly root: Group;
@@ -90,6 +82,7 @@ function funnelGeometry(): BufferGeometry {
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
+  geometry.computeVertexNormals();
 
   return geometry;
 }
@@ -129,6 +122,7 @@ function dustGeometry(): BufferGeometry {
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
   geometry.setIndex(indices);
+  geometry.computeVertexNormals();
 
   return geometry;
 }
@@ -140,15 +134,11 @@ function geometries(): CycloneGeometry {
 }
 
 function glowMaterial(color: Color): MeshBasicMaterial {
-  return new MeshBasicMaterial({
-    color,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    side: DoubleSide,
-  });
+  const material = effectMaterials.trail.take();
+  material.color.copy(color);
+  material.opacity = 0;
+
+  return material;
 }
 
 export function createCycloneEffect(): CycloneEffect {
@@ -187,8 +177,8 @@ export function createCycloneEffect(): CycloneEffect {
     },
 
     dispose() {
-      windMaterial.dispose();
-      dustMaterial.dispose();
+      releaseEffectMaterial(windMaterial);
+      releaseEffectMaterial(dustMaterial);
       root.removeFromParent();
     },
   };

@@ -1,15 +1,5 @@
-import {
-  AdditiveBlending,
-  BufferGeometry,
-  Color,
-  DoubleSide,
-  Float32BufferAttribute,
-  Group,
-  Mesh,
-  MeshBasicMaterial,
-  Quaternion,
-  Vector3,
-} from "three";
+import { BufferGeometry, Color, Float32BufferAttribute, Group, Mesh, Quaternion, Vector3, type MeshBasicMaterial } from "three";
+import { effectMaterials, releaseEffectMaterial } from "./effect-materials.js";
 import type { ParticleStyle, ParticleSystem } from "./particles.js";
 import type { SpellVisual } from "./spell-visuals.js";
 import { createTubeBatch } from "./thread-tube.js";
@@ -134,21 +124,19 @@ function crescent(reach: number, width: number, bend: number): BufferGeometry {
   const geometry = new BufferGeometry();
   geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
   geometry.setIndex(indices);
+  geometry.computeVertexNormals();
   geometry.setDrawRange(0, 0);
 
   return geometry;
 }
 
 function surface(color: Color, opacity: number, additive: boolean): MeshBasicMaterial {
-  return new MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    depthWrite: false,
-    depthTest: false,
-    side: DoubleSide,
-    blending: additive ? AdditiveBlending : undefined,
-  });
+  const material = additive ? effectMaterials.glow.take() : effectMaterials.veil.take();
+  material.color.copy(color);
+  material.opacity = opacity;
+  material.depthTest = false;
+
+  return material;
 }
 
 export function duskPuff(particles: ParticleSystem, at: Vector3, strength: number): void {
@@ -218,8 +206,8 @@ export function clawRake(particles: ParticleSystem, center: Vector3, strength: n
 
       for (const claw of claws) {
         claw.geometry.dispose();
-        claw.edge.material.dispose();
-        claw.hot.material.dispose();
+        releaseEffectMaterial(claw.edge.material);
+        releaseEffectMaterial(claw.hot.material);
       }
     },
   };
@@ -273,8 +261,8 @@ export function duskStreak(particles: ParticleSystem, from: Vector3, to: Vector3
       root.removeFromParent();
       ink.dispose();
       glow.dispose();
-      inkSurface.dispose();
-      glowSurface.dispose();
+      releaseEffectMaterial(inkSurface);
+      releaseEffectMaterial(glowSurface);
     },
   };
 }

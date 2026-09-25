@@ -225,15 +225,25 @@ function leadFor(unit: UnitState, friendlyTeamId: string): string {
 
 export function createUnitInspectorView(container: HTMLElement, friendlyTeamId: string): UnitInspectorView {
   let inspected: Inspected | null = null;
+  let shownUnit: UnitState | null = null;
+  let shownTick = -1;
 
   function clear(): void {
     inspected = null;
+    shownUnit = null;
     container.replaceChildren();
     container.hidden = true;
   }
 
   return {
     update(unit, tick) {
+      if (unit === shownUnit && tick === shownTick) {
+        return;
+      }
+
+      shownUnit = unit;
+      shownTick = tick;
+
       if (unit === null) {
         if (inspected !== null || !container.hidden) {
           clear();

@@ -44,7 +44,7 @@ export function waterSurface(
   const position = geometry.getAttribute("position");
   const rest = Float32Array.from(position.array);
 
-  kit.animate((seconds) => {
+  kit.animate([surface], (seconds) => {
     for (let index = 0; index < position.count; index += 1) {
       const x = rest[index * 3]!;
       const z = rest[index * 3 + 2]!;
@@ -63,6 +63,7 @@ export function mountEnvironment(stage: BoardStage, theme: EnvironmentTheme, gri
 
   const kit = createPropKit(theme.seed);
   const root = theme.build(kit, { grid, footprint: boardFootprint(grid), floorY: STAGE_FLOOR_Y });
+  kit.mergeStatic(root);
   stage.scene.add(root);
 
   let seconds = 0;

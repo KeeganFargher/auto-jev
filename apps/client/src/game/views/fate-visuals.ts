@@ -1,15 +1,11 @@
 import {
-  AdditiveBlending,
   CircleGeometry,
   BufferGeometry,
   Color,
-  DoubleSide,
   Float32BufferAttribute,
   Group,
   LatheGeometry,
   Mesh,
-  MeshBasicMaterial,
-  MeshStandardMaterial,
   OctahedronGeometry,
   RingGeometry,
   SphereGeometry,
@@ -17,8 +13,10 @@ import {
   Vector2,
   Vector3,
   type Material,
+  type MeshBasicMaterial,
   type Object3D,
 } from "three";
+import { effectMaterials, releaseEffectMaterial } from "./effect-materials.js";
 import { createTrail, type ParticleStyle, type ParticleSystem } from "./particles.js";
 import type { ProjectileVisual, SpellVisual } from "./spell-visuals.js";
 import { createTubeBatch, type TubeBatch } from "./thread-tube.js";
@@ -274,18 +272,19 @@ function easeOutBack(value: number): number {
 }
 
 function glowSurface(color: Color, opacity: number): MeshBasicMaterial {
-  return new MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    blending: AdditiveBlending,
-    depthWrite: false,
-    side: DoubleSide,
-  });
+  const material = effectMaterials.glow.take();
+  material.color.copy(color);
+  material.opacity = opacity;
+
+  return material;
 }
 
 function inkSurface(color: Color, opacity: number): MeshBasicMaterial {
-  return new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, side: DoubleSide });
+  const material = effectMaterials.veil.take();
+  material.color.copy(color);
+  material.opacity = opacity;
+
+  return material;
 }
 
 function arcPoint(from: Vector3, to: Vector3, lift: number, along: number, out: Vector3): Vector3 {
@@ -325,19 +324,21 @@ function faceCamera(target: Object3D, meshes: readonly Mesh[]): void {
 }
 
 function release(
-  root: Group,
+  parts: readonly Object3D[],
   geometries: readonly BufferGeometry[],
   materials: readonly Material[],
   batches: readonly TubeBatch[],
 ): void {
-  root.removeFromParent();
+  for (const part of parts) {
+    part.removeFromParent();
+  }
 
   for (const geometry of geometries) {
     geometry.dispose();
   }
 
   for (const material of materials) {
-    material.dispose();
+    releaseEffectMaterial(material);
   }
 
   for (const batch of batches) {
@@ -356,8 +357,10 @@ export function spiteNeedle(particles: ParticleSystem, launch: Vector3): Project
   const halo = new Mesh(new OctahedronGeometry(1, 0), glowSurface(FATE, 0.6));
   const tip = new Mesh(new SphereGeometry(0.5, 10, 8), glowSurface(FATE_PALE, 1));
   const aura = new Mesh(new SphereGeometry(1.9, 14, 10), glowSurface(YARN, 0.35));
-  const core = createTubeBatch(inkSurface(YARN, 1), { tubes: 1, rings: SPITE_RINGS, sides: 6 });
-  const glow = createTubeBatch(glowSurface(FATE, 0.3), { tubes: 1, rings: SPITE_RINGS, sides: 6 });
+  const coreThread = inkSurface(YARN, 1);
+  const glowThread = glowSurface(FATE, 0.3);
+  const core = createTubeBatch(coreThread, { tubes: 1, rings: SPITE_RINGS, sides: 6 });
+  const glow = createTubeBatch(glowThread, { tubes: 1, rings: SPITE_RINGS, sides: 6 });
   body.scale.set(0.55, 0.55, 2.6);
   halo.scale.set(1, 1, 3.6);
   const sparkles = createTrail(particles, { ...NEEDLE_SPARKLE, size: [1.4, 0.2] }, 0.8, launch);
@@ -421,6 +424,15 @@ export function spiteNeedle(particles: ParticleSystem, launch: Vector3): Project
       sparkles.follow(tip.position);
       fibres.follow(body.position);
     },
+
+    dispose() {
+      release(
+        [body, halo, tip, aura],
+        [body.geometry, halo.geometry, tip.geometry, aura.geometry],
+        [body.material, halo.material, tip.material, aura.material, coreThread, glowThread],
+        [core, glow],
+      );
+    },
   };
 }
 
@@ -428,7 +440,8 @@ function hopBolt(particles: ParticleSystem, launch: Vector3, loop: Color, heart:
   const bead = new Mesh(new SphereGeometry(0.75, 10, 8), inkSurface(heart, 1));
   const halo = new Mesh(new SphereGeometry(2, 12, 8), glowSurface(FATE, 0.5));
   const ring = new Mesh(new TorusGeometry(1.35, 0.24, 5, 18), inkSurface(loop, 1));
-  const tail = createTubeBatch(glowSurface(FATE, 0.6), { tubes: 1, rings: HOP_TAIL, sides: 4 });
+  const tailSurface = glowSurface(FATE, 0.6);
+  const tail = createTubeBatch(tailSurface, { tubes: 1, rings: HOP_TAIL, sides: 4 });
   const sparkles = createTrail(particles, NEEDLE_SPARKLE, 0.7, launch);
   const history = Array.from({ length: HOP_TAIL }, () => launch.clone());
 
@@ -447,6 +460,10 @@ function hopBolt(particles: ParticleSystem, launch: Vector3, loop: Color, heart:
       tail.tube(history, (along) => 0.6 * (1 - along));
       tail.end();
       sparkles.follow(bead.position);
+    },
+
+    dispose() {
+      release([bead, halo, ring], [bead.geometry, halo.geometry, ring.geometry], [bead.material, halo.material, ring.material, tailSurface], [tail]);
     },
   };
 }
@@ -506,8 +523,10 @@ export function evilEye(particles: ParticleSystem, center: Vector3, radius: numb
   }
 
   faceCamera(eye, eyeMeshes);
-  const core = createTubeBatch(inkSurface(YARN, 1), { tubes: HELIX_STRANDS, rings: HELIX_RINGS, sides: 5 });
-  const glow = createTubeBatch(glowSurface(FATE, 0.5), { tubes: HELIX_STRANDS, rings: HELIX_RINGS, sides: 5 });
+  const coreThread = inkSurface(YARN, 1);
+  const glowThread = glowSurface(FATE, 0.5);
+  const core = createTubeBatch(coreThread, { tubes: HELIX_STRANDS, rings: HELIX_RINGS, sides: 5 });
+  const glow = createTubeBatch(glowThread, { tubes: HELIX_STRANDS, rings: HELIX_RINGS, sides: 5 });
   root.add(eye, core.mesh, glow.mesh);
 
   const strands: Strand[] = Array.from({ length: HELIX_STRANDS }, (_, index) => ({
@@ -604,7 +623,7 @@ export function evilEye(particles: ParticleSystem, center: Vector3, radius: numb
 
     dispose() {
       release(
-        root,
+        [root],
         [halo, lash, sclera, iris, pupil, shine, runeGeometry, flash.geometry, shockGeometry],
         [
           haloSurface,
@@ -616,6 +635,8 @@ export function evilEye(particles: ParticleSystem, center: Vector3, radius: numb
           runeSurface,
           flash.material,
           shockSurface,
+          coreThread,
+          glowThread,
         ],
         [core, glow],
       );
@@ -653,13 +674,16 @@ export function fateWeb(particles: ParticleSystem, center: Vector3, radius: numb
   const reach = Math.min(Math.max(WEB_MIN_RADIUS, radius), WEB_MAX_RADIUS) * 0.95;
   const area = Math.max(radius, reach);
 
-  const threadCore = createTubeBatch(inkSurface(YARN_DARK, 0.95), {
+  const coreThread = inkSurface(YARN_DARK, 0.95);
+  const glowThread = glowSurface(FATE, 0.55);
+
+  const threadCore = createTubeBatch(coreThread, {
     tubes: THROWS + SPOKES + WEB_RINGS.length,
     rings: 48,
     sides: 5,
   });
 
-  const threadGlow = createTubeBatch(glowSurface(FATE, 0.55), {
+  const threadGlow = createTubeBatch(glowThread, {
     tubes: THROWS + SPOKES + WEB_RINGS.length,
     rings: 48,
     sides: 5,
@@ -775,7 +799,7 @@ export function fateWeb(particles: ParticleSystem, center: Vector3, radius: numb
     },
 
     dispose() {
-      release(root, [discGeometry, shockGeometry], [discSurface, shockSurface], [threadCore, threadGlow]);
+      release([root], [discGeometry, shockGeometry], [discSurface, shockSurface, coreThread, glowThread], [threadCore, threadGlow]);
     },
   };
 }
@@ -806,15 +830,12 @@ export function deathKnell(particles: ParticleSystem, center: Vector3, radius: n
   const rim = new TorusGeometry(1.9, 0.12, 6, 32);
   const ringGeometry = new RingGeometry(0.88, 1, 64);
 
-  const bronze = new MeshStandardMaterial({
-    color: BRONZE,
-    metalness: 0.2,
-    roughness: 0.45,
-    emissive: BRONZE,
-    emissiveIntensity: 0.35,
-    transparent: true,
-    side: DoubleSide,
-  });
+  const bronze = effectMaterials.fadingSolid.take();
+  bronze.color.set(BRONZE);
+  bronze.metalness = 0.2;
+  bronze.roughness = 0.45;
+  bronze.emissive.set(BRONZE);
+  bronze.emissiveIntensity = 0.35;
 
   const rimSurface = glowSurface(FATE, 0.9);
   const ringSurface = inkSurface(INK, 0.6);
@@ -881,7 +902,7 @@ export function deathKnell(particles: ParticleSystem, center: Vector3, radius: n
     },
 
     dispose() {
-      release(root, [bell, clapper, rim, ringGeometry], [bronze, rimSurface, ringSurface, ringGlowSurface], []);
+      release([root], [bell, clapper, rim, ringGeometry], [bronze, rimSurface, ringSurface, ringGlowSurface], []);
     },
   };
 }
@@ -901,7 +922,8 @@ export function weaverSurge(particles: ParticleSystem, center: Vector3, radius: 
     return { bead, halo, angle: (index / SURGE_BEADS) * Math.PI * 2 };
   });
 
-  const trail = createTubeBatch(glowSurface(FATE, 0.5), { tubes: SURGE_BEADS, rings: 10, sides: 4 });
+  const trailSurface = glowSurface(FATE, 0.5);
+  const trail = createTubeBatch(trailSurface, { tubes: SURGE_BEADS, rings: 10, sides: 4 });
   root.add(trail.mesh);
   const reach = Math.max(radius, 6);
   const path = Array.from({ length: 10 }, () => new Vector3());
@@ -956,7 +978,7 @@ export function weaverSurge(particles: ParticleSystem, center: Vector3, radius: 
     },
 
     dispose() {
-      release(root, [beadGeometry], [beadSurface, haloSurface], [trail]);
+      release([root], [beadGeometry], [beadSurface, haloSurface, trailSurface], [trail]);
     },
   };
 }
@@ -964,7 +986,8 @@ export function weaverSurge(particles: ParticleSystem, center: Vector3, radius: 
 export function fatePulse(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
   const bead = new Mesh(new SphereGeometry(0.75, 10, 8), inkSurface(FATE_PALE, 1));
   const halo = new Mesh(new SphereGeometry(1.9, 12, 8), glowSurface(FATE, 0.6));
-  const tail = createTubeBatch(glowSurface(FATE, 0.75), { tubes: 1, rings: PULSE_TAIL, sides: 4 });
+  const tailSurface = glowSurface(FATE, 0.75);
+  const tail = createTubeBatch(tailSurface, { tubes: 1, rings: PULSE_TAIL, sides: 4 });
   const sparkles = createTrail(particles, NEEDLE_SPARKLE, 0.9, launch);
   const path = Array.from({ length: PULSE_TAIL }, () => new Vector3());
 
@@ -994,6 +1017,10 @@ export function fatePulse(particles: ParticleSystem, launch: Vector3): Projectil
       tail.end();
       sparkles.follow(bead.position);
     },
+
+    dispose() {
+      release([bead, halo], [bead.geometry, halo.geometry], [bead.material, halo.material, tailSurface], [tail]);
+    },
   };
 }
 
@@ -1022,6 +1049,10 @@ export function knellToll(particles: ParticleSystem, launch: Vector3): Projectil
       ring.rotation.set(progress * 8, progress * 5, 0);
       dust.follow(orb.position);
       sparkles.follow(orb.position);
+    },
+
+    dispose() {
+      release([orb, halo, ring], [orb.geometry, halo.geometry, ring.geometry], [orb.material, halo.material, ring.material], []);
     },
   };
 }

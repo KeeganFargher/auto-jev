@@ -52,6 +52,7 @@ interface Dummy {
 interface Flight {
   readonly objects: readonly Mesh[];
   readonly place: (from: Vector3, to: Vector3, progress: number) => void;
+  readonly dispose: () => void;
   readonly from: () => Vector3;
   readonly target: Dummy;
   readonly delay: number;
@@ -98,17 +99,6 @@ const KNELL_RADIUS = 14;
 const FATE_RADIUS = 40;
 
 const LINK_ID = 1;
-
-function release(objects: readonly Mesh[]): void {
-  for (const object of objects) {
-    object.removeFromParent();
-    object.geometry.dispose();
-
-    for (const material of [object.material].flat()) {
-      material.dispose();
-    }
-  }
-}
 
 function yawTowards(from: Vector3, to: Vector3): number {
   return Math.atan2(to.x - from.x, to.z - from.z);
@@ -188,6 +178,7 @@ export function createSpellBench(host: HTMLElement): SpellBench {
     flights.add({
       objects: visual.objects,
       place: (start, end, progress) => visual.place(start, end, progress),
+      dispose: () => visual.dispose(),
       from,
       target,
       delay,
@@ -262,7 +253,7 @@ export function createSpellBench(host: HTMLElement): SpellBench {
     }
 
     for (const flight of flights) {
-      release(flight.objects);
+      flight.dispose();
     }
 
     visuals.clear();
@@ -374,7 +365,7 @@ export function createSpellBench(host: HTMLElement): SpellBench {
       flight.place(flight.launch ?? flight.from(), chestOf(flight.target), progress);
 
       if (progress >= 1) {
-        release(flight.objects);
+        flight.dispose();
         flights.delete(flight);
         flight.onLand();
       }

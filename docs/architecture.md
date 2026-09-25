@@ -552,6 +552,45 @@ own objects to its scene.
   - Each kind also has a bolt tint, a trail and a release flare at the
     cast socket.
   - This is cosmetic, so it stays out of the engine.
+- **Effect materials.** `effect-materials.ts` pools the materials of
+  every short-lived effect by kind: glow, flash, flame, trail, scorch,
+  veil, core, rock, fading rock, solid, fading solid and arc.
+  - An effect takes one with `effectMaterials.<kind>.take()` and hands
+    it back with `releaseEffectMaterial`. Nothing disposes them.
+  - Why: three deletes a shader when its last material is disposed, so
+    effects that made and disposed their own materials recompiled their
+    shaders on every cast, and each compile stalled a frame.
+  - The stage draws one tiny mesh of each kind for a single frame
+    (`warmEffectMaterials`) when it starts, when the graphics settings
+    change and when the board theme changes. The shaders compile then, in
+    the same pipeline the fight uses.
+  - A shader variant also depends on the geometry: three r186 keys it on
+    whether the geometry has normals. Every effect mesh has normals and
+    arc lines have none, like the warm-up's. A test checks every effect
+    against the warm-up.
+  - The additive double-sided kinds set `forceSinglePass`. Otherwise
+    three draws a transparent double-sided mesh twice, back faces then
+    front, and rebuilds its shader key for each pass. Added light doesn't
+    depend on draw order.
+- **Battle effects.** `battle-effects.ts` draws the battle view's combo
+  bursts, impact flashes, bolts, arcs and ground markers. Rings of one
+  proportion share a geometry, and arc lines reuse theirs.
+- **Static merging.** `merge-static.ts` merges the static meshes under a
+  root into one mesh per material and shadow setting, in the root's
+  space. Transparent meshes keep their own draw so three still sorts
+  them.
+  - Environments merge when they mount (`kit.mergeStatic`). An animator
+    names what it moves: `kit.animate(targets, animator)`. The targets are
+    left alone, and each target's own parts merge inside it, so a swaying
+    palm is one draw per material.
+  - An animator may only change its targets themselves: their
+    transform, geometry or material. Fire names its flame and core, not
+    the group around them.
+  - Placeholder heroes merge their parts per material; the turret's
+    rotor merges on its own.
+- **No layout reads per frame.** The stage caches its size. `screenPan`
+  gives a point's audio pan without reading layout, and `showBoard`
+  returns early when nothing changed, so views may call it every update.
 - **Glow.** `stage-glow.ts` renders through an `EffectComposer`:
   - the scene, into a half-float target with 4× MSAA;
   - `UnrealBloomPass`, with a threshold of 1.05 in linear HDR;
@@ -584,5 +623,10 @@ own objects to its scene.
   - the particle ring buffer, cone sampling, expiry and clear;
   - trails;
   - settings parsing and resolution;
-  - the frame sampler.
+  - the frame sampler;
+  - the effect material pool, and the warm-up covering every effect;
+  - hit effects and spells reusing their materials;
+  - static merging (placement, shadows, animated and mirrored props) and
+    merged heroes;
+  - HUD text written only when it changes.
   `pnpm --filter ./apps/client typecheck` checks the tests too.
