@@ -7,8 +7,17 @@ items and combos: a design doc first" note in
 personality idea, and §13 is a short check against the 8 kinds of fun.
 
 A redesign of the kits, runes (as gems), items and talents (as levels) is
-proposed in `docs/hero-redesign.md`. Until its slices land, this doc
-still describes what's built.
+under way in `docs/hero-redesign.md`. Slices 1, 2, 4a, 4b and 4c and the
+items overhaul have landed: runes are now gems socketed per skill, the
+signature is now the ultimate and the utility the ability, triggered
+casts are real casts, talent tiers are now hero levels, all ten heroes
+are rebuilt, and the item list is §7's (redesign §13 to §19). Where this
+doc talks about runes, talents, the signature, the heroes' kits or items
+(Siphon, Cruel Hex, Mass Hex, Raise Dead, Soul Well, Horde, Golem Heart,
+Blood Contract, Flashbang, Ward Bell, Soul Lantern, Thunder Maul and
+Hourglass are all gone), the redesign doc describes what's built now; §6
+below is kept current, and the rest of this doc still describes what's
+built.
 
 The goal: runs that play out differently each time, builds that can get
 properly broken, and battles where the big moments come from heroes
@@ -47,15 +56,15 @@ I'll build towards that".
 | After round | Every round | Milestone |
 | --- | --- | --- |
 | draft | — | pick 3 of 5 heroes (as today) |
-| 1 | item (common) | rune |
-| 2 | item (common) | **talents tier 1**, every hero |
+| 1 | item (common) | gem |
+| 2 | item (common) | **level 2**, every hero |
 | 3 | item (common) | **recruit or train** (4th hero) |
-| 4 | item (rare) | rune |
-| 5 | item (rare) | **talents tier 2**, every hero; opens rune socket 2 |
-| 6 | item (rare) | **recruit or train** (5th hero) |
-| 7 | item (legendary) | **talents tier 3** capstones |
-| 8 | item (legendary) | rune |
-| 9+ | item (legendary) | rune on even rounds |
+| 4 | item (rare), one card a gem | gem |
+| 5 | item (rare), one card a gem | **level 3**, every hero |
+| 6 | item (rare), one card a gem | **recruit or train** (5th hero) |
+| 7 | item (legendary), one card a gem | **level 4**, every hero |
+| 8 | item (legendary), one card a gem | gem |
+| 9+ | item (legendary), one card a gem | gem on even rounds |
 
 - **Pick 1 of 3.** Every offer is three options drawn from the seat's own
   seeded stream. Today's upgrade phase lists *every* eligible upgrade, so
@@ -64,13 +73,13 @@ I'll build towards that".
   of 3. It's a small catch-up that adds no new system.
 - **Surprise rolls:** from round 3, each item offer has a ~5% chance to
   contain one item a rarity above the band.
-- **Talent rounds level every hero at once.** Each hero picks left or
-  right at that tier (see §4), so no hero gets left behind. With 5 heroes
-  that's 5 quick binary choices.
-- **Recruit or train.** Take 1 of 3 new heroes, or decline and give one
-  existing hero a 3rd rune socket. Going wide or going tall is a real
-  choice. A recruited hero arrives at the current talent tier and you pick
-  its talents on arrival.
+- **Level rounds level every hero at once.** Each hero picks left or
+  right at that level (redesign §8), so no hero gets left behind. With 5
+  heroes that's 5 quick binary choices.
+- **Recruit or train.** Take 1 of 3 new heroes, or train one: +1 gem
+  socket in the skill you pick. Going wide or going tall is a real choice.
+  A recruited hero arrives at the team's level and you make its missed
+  level picks on arrival.
 - **Runes are scarce on purpose.** That's 4 runes by round 10 across up
   to 10 sockets, so where you put them is where your broken carry comes
   from.
@@ -180,17 +189,14 @@ trait strip shows exactly that.
 
 1. **Unique heroes.** Hero offers can repeat today, and five Frostweavers
    mustn't reach Shatter tier II on their own.
-2. **The two halves must be different heroes** (combo rule 4). A Bulwark
-   carrying Thunder Maul applies Staggered *and* detonates as Arcana, but
-   can't light Overload alone. The Resonance rune and hybrid talents are
-   the stated exceptions, and the strip shows those as a self-combo
-   marker.
+2. **The two halves must be different heroes** (combo rule 4). The
+   Resonance rune and hybrid talents are the stated exceptions, and the
+   strip shows those as a self-combo marker.
 3. **Items and runes count.** Frost Brand, Pocket Sand and the Primer
-   runes add "applies" chips, and Thunder Maul adds a detonator. That's
-   what makes moving items between rounds a trait decision.
-4. **Attunement counts printed schools only.** Thunder Maul makes a hero
-   an Arcana detonator in the combo rows, but it doesn't add to Arcana
-   Attunement.
+   runes add "applies" chips. That's what makes moving items between
+   rounds a trait decision.
+4. **Attunement counts printed schools only.** A piece that lets a hero
+   detonate another school never adds to that school's Attunement.
 
 **Where the icons show up:**
 
@@ -241,10 +247,10 @@ flowchart LR
 | Swarm beats Dive | Shadowstep and Leap both go for the lowest-HP enemy, which is always a thrall or turret, and the bodies block the path to the summoner. |
 | Swarm beats Blight | Hex, Shared Fate and poison stacks get wasted on disposable bodies. |
 | Dive beats Blight | Poison needs time. Blightmother and Hexbinder are squishy backliners who die first. |
-| Dive beats Artillery | Casters die before Meteor or Lance lands. |
-| Blight beats Artillery | Withering cuts mana gain by 30% and Hex locks down whoever has the most mana. Casters starve. |
-| Blight beats Wall | Poison and Burn ignore armor, and Withering cuts healing by 40%. Shared Fate turns big HP pools into damage for the rest of the team. |
-| Artillery beats Wall | Meteor punishes the Wall's clumped formation. Lance pierces the whole front line. |
+| Dive beats Artillery | Casters die before Meteor Shower or Glacial Prison lands. |
+| Blight beats Artillery | Withering cuts mana gain by up to 30% and Hex locks down whoever has the most mana. Casters starve. |
+| Blight beats Wall | Poison and Burn ignore armor, and Withering cuts healing by up to 40%. Shared Fate turns big HP pools into damage for the rest of the team. |
+| Artillery beats Wall | Meteor Shower punishes the Wall's clumped formation. Frozen Orb shreds the whole front line. |
 | Artillery beats Swarm | Area and pierce clear clustered thralls and turrets. |
 
 **What makes the wheel playable, not just decoration:**
@@ -292,12 +298,10 @@ you can mix. Tier 3 is a capstone that transforms the hero.
 | Bonecaller | Arcana (thralls hit as Might) | Swarm | (via talent) | Staggered / thralls: Disoriented |
 | Clockwright | Cunning | Swarm | Disoriented | Brittle |
 
-### Bulwark (Might, Wall)
-- **Signature, Challenge:** taunts every enemy within 2 cells for 2.5 s and
-  gains a shield worth 8% of max HP per enemy taunted.
-- **Passive, Interpose:** takes 20% of the damage dealt to adjacent allies.
-- **Utility, Shield Bash (6 s):** hits the current target and Staggers it.
-- Paths: **Warden** (protect others) / **Thornwall** (punish attackers).
+Anvil (Bulwark), Gorrak (Ravager), Vesper (Duskblade), Cinder
+(Pyromancer), Rime (Frostweaver) and Nettle (Blightmother) are rebuilt;
+their kits and level picks are in `docs/hero-redesign.md` §9, §13, §14
+and §15.
 
 ### Oathkeeper (Might, Wall, the healer)
 - **Signature, Consecrate:** a hammer slam deals damage and Staggers
@@ -309,37 +313,6 @@ you can mix. Tier 3 is a capstone that transforms the hero.
   on here.
 - Paths: **Martyr** (spend own HP to heal harder, Last Rites twice) /
   **Crusader** (heal by dealing damage).
-
-### Ravager (Might, Dive)
-- **Signature, Whirlwind:** spins for 2 s and hits every enemy within 1 cell
-  every 0.5 s. Can't be slowed or stunned while spinning.
-- **Passive, Bloodlust:** +1% attack speed for every 2% of HP missing.
-- **Utility, Leap (8 s, also at battle start):** lands on the lowest-HP
-  enemy within 4 cells.
-- Paths: **Butcher** (every 3rd hit Staggers, basic attacks cleave) /
-  **Juggernaut** (lifesteal while spinning, taunt-immune; the Wall flipper).
-
-### Duskblade (Cunning, Dive)
-- **Signature, Shadowstep:** blinks behind the lowest-HP enemy, strikes
-  hard and Disorients it.
-- **Passive, Opportunist:** +40% crit chance against any target that has
-  a condition.
-- **Utility, Smoke (once, at 50% HP):** can't be targeted for 1.5 s and
-  sheds taunts.
-- Paths: **Executioner** (a kill refunds Shadowstep, so kills can chain) /
-  **Phantom** (evasion, Disorients everything nearby when Smoke triggers).
-
-### Pyromancer (Arcana, Artillery)
-- **Signature, Meteor:** marks the densest enemy cluster. It lands 1.5 s
-  later for huge area damage and leaves burning ground.
-- **Passive, Kindling:** every spell applies Burn, a DoT that stacks 3
-  times.
-- **Utility, Flame Ward (8 s):** when an enemy gets adjacent, a fire ring
-  knocks it back.
-- Paths: **Cataclysm** (slower, bigger meteors) / **Wildfire** (burn spreads
-  on death, faster casts).
-- The delay is the point: Meteor wants partners that hold enemies still
-  (taunt, freeze, Crush).
 
 ### Frostweaver (Arcana, Artillery)
 - **Signature, Glacial Lance:** a piercing lance through a line of enemies.
@@ -393,12 +366,6 @@ you can mix. Tier 3 is a capstone that transforms the hero.
   turrets are the broken build here).
 
 ### Example full talent trees
-
-| Tier | Bulwark: Warden | Bulwark: Thornwall |
-| --- | --- | --- |
-| 1 | **Heavy Shield:** Shield Bash also Staggers everything adjacent to the target | **Spiked Plate:** each hit Bulwark takes deals 8 Might damage back to the attacker |
-| 2 | **Rallying Presence:** Interpose covers allies within 2 cells and takes 30% | **Grudge:** +1% damage each time Bulwark is hit (up to 50%) |
-| 3 | **Unbreakable Oath:** Bulwark can't drop below 1 HP while Challenge is active | **Retribution:** when Challenge ends, all the damage Bulwark took during it is released as a Staggering shockwave |
 
 | Tier | Hexbinder: Doom | Hexbinder: Malice |
 | --- | --- | --- |
@@ -458,44 +425,74 @@ can't fire trigger runes.
 3 slots per hero plus a 3-item stash. Items can be moved freely during
 prep. Rarity follows the round band in §1.
 
-**Common (stats with a small twist):**
-- Vitality Charm: +15% max HP
-- Whetstone: +12% damage
-- Quickblade Gloves: +15% attack speed
-- Mana Stone: start with 30 mana
-- Swift Boots: +20% move speed
-- Sparkflint: basic attacks apply Burn
-- Ward Bell: a shield the first time the hero drops below 50%
+The list below matches the game after the items overhaul
+(hero-redesign.md §7, as built in §19).
 
-**Rare (procs, school benders, flippers):**
-- Frost Brand: every 4th basic attack applies Brittle
-- Thunder Maul: basic attacks count as Arcana, so a Might hero can
-  detonate its allies' Staggered
-- Pocket Sand: the first hit on each enemy Disorients it
+**Common (one stat):**
+- Vitality Charm: +15% max HP
+- Whetstone: +12% attack damage
+- Quickblade Gloves: +15% attack speed
+- Focus Crystal: +15% spell damage; damage over time counts as spell
+  damage
+- Keen Edge: +8% crit chance
+- Mana Stone: attacks give 15% more mana, so the ultimate charges 15%
+  faster
+- Hourglass Shard: the ability's cooldown is 12% shorter
+- Iron Plate: +8% armor
+- Swift Boots: +20% move speed; dashes and leaps reach 1 cell further
+- Sparkflint: attacks apply Burn
+
+**Rare (procs and enablers):**
+- Battle Axe: attacks cleave 50% to every enemy within 1 cell of the
+  target
+- Daedalus Edge: +5% crit chance; crits deal ×2.25 instead of ×1.75
+- Quicksilver Boots: after any dash, leap or blink, +60% attack speed
+  for 2 s
+- Storm Gauntlet: attacks have a 25% chance to throw chain lightning
+- Essence Siphon: each attack steals 3% attack speed from its target for
+  8 s
+- Thorn Mail: attackers that hit the holder take 10 + 1.5% of its max HP
+  back
+- Spell Siphon: each enemy a spell hits restores 5 mana, at most once
+  per enemy a second
+- Skull Basher: every 4th attack stuns for 0.6 s
+- Ember Brand: dashes and leaps leave a fire trail for 2 s
+- Vampiric Fang: heal for 15% of the damage attacks deal
+- Frost Brand: every 3rd attack makes the target Brittle
 - Venom Vial: attacks add 1 Poison stack
-- Vampiric Fang: 15% lifesteal
-- Sentinel Ward: the first enemy to dash or blink next to the holder is
-  stunned for 1.5 s
-- Brambleguard: taunt-immune
+- Pocket Sand: the first hit on each enemy Disorients it
+- Sentinel Ward: the first enemy to leap or blink within 2 cells of the
+  holder is stunned for 1.5 s
+- Null Talisman: enemies within 2 cells of the holder can't trigger
+  their gems
+- Brambleguard: can't be taunted, +5% armor
 - Blight Ward: halves Poison and ignores Withering
-- Soul Lantern: gain a fallen ally's remaining mana
 
 **Legendary (rules that break):**
-- Prism of Three: enemies this hero hits can hold all three conditions at
-  once
-- Aegis: revive once at 50% HP
-- Hourglass: refill mana once, right after the first signature cast
-- Crown of Echoes: Echo and Twincast on this hero work at full strength
-- Blood Contract: the signature costs 15% max HP instead of mana
+- Spellblade Hilt: spells count as attacks for on-hit effects
+- Crown of Echoes: Multistrike and Multicast repeats are at full
+  strength
+- Blood Pact: the ability and ultimate cost 6% of current HP instead of
+  cooldown or mana
+- The Unbound: +1 gem socket in the ability and the ultimate
+- Voidheart: enemies this hero kills burst for a quarter of their max HP
+- Infinity Band: trigger gems on this hero recharge twice as fast
+- Aegis: revive once at 20% HP
+- Heart of the Swarm: this hero's summons carry copies of its other
+  items
+- Worldbreaker: combos this hero detonates also hit every enemy within 2
+  cells
 - Kingmaker Banner: every combo your team detonates gives all allies +4%
-  attack speed for the rest of the battle
-- Heart of the Swarm: this hero's summons inherit its other items
-- Obsidian Mirror: reflects the first enemy signature aimed at this hero
-- Worldbreaker: combos this hero detonates hit every enemy within 2 cells
+  attack speed for the rest of the fight
+- Prism of Three: this hero's hits count as all three schools
+- Obsidian Mirror: reflects the first enemy ultimate cast at the holder
 
-**Cursed (the surprise category, a rare slot in any band):** a big upside
-with a real cost. For example, Soulbound Blade: +60% damage, but the
-holder loses 2% HP per second.
+**Cursed (a big upside with a real cost, flagged on a rare or legendary):**
+- Soulbound Blade (rare): +60% damage; loses 2% of max HP a second
+- Glass Idol (rare): +25% damage and +20% attack speed; −30% max HP
+- Berserker's Collar (rare): +50% attack speed; can't be healed
+- Unstable Core (legendary): the ability and ultimate each cast twice;
+  each second cast costs 5% of max HP
 
 ## 7 Broken builds we want to be possible
 
@@ -801,6 +798,8 @@ health bar (decisions.md, 2026-09-24).
 
 - **Combos:** one callout, the combo name over the damage, in the
   condition's colour.
+- **Bursts:** Nettle's Burst gets the same callout, "Burst" over the
+  damage, in poison chartreuse.
 - **Crits:** gold with "!", and bigger at 20% of max HP or more.
 - **Big hits:** 20% or more of a hero's max HP in one hit. Hits on summons
   don't count.

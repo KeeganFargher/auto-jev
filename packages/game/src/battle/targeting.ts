@@ -6,6 +6,22 @@ export function isLegalEnemy(unit: UnitState, candidate: UnitState): boolean {
   return candidate.alive && candidate.teamId !== unit.teamId && candidate.untargetableUntilTick === 0;
 }
 
+export function isCorpse(unit: UnitState): boolean {
+  return !unit.alive && unit.memory.fellAtTick >= 0 && !unit.memory.corpseSpent;
+}
+
+export function isRevivable(caster: UnitState, candidate: UnitState): boolean {
+  return isCorpse(candidate) && candidate.teamId === caster.teamId && candidate.summonerUnitId === null && !candidate.memory.resurrected;
+}
+
+export function isExplodable(unit: UnitState, candidate: UnitState, summonId: string | undefined): boolean {
+  return isCorpse(candidate) || (candidate.alive && candidate.summonerUnitId === unit.unitId && candidate.heroId === summonId);
+}
+
+export function isCastTarget(ability: AbilityDefinition, source: UnitState, target: UnitState): boolean {
+  return ability.targetPolicy === "busiest-corpse" ? isExplodable(source, target, ability.consumes?.summonId) : target.alive;
+}
+
 function isLegalAlly(unit: UnitState, candidate: UnitState): boolean {
   return candidate.alive && candidate.teamId === unit.teamId;
 }
@@ -104,36 +120,32 @@ function findHighestManaEnemy(unit: UnitState, units: readonly UnitState[], rang
   return best;
 }
 
-function findBiggestShieldEnemy(unit: UnitState, units: readonly UnitState[], rangeUnits: number): UnitState | null {
+function findBusiestCorpse(unit: UnitState, units: readonly UnitState[], ability: AbilityDefinition, radiusUnits: number): UnitState | null {
   let best: UnitState | null = null;
+  let bestCount = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
 
   for (const candidate of units) {
-    if (!isLegalEnemy(unit, candidate) || candidate.shield === null || !inReach(unit, candidate, rangeUnits)) {
+    if (!isExplodable(unit, candidate, ability.consumes?.summonId)) {
       continue;
     }
 
-    if (best === null || candidate.shield.amount > (best.shield?.amount ?? 0) || (candidate.shield.amount === best.shield?.amount && candidate.unitId < best.unitId)) {
-      best = candidate;
-    }
-  }
+    const candidateDistance = distance(unit.position, candidate.position);
 
-  return best;
-}
-
-function findBusiestOwnSummon(unit: UnitState, units: readonly UnitState[], radiusUnits: number): UnitState | null {
-  let best: UnitState | null = null;
-  let bestCount = 0;
-
-  for (const candidate of units) {
-    if (!candidate.alive || candidate.summonerUnitId !== unit.unitId) {
+    if (!isWithinRange(candidateDistance, ability.range)) {
       continue;
     }
 
     const count = countEnemiesWithin(unit, units, candidate.position, radiusUnits);
 
-    if (count > bestCount || (count === bestCount && best !== null && count > 0 && candidate.unitId < best.unitId)) {
+    if (
+      count > bestCount ||
+      (count === bestCount && candidateDistance < bestDistance) ||
+      (count === bestCount && candidateDistance === bestDistance && best !== null && candidate.unitId < best.unitId)
+    ) {
       best = candidate;
       bestCount = count;
+      bestDistance = candidateDistance;
     }
   }
 
@@ -200,11 +212,54 @@ function tauntingEnemy(unit: UnitState, units: readonly UnitState[]): UnitState 
   return taunter !== undefined && isLegalEnemy(unit, taunter) ? taunter : null;
 }
 
-export function resolveTarget(unit: UnitState, units: readonly UnitState[]): UnitState | null {
-  const taunter = tauntingEnemy(unit, units);
+export function puppetPartner(unit: UnitState, units: readonly UnitState[]): UnitState | null {
+  const link = unit.link;
 
-  if (taunter !== null) {
-    return taunter;
+  if (link === null || link.puppetUntilTick === 0) {
+    return null;
+  }
+
+  let nearest: UnitState | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  for (const candidate of units) {
+    if (!candidate.alive || candidate.unitId === unit.unitId || candidate.link?.linkId !== link.linkId || candidate.untargetableUntilTick !== 0) {
+      continue;
+    }
+
+    const candidateDistance = distance(unit.position, candidate.position);
+
+    if (candidateDistance < nearestDistance || (candidateDistance === nearestDistance && nearest !== null && candidate.unitId < nearest.unitId)) {
+      nearest = candidate;
+      nearestDistance = candidateDistance;
+    }
+  }
+
+  return nearest;
+}
+
+export function resolveTarget(unit: UnitState, units: readonly UnitState[]): UnitState | null {
+  return puppetPartner(unit, units) ?? resolveEnemyTarget(unit, units);
+}
+
+function commandedTarget(unit: UnitState, units: readonly UnitState[]): UnitState | null {
+  const commander = unit.summonerUnitId === null ? undefined : units.find((candidate) => candidate.unitId === unit.summonerUnitId);
+
+  if (commander === undefined || !commander.alive || commander.form?.definition.commandsSummons !== true || commander.targetUnitId === null) {
+    return null;
+  }
+
+  const target = units.find((candidate) => candidate.unitId === commander.targetUnitId);
+  const reach = unit.abilities[unit.basicAttackId]?.range ?? 0;
+
+  return target !== undefined && isLegalEnemy(unit, target) && isWithinRange(distance(unit.position, target.position), reach) ? target : null;
+}
+
+function resolveEnemyTarget(unit: UnitState, units: readonly UnitState[]): UnitState | null {
+  const forced = tauntingEnemy(unit, units) ?? commandedTarget(unit, units);
+
+  if (forced !== null) {
+    return forced;
   }
 
   if (unit.targetUnitId !== null) {
@@ -218,14 +273,14 @@ export function resolveTarget(unit: UnitState, units: readonly UnitState[]): Uni
   return findNearestEnemy(unit, units);
 }
 
-export function resolveAbilityTarget(
-  targetPolicy: TargetPolicy,
+function resolvePolicyTarget(
+  targetPolicy: Exclude<TargetPolicy, "busiest-corpse">,
   unit: UnitState,
   units: readonly UnitState[],
 ): UnitState | null {
   switch (targetPolicy) {
     case "nearest-enemy":
-      return resolveTarget(unit, units);
+      return resolveEnemyTarget(unit, units);
 
     case "lowest-hp-fraction-ally":
       return findLowestHpFractionAlly(unit, units);
@@ -234,19 +289,13 @@ export function resolveAbilityTarget(
       return tauntingEnemy(unit, units) ?? findLowestHpEnemy(unit, units, Number.POSITIVE_INFINITY);
 
     case "highest-mana-enemy":
-      return findHighestManaEnemy(unit, units, Number.POSITIVE_INFINITY) ?? resolveTarget(unit, units);
-
-    case "biggest-shield-enemy":
-      return findBiggestShieldEnemy(unit, units, Number.POSITIVE_INFINITY) ?? resolveTarget(unit, units);
-
-    case "own-summon":
-      return findBusiestOwnSummon(unit, units, 0);
+      return findHighestManaEnemy(unit, units, Number.POSITIVE_INFINITY) ?? resolveEnemyTarget(unit, units);
 
     case "self":
       return unit.alive ? unit : null;
 
     case "densest-enemy-cluster":
-      return resolveTarget(unit, units);
+      return resolveEnemyTarget(unit, units);
 
     default: {
       const exhaustive: never = targetPolicy;
@@ -271,15 +320,12 @@ export function resolveCastTarget(
       return tauntingEnemy(unit, units) ?? findLowestHpEnemy(unit, units, ability.range);
 
     case "highest-mana-enemy":
-      return findHighestManaEnemy(unit, units, ability.range) ?? resolveTarget(unit, units);
+      return findHighestManaEnemy(unit, units, ability.range) ?? resolveEnemyTarget(unit, units);
 
-    case "biggest-shield-enemy":
-      return findBiggestShieldEnemy(unit, units, ability.range) ?? resolveTarget(unit, units);
-
-    case "own-summon":
-      return findBusiestOwnSummon(unit, units, radius);
+    case "busiest-corpse":
+      return findBusiestCorpse(unit, units, ability, radius);
 
     default:
-      return resolveAbilityTarget(ability.targetPolicy, unit, units);
+      return resolvePolicyTarget(ability.targetPolicy, unit, units);
   }
 }

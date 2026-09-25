@@ -28,8 +28,8 @@ export interface HeroRow {
   battles: number;
   damagePerAppearance: number;
   deathRate: number;
-  signatureCastsPerAppearance: number;
-  firstSignatureTick: number | null;
+  ultimateCastsPerAppearance: number;
+  firstUltimateTick: number | null;
 }
 
 export interface TeamRow {
@@ -66,7 +66,7 @@ export interface RunSummary {
   heroes: RunPickRow[];
   upgrades: RunPickRow[];
   items: RunPickRow[];
-  runes: RunPickRow[];
+  gems: RunPickRow[];
   eliminationRounds: number[];
 }
 
@@ -249,18 +249,18 @@ function mergeTallies(results: readonly BattleJobResult[]): Map<string, HeroTall
         damageDealt: 0,
         deaths: 0,
         casts: 0,
-        signatureCasts: 0,
-        firstSignatureTickSum: 0,
-        firstSignatureSamples: 0,
+        ultimateCasts: 0,
+        firstUltimateTickSum: 0,
+        firstUltimateSamples: 0,
       };
 
       current.appearances += tally.appearances;
       current.damageDealt += tally.damageDealt;
       current.deaths += tally.deaths;
       current.casts += tally.casts;
-      current.signatureCasts += tally.signatureCasts;
-      current.firstSignatureTickSum += tally.firstSignatureTickSum;
-      current.firstSignatureSamples += tally.firstSignatureSamples;
+      current.ultimateCasts += tally.ultimateCasts;
+      current.firstUltimateTickSum += tally.firstUltimateTickSum;
+      current.firstUltimateSamples += tally.firstUltimateSamples;
       merged.set(heroId, current);
     }
   }
@@ -287,9 +287,9 @@ export function heroRows(pairs: readonly [BattleJob, BattleJobResult][]): HeroRo
       battles: line.battles,
       damagePerAppearance: tally.damageDealt / appearances,
       deathRate: tally.deaths / appearances,
-      signatureCastsPerAppearance: tally.signatureCasts / appearances,
-      firstSignatureTick:
-        tally.firstSignatureSamples === 0 ? null : tally.firstSignatureTickSum / tally.firstSignatureSamples,
+      ultimateCastsPerAppearance: tally.ultimateCasts / appearances,
+      firstUltimateTick:
+        tally.firstUltimateSamples === 0 ? null : tally.firstUltimateTickSum / tally.firstUltimateSamples,
     });
   }
 
@@ -371,7 +371,7 @@ export function summariseRuns(results: readonly RunJobResult[]): RunSummary {
   const heroes = new Map<string, PickLine>();
   const upgrades = new Map<string, PickLine>();
   const items = new Map<string, PickLine>();
-  const runes = new Map<string, PickLine>();
+  const gems = new Map<string, PickLine>();
   const eliminationRounds: number[] = [];
   let seats = 0;
 
@@ -391,8 +391,8 @@ export function summariseRuns(results: readonly RunJobResult[]): RunSummary {
         notePick(items, itemId, seat.placement);
       }
 
-      for (const runeId of new Set(seat.runeIds)) {
-        notePick(runes, runeId, seat.placement);
+      for (const gemId of new Set(seat.gemIds)) {
+        notePick(gems, gemId, seat.placement);
       }
 
       if (seat.eliminatedInRound !== null) {
@@ -413,7 +413,7 @@ export function summariseRuns(results: readonly RunJobResult[]): RunSummary {
     heroes: pickRows(heroes, seats),
     upgrades: pickRows(upgrades, seats),
     items: pickRows(items, seats),
-    runes: pickRows(runes, seats),
+    gems: pickRows(gems, seats),
     eliminationRounds,
   };
 }

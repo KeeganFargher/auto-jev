@@ -1,120 +1,48 @@
-import type { AbilityDefinition, AbilityTag, Catalogue, EffectDefinition, RuneKind, UpgradeDefinition } from "../definitions.js";
+import { SKILL_SLOTS, type AbilityDefinition, type Catalogue, type SkillSlot, type SkillTag, type UpgradeDefinition } from "../definitions.js";
 import type { HeroBuild } from "./state.js";
-import { compileBuild, findSignatureAbilityId } from "./compile-build.js";
+import { gemSocketsFor, skillIdFor } from "./compile-build.js";
+import { gemFitsAbility } from "./gem-fit.js";
 
 export const ITEM_SLOTS = 3;
 
 export type EquipmentProblem =
   | "unknown-piece"
   | "not-an-item"
-  | "not-a-rune"
+  | "not-a-gem"
   | "too-many-items"
-  | "too-many-runes"
-  | "no-signature"
-  | "rune-does-not-fit"
-  | "duplicate-rune"
+  | "too-many-gems"
+  | "no-skill"
+  | "gem-does-not-fit"
+  | "duplicate-gem"
   | "item-over-stack-limit";
 
-export function signatureTags(heroId: string, catalogue: Catalogue): AbilityTag[] {
+export function skillOf(heroId: string, slot: SkillSlot, catalogue: Catalogue): AbilityDefinition | null {
   const hero = catalogue.heroes[heroId];
+  const skillId = hero === undefined ? null : skillIdFor(hero, slot);
 
-  if (hero === undefined) {
-    return [];
-  }
-
-  const signatureId = findSignatureAbilityId(hero, catalogue);
-
-  return signatureId === null ? [] : (catalogue.abilities[signatureId]?.tags ?? []);
+  return skillId === null ? null : (catalogue.abilities[skillId] ?? null);
 }
 
-function signatureOf(heroId: string, catalogue: Catalogue): AbilityDefinition | null {
-  const hero = catalogue.heroes[heroId];
-  const signatureId = hero === undefined ? null : findSignatureAbilityId(hero, catalogue);
-
-  return signatureId === null ? null : (catalogue.abilities[signatureId] ?? null);
+export function skillTags(heroId: string, slot: SkillSlot, catalogue: Catalogue): SkillTag[] {
+  return skillOf(heroId, slot, catalogue)?.tags ?? [];
 }
 
-function directEffects(signature: AbilityDefinition): EffectDefinition[] {
-  return [...signature.effects, ...(signature.allyEffects ?? []), ...(signature.secondary?.effects ?? [])];
+export function gemFitsSkill(gem: UpgradeDefinition, heroId: string, slot: SkillSlot, catalogue: Catalogue): boolean {
+  const skill = skillOf(heroId, slot, catalogue);
+
+  return skill !== null && gemFitsAbility(gem, skill, catalogue);
 }
 
-function signatureAppliesCondition(signature: AbilityDefinition): boolean {
-  const effects = [...signature.effects, ...(signature.secondary?.effects ?? [])];
-
-  return effects.some((effect) => effect.kind === "apply-condition" || (effect.kind === "dot" && effect.conditionAtStacks !== undefined));
+export function gemFitsHero(gem: UpgradeDefinition, heroId: string, catalogue: Catalogue): boolean {
+  return SKILL_SLOTS.some((slot) => gemFitsSkill(gem, heroId, slot, catalogue));
 }
 
-function signatureRecastDoesSomething(signature: AbilityDefinition): boolean {
-  return directEffects(signature).some((effect) => effect.kind !== "dot" && effect.kind !== "summon");
+export function fittingSlots(gem: UpgradeDefinition, heroId: string, catalogue: Catalogue): SkillSlot[] {
+  return SKILL_SLOTS.filter((slot) => gemFitsSkill(gem, heroId, slot, catalogue));
 }
 
-function signatureHitsCanDetonate(signature: AbilityDefinition): boolean {
-  return [...directEffects(signature), ...(signature.channel?.effects ?? [])].some((effect) => effect.kind === "damage");
-}
-
-function lingerDoesSomething(signature: AbilityDefinition): boolean {
-  if (signature.zone !== undefined || signature.channel !== undefined) {
-    return true;
-  }
-
-  return signature.area?.kind === "circle" && directEffects(signature).some((effect) => effect.kind === "damage" || effect.kind === "heal");
-}
-
-function lastWordDoesSomething(signature: AbilityDefinition): boolean {
-  const effects = directEffects(signature);
-
-  return (
-    signature.channel === undefined &&
-    !effects.some((effect) => effect.kind === "taunt" || effect.kind === "summon") &&
-    signatureRecastDoesSomething(signature)
-  );
-}
-
-function runeDoesSomething(kind: RuneKind | undefined, signature: AbilityDefinition): boolean {
-  switch (kind) {
-    case "echo":
-    case "retaliate":
-    case "tandem":
-      return signatureRecastDoesSomething(signature);
-
-    case "primer":
-      return !signatureAppliesCondition(signature);
-
-    case "linger":
-      return lingerDoesSomething(signature);
-
-    case "last-word":
-      return lastWordDoesSomething(signature);
-
-    case "resonance":
-      return signatureHitsCanDetonate(signature);
-
-    case "fork":
-      return signature.area?.kind === "line";
-
-    case "split":
-    case "empower":
-      return signature.effects.some((effect) => effect.kind === "summon");
-
-    default:
-      return true;
-  }
-}
-
-export function runeFitsHero(rune: UpgradeDefinition, heroId: string, catalogue: Catalogue): boolean {
-  const tags = signatureTags(heroId, catalogue);
-  const signature = signatureOf(heroId, catalogue);
-
-  if (signature === null || tags.length === 0 || !(rune.runeFits ?? []).some((tag) => tags.includes(tag))) {
-    return false;
-  }
-
-  return runeDoesSomething(rune.rune?.kind, signature);
-}
-
-export function checkEquipment(build: HeroBuild, catalogue: Catalogue): EquipmentProblem | null {
+function checkItems(build: HeroBuild, catalogue: Catalogue): EquipmentProblem | null {
   const itemIds = build.itemIds ?? [];
-  const runeIds = build.runeIds ?? [];
 
   if (itemIds.length > ITEM_SLOTS) {
     return "too-many-items";
@@ -136,38 +64,64 @@ export function checkEquipment(build: HeroBuild, catalogue: Catalogue): Equipmen
     }
   }
 
-  if (runeIds.length === 0) {
+  return null;
+}
+
+export function checkEquipment(build: HeroBuild, catalogue: Catalogue): EquipmentProblem | null {
+  const itemProblem = checkItems(build, catalogue);
+
+  if (itemProblem !== null) {
+    return itemProblem;
+  }
+
+  const gems = build.gems ?? [];
+
+  if (gems.length === 0) {
     return null;
   }
 
   const hero = catalogue.heroes[build.heroId];
 
-  if (hero === undefined || findSignatureAbilityId(hero, catalogue) === null) {
-    return "no-signature";
+  if (hero === undefined) {
+    return "no-skill";
   }
 
-  if (new Set(runeIds).size !== runeIds.length) {
-    return "duplicate-rune";
-  }
+  const sockets = gemSocketsFor(hero, build, catalogue);
 
-  for (const runeId of runeIds) {
-    const rune = catalogue.upgrades[runeId];
+  for (const slot of SKILL_SLOTS) {
+    const inSlot = gems.filter((gem) => gem.slot === slot);
 
-    if (rune === undefined) {
-      return "unknown-piece";
+    if (inSlot.length === 0) {
+      continue;
     }
 
-    if (rune.category !== "rune") {
-      return "not-a-rune";
+    if (skillIdFor(hero, slot) === null) {
+      return "no-skill";
     }
 
-    if (!runeFitsHero(rune, build.heroId, catalogue)) {
-      return "rune-does-not-fit";
+    if (new Set(inSlot.map((gem) => gem.gemId)).size !== inSlot.length) {
+      return "duplicate-gem";
     }
-  }
 
-  if (runeIds.length > compileBuild(build, catalogue).runeSockets) {
-    return "too-many-runes";
+    if (inSlot.length > sockets[slot]) {
+      return "too-many-gems";
+    }
+
+    for (const equipped of inSlot) {
+      const gem = catalogue.upgrades[equipped.gemId];
+
+      if (gem === undefined) {
+        return "unknown-piece";
+      }
+
+      if (gem.category !== "gem") {
+        return "not-a-gem";
+      }
+
+      if (!gemFitsSkill(gem, build.heroId, slot, catalogue)) {
+        return "gem-does-not-fit";
+      }
+    }
   }
 
   return null;

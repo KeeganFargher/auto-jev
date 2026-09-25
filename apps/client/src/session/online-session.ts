@@ -209,16 +209,16 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
       send({ kind: "commit-draft", offerIds: [...offerIds] });
     },
 
-    chooseOffer(decisionId, offerId, heroSlot) {
-      send({ kind: "choose-offer", decisionId, offerId, heroSlot });
+    chooseOffer(decisionId, offerId, heroSlot, skill) {
+      send({ kind: "choose-offer", decisionId, offerId, heroSlot, skill });
     },
 
     moveItem(instanceId, heroSlot) {
       send({ kind: "move-item", instanceId, heroSlot });
     },
 
-    socketRune(instanceId, heroSlot) {
-      send({ kind: "socket-rune", instanceId, heroSlot });
+    socketGem(instanceId, heroSlot, skill) {
+      send({ kind: "socket-gem", instanceId, heroSlot, skill });
     },
 
     discardItem(instanceId) {

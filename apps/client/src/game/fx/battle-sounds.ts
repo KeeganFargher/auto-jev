@@ -1,15 +1,26 @@
-import type { CastEvent, ComboKind, DamageDealtEvent } from "@jev-game/game";
+import { TICK_RATE, type CastEvent, type ComboKind, type DamageDealtEvent, type HpPaymentReason } from "@jev-game/game";
 import { audio, type PlayOptions } from "../../audio/engine.js";
 import {
   abilitySounds,
   COMBO_SOUNDS,
   CRIT_SOUND,
-  FALL_START_FRACTION,
+  CRUMBLE_SOUND,
+  emitterSound,
+  formSound,
   HEAVY_HIT_SOUND,
   HERO_DEATH_SOUND,
-  SHIELD_SOUND,
-  SILENT_SHIELD_ABILITIES,
+  impactSounds,
+  OMEN_ECHO_SOUND,
+  passiveSound,
+  paymentSound,
+  PUPPET_SOUND,
+  reactionSound,
+  reviveSound,
+  RISE_SOUND,
+  shieldSound,
+  STUN_SOUND,
   TELEPORT_SOUNDS,
+  THAW_SOUND,
   type TeleportBeat,
   unitSounds,
 } from "../../audio/sound-map.js";
@@ -18,17 +29,21 @@ import { heroVoices } from "./hero-voices.js";
 export interface SoundSource {
   heroId: string;
   friendly: boolean;
+  risen: boolean;
 }
 
 export interface Falling {
   impactId: number;
+  sourceUnitId: string;
   abilityId: string;
   landsAtTick: number;
 }
 
+export type UpgradeLookup = (unitId: string) => readonly string[];
+
 export interface FallingTracker {
-  sync(impacts: readonly Falling[], tick: number, panFor: (impactId: number) => number | undefined): void;
-  reset(): void;
+  sync(impacts: readonly Falling[], tick: number, upgradesOf: UpgradeLookup, panFor: (impactId: number) => number | undefined): void;
+  reset(current: readonly Falling[]): void;
 }
 
 function at(pan: number | undefined): PlayOptions {
@@ -42,13 +57,23 @@ export function playCast(event: CastEvent, source: SoundSource, pan: number | un
     audio.play(sound, at(pan));
   }
 
-  if (event.signature === true && event.triggered !== true) {
+  if (event.ultimate === true && event.triggered !== true && !source.risen) {
     heroVoices.cast(source.heroId, source.friendly);
   }
 }
 
 export function playHit(event: DamageDealtEvent, heavy: boolean, pan: number | undefined): void {
-  if (event.dot !== undefined || event.reaction === true) {
+  if (event.dot !== undefined) {
+    return;
+  }
+
+  if (event.reaction === true) {
+    const reaction = reactionSound(event.abilityId);
+
+    if (reaction !== undefined) {
+      audio.play(reaction, at(pan));
+    }
+
     return;
   }
 
@@ -74,18 +99,50 @@ export function playHeal(abilityId: string, pan: number | undefined): void {
 }
 
 export function playShield(abilityId: string, pan: number | undefined): void {
-  if (!SILENT_SHIELD_ABILITIES.has(abilityId)) {
-    audio.play(SHIELD_SOUND, at(pan));
+  const sound = shieldSound(abilityId);
+
+  if (sound !== undefined) {
+    audio.play(sound, at(pan));
   }
+}
+
+export function playStun(pan: number | undefined): void {
+  audio.play(STUN_SOUND, at(pan));
+}
+
+export function playThaw(pan: number | undefined): void {
+  audio.play(THAW_SOUND, at(pan));
 }
 
 export function playCombo(combo: ComboKind, pan: number | undefined): void {
   audio.play(COMBO_SOUNDS[combo], at(pan));
 }
 
+export function playOmenEcho(pan: number | undefined): void {
+  audio.play(OMEN_ECHO_SOUND, at(pan));
+}
+
+export function playPuppet(pan: number | undefined): void {
+  audio.play(PUPPET_SOUND, at(pan));
+}
+
 export function playDeath(source: SoundSource, pan: number | undefined): void {
+  if (source.risen) {
+    playCrumble(pan);
+
+    return;
+  }
+
   audio.play(unitSounds(source.heroId)?.death ?? HERO_DEATH_SOUND, at(pan));
   heroVoices.death(source.heroId, source.friendly);
+}
+
+export function playCrumble(pan: number | undefined): void {
+  audio.play(CRUMBLE_SOUND, at(pan));
+}
+
+export function playRise(pan: number | undefined): void {
+  audio.play(RISE_SOUND, at(pan));
 }
 
 export function playSpawn(heroId: string, pan: number | undefined): void {
@@ -96,8 +153,56 @@ export function playSpawn(heroId: string, pan: number | undefined): void {
   }
 }
 
-export function playLanding(abilityId: string, pan: number | undefined): void {
-  const sound = abilitySounds(abilityId)?.landing;
+export function playLanding(abilityId: string, upgradeIds: readonly string[], pan: number | undefined): void {
+  const sound = impactSounds(abilityId, upgradeIds)?.landing;
+
+  if (sound !== undefined) {
+    audio.play(sound, at(pan));
+  }
+}
+
+export function playZone(abilityId: string, pan: number | undefined): void {
+  const sound = abilitySounds(abilityId)?.zone;
+
+  if (sound !== undefined) {
+    audio.play(sound, at(pan));
+  }
+}
+
+export function playForm(key: string, pan: number | undefined): void {
+  const sound = formSound(key);
+
+  if (sound !== undefined) {
+    audio.play(sound, at(pan));
+  }
+}
+
+export function playRevive(upgradeIds: readonly string[], pan: number | undefined): void {
+  const sound = reviveSound(upgradeIds);
+
+  if (sound !== undefined) {
+    audio.play(sound, at(pan));
+  }
+}
+
+export function playEmitter(abilityId: string, pan: number | undefined): void {
+  const sound = emitterSound(abilityId);
+
+  if (sound !== undefined) {
+    audio.play(sound, at(pan));
+  }
+}
+
+export function playPassive(passive: string, pan: number | undefined): void {
+  const sound = passiveSound(passive);
+
+  if (sound !== undefined) {
+    audio.play(sound, at(pan));
+  }
+}
+
+export function playPayment(reason: HpPaymentReason, pan: number | undefined): void {
+  const sound = paymentSound(reason);
 
   if (sound !== undefined) {
     audio.play(sound, at(pan));
@@ -109,31 +214,30 @@ export function playTeleport(beat: TeleportBeat, pan: number | undefined): void 
 }
 
 export function createFallingTracker(): FallingTracker {
-  const firstSeen = new Map<number, number>();
-  const played = new Set<number>();
+  const handled = new Set<number>();
 
   return {
-    sync(impacts, tick, panFor) {
+    sync(impacts, tick, upgradesOf, panFor) {
       for (const impact of impacts) {
-        const sound = abilitySounds(impact.abilityId)?.falling;
+        const sound = impactSounds(impact.abilityId, upgradesOf(impact.sourceUnitId))?.falling;
 
-        if (sound === undefined || played.has(impact.impactId)) {
+        if (sound === undefined || handled.has(impact.impactId)) {
           continue;
         }
 
-        const seenAt = firstSeen.get(impact.impactId) ?? tick;
-        firstSeen.set(impact.impactId, seenAt);
-
-        if (tick >= seenAt + (impact.landsAtTick - seenAt) * FALL_START_FRACTION) {
-          played.add(impact.impactId);
+        if (tick >= impact.landsAtTick - Math.ceil(audio.duration(sound) * TICK_RATE)) {
+          handled.add(impact.impactId);
           audio.play(sound, at(panFor(impact.impactId)));
         }
       }
     },
 
-    reset() {
-      firstSeen.clear();
-      played.clear();
+    reset(current) {
+      handled.clear();
+
+      for (const impact of current) {
+        handled.add(impact.impactId);
+      }
     },
   };
 }

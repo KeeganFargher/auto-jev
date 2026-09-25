@@ -1,3 +1,5 @@
+import type { EquippedGem } from "@jev-game/game";
+
 
 export type BattleTier = "sanity" | "teams" | "pieces" | "confirm";
 
@@ -7,7 +9,7 @@ export interface HeroPick {
   heroId: string;
   upgradeIds: string[];
   itemIds?: string[];
-  runeIds?: string[];
+  gems?: EquippedGem[];
 }
 
 export interface BattleJob {
@@ -25,9 +27,9 @@ export interface HeroTally {
   damageDealt: number;
   deaths: number;
   casts: number;
-  signatureCasts: number;
-  firstSignatureTickSum: number;
-  firstSignatureSamples: number;
+  ultimateCasts: number;
+  firstUltimateTickSum: number;
+  firstUltimateSamples: number;
 }
 
 export interface NotableBattle {
@@ -68,7 +70,7 @@ export interface SeatOutcome {
   heroIds: string[];
   upgradeIds: string[];
   itemIds: string[];
-  runeIds: string[];
+  gemIds: string[];
   eliminatedInRound: number | null;
   runHealth: number;
   placement: number;

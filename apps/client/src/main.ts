@@ -6,7 +6,8 @@ import type { BattleLab } from "./game/scenes/battle-lab.js";
 import { createMatchScene, type MatchScene } from "./game/scenes/match-scene.js";
 import type { EnvironmentLabScene } from "./game/scenes/environment-lab-scene.js";
 import type { ModelLabScene } from "./game/scenes/model-lab-scene.js";
-import { ENVIRONMENT_HASH, MODEL_LAB_HASH } from "./game/scenes/lab-routes.js";
+import type { SculptLabScene } from "./game/scenes/sculpt-lab-scene.js";
+import { ENVIRONMENT_HASH, MODEL_LAB_HASH, SCULPT_HASH } from "./game/scenes/lab-routes.js";
 import { audio } from "./audio/engine.js";
 import { models } from "./models/library.js";
 import { mountSettingsWindow } from "./hud/settings/settings-window.js";
@@ -50,6 +51,8 @@ let activeEnvironmentLab: EnvironmentLabScene | null = null;
 
 let activeModelLab: ModelLabScene | null = null;
 
+let activeSculptLab: SculptLabScene | null = null;
+
 let modeRequest = 0;
 
 const JOIN_PREFIX = "#join/";
@@ -61,12 +64,40 @@ async function applyMode(): Promise<void> {
   const isMatch = location.hash === "#match" || joinRoomId !== null;
   const isEnvironment = location.hash === ENVIRONMENT_HASH || location.hash.startsWith(`${ENVIRONMENT_HASH}/`);
   const isModels = location.hash === MODEL_LAB_HASH || location.hash.startsWith(`${MODEL_LAB_HASH}/`);
+  const isSculpt = location.hash === SCULPT_HASH || location.hash.startsWith(`${SCULPT_HASH}/`);
 
-  canvasRoot.hidden = isMatch || isEnvironment || isModels;
-  hudRoot.hidden = isMatch || isEnvironment || isModels;
+  canvasRoot.hidden = isMatch || isEnvironment || isModels || isSculpt;
+  hudRoot.hidden = isMatch || isEnvironment || isModels || isSculpt;
   matchRoot.hidden = !isMatch;
   envRoot.hidden = !isEnvironment;
   modelsRoot.hidden = !isModels;
+
+  if (isSculpt) {
+    battleLab?.hide();
+    activeMatchScene?.dispose();
+    activeMatchScene = null;
+    activeEnvironmentLab?.dispose();
+    activeEnvironmentLab = null;
+    activeModelLab?.dispose();
+    activeModelLab = null;
+    const view = location.hash.slice(SCULPT_HASH.length + 1) || null;
+    const { createSculptLabScene } = await import("./game/scenes/sculpt-lab-scene.js");
+
+    if (request !== modeRequest) {
+      return;
+    }
+
+    if (activeSculptLab === null) {
+      activeSculptLab = createSculptLabScene(view);
+    } else {
+      activeSculptLab.show(view);
+    }
+
+    return;
+  }
+
+  activeSculptLab?.dispose();
+  activeSculptLab = null;
 
   if (isModels) {
     battleLab?.hide();

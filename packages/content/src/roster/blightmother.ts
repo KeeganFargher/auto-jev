@@ -1,20 +1,13 @@
-import type { AbilityDefinition, EffectDefinition, HeroDefinition, UpgradeDefinition } from "@jev-game/game";
+import type { AbilityDefinition, EffectDefinition, HeroDefinition, UpgradeDefinition, ZoneDefinition } from "@jev-game/game";
 
-function poison(stacks: number): EffectDefinition {
-  return {
-    kind: "dot",
-    dot: "poison",
-    stacks,
-    damagePerStackPerSecond: 7,
-    durationTicks: 180,
-    maxStacks: 8,
-    conditionAtStacks: { stacks: 4, condition: "disoriented" },
-  };
-}
+const poison: EffectDefinition = { kind: "dot", dot: "poison", stacks: 1, damagePerStackPerSecond: 1.5, durationTicks: 150 };
+
+const bloom: ZoneDefinition = { radiusUnits: 15, durationTicks: 90, periodTicks: 15, effects: [poison] };
 
 export const thornshot: AbilityDefinition = {
   id: "thornshot",
   name: "Thornshot",
+  hitType: "attack",
   cooldownTicks: 50,
   targetPolicy: "nearest-enemy",
   range: 35,
@@ -22,36 +15,41 @@ export const thornshot: AbilityDefinition = {
   tags: ["projectile", "target"],
 };
 
-export const plagueCloud: AbilityDefinition = {
-  id: "plague-cloud",
-  name: "Plague Cloud",
-  description: "A poison cloud 3 cells wide over the densest enemy group for 4 s. One Poison stack a second; at 4 stacks a target is Disoriented.",
-  cooldownTicks: 30,
-  manaCost: 60,
+export const plagueBloom: AbilityDefinition = {
+  id: "plague-bloom",
+  name: "Plague Bloom",
+  hitType: "spell",
+  description: "Plants a flower at the densest enemy group. It adds a Poison stack to every enemy within 1.5 cells, then again every 0.5 s for 3 s.",
+  tags: ["area", "zone"],
+  cooldownTicks: 150,
   targetPolicy: "densest-enemy-cluster",
   range: 50,
   area: { kind: "circle", center: "target", radiusUnits: 15 },
-  effects: [poison(1)],
-  zone: { radiusUnits: 15, durationTicks: 120, periodTicks: 30, effects: [poison(1)] },
+  effects: [poison],
+  zone: bloom,
   canCrit: false,
-  tags: ["area", "zone"],
 };
 
-export const causticSpit: AbilityDefinition = {
-  id: "caustic-spit",
-  name: "Caustic Spit",
-  description: "Hits the enemy with the biggest shield, strips the shield and adds 2 Poison stacks.",
-  cooldownTicks: 210,
-  targetPolicy: "biggest-shield-enemy",
-  range: 45,
-  effects: [{ kind: "strip-shield" }, { kind: "damage", amount: 40 }, poison(2)],
-  tags: ["projectile", "target"],
+export const pandemic: AbilityDefinition = {
+  id: "pandemic",
+  name: "Pandemic",
+  hitType: "spell",
+  description: "Doubles every enemy's Poison stacks, and for 4 s her Poison ticks twice as fast. She waits until 2 enemies carry 5 stacks.",
+  tags: ["area"],
+  cooldownTicks: 30,
+  manaCost: 140,
+  targetPolicy: "self",
+  range: 0,
+  area: { kind: "circle", center: "self", radiusUnits: 120 },
+  requiresPoisoned: { targets: 2, stacks: 5 },
+  effects: [{ kind: "pandemic", stackMultiplier: 2, durationTicks: 120, tickRateMultiplier: 2 }],
+  canCrit: false,
 };
 
 export const blightmother: HeroDefinition = {
   id: "blightmother",
   name: "Nettle",
-  title: "Makes the air itself hurt",
+  title: "Poison piles up until enemies pop",
   school: "cunning",
   archetype: "blight",
   appliesCondition: "disoriented",
@@ -61,104 +59,104 @@ export const blightmother: HeroDefinition = {
   critChance: 0.05,
   manaPerAttack: 21,
   basicAttackId: thornshot.id,
-  abilityIds: [plagueCloud.id, causticSpit.id],
-  passives: [{ kind: "withering", healingReduction: 0.4, manaReduction: 0.3 }],
+  abilityId: plagueBloom.id,
+  ultimateId: pandemic.id,
+  passives: [
+    {
+      kind: "virulence",
+      name: "Virulence",
+      condition: "disoriented",
+      conditionAtStacks: 10,
+      burstAtStacks: 20,
+      spreadFraction: 0.5,
+      spreadRadiusUnits: 15,
+      windowTicks: 60,
+    },
+    { kind: "withering", healingReduction: 0.4, manaReduction: 0.3, fullAtStacks: 10 },
+  ],
 };
 
-export const blightmotherAbilities: AbilityDefinition[] = [thornshot, plagueCloud, causticSpit];
+export const blightmotherAbilities: AbilityDefinition[] = [thornshot, plagueBloom, pandemic];
 
-const T1 = ["blightmother-contagion", "blightmother-virulence"];
-
-const T2 = ["blightmother-miasma", "blightmother-festering"];
-
-export const blightmotherTalents: UpgradeDefinition[] = [
+export const blightmotherLevels: UpgradeDefinition[] = [
+  {
+    id: "blightmother-big-bloom",
+    name: "Big Bloom",
+    description: "Plague Bloom reaches 50% further.",
+    category: "level",
+    heroId: blightmother.id,
+    level: 2,
+    path: "left",
+    maxStacks: 1,
+    statModifiers: [{ target: { kind: "ability-area", abilityId: plagueBloom.id }, kind: "percent", value: 0.5 }],
+  },
+  {
+    id: "blightmother-twin-bloom",
+    name: "Twin Bloom",
+    description: "Plague Bloom plants a second flower at the next densest enemy group it didn't reach. Both flowers last 2 s.",
+    category: "level",
+    heroId: blightmother.id,
+    level: 2,
+    path: "right",
+    maxStacks: 1,
+    statModifiers: [],
+    abilityChanges: [{ abilityId: plagueBloom.id, setZone: { ...bloom, durationTicks: 60, count: 2 } }],
+  },
   {
     id: "blightmother-contagion",
     name: "Contagion",
-    description: "When a poisoned enemy dies, its Poison jumps to the nearest enemy.",
-    category: "talent",
+    description: "A Burst shares all its stacks among the 3 nearest enemies, however far away they are.",
+    category: "level",
     heroId: blightmother.id,
-    tier: 1,
+    level: 3,
     path: "left",
     maxStacks: 1,
-    excludesUpgradeIds: ["blightmother-virulence"],
     statModifiers: [],
-    grantsPassives: [{ kind: "dot-spread-on-death", dot: "poison" }],
+    grantsPassives: [{ kind: "contagion", targets: 3, fraction: 1 }],
   },
   {
-    id: "blightmother-virulence",
-    name: "Virulence",
-    description: "Poison deals 25% more damage.",
-    category: "talent",
+    id: "blightmother-toxic-tether",
+    name: "Toxic Tether",
+    description: "20% of the Poison damage she deals heals her most wounded ally.",
+    category: "level",
     heroId: blightmother.id,
-    tier: 1,
+    level: 3,
     path: "right",
     maxStacks: 1,
-    excludesUpgradeIds: ["blightmother-contagion"],
-    statModifiers: [{ target: { kind: "dot-damage" }, kind: "percent", value: 0.25 }],
+    statModifiers: [],
+    grantsPassives: [{ kind: "toxic-tether", fraction: 0.2 }],
   },
   {
-    id: "blightmother-miasma",
-    name: "Miasma",
-    description: "Plague Cloud is 50% wider.",
-    category: "talent",
+    id: "blightmother-epidemic",
+    name: "Epidemic",
+    description: "While Pandemic lasts, every time her Poison ticks on an enemy, enemies within 3 cells catch up to its stacks.",
+    category: "level",
     heroId: blightmother.id,
-    tier: 2,
+    level: 4,
     path: "left",
     maxStacks: 1,
-    requiresAnyOfUpgradeIds: T1,
-    excludesUpgradeIds: ["blightmother-festering"],
-    unlocksRuneSocket: true,
-    statModifiers: [{ target: { kind: "ability-area", abilityId: plagueCloud.id }, kind: "percent", value: 0.5 }],
-  },
-  {
-    id: "blightmother-festering",
-    name: "Festering",
-    description: "Poison stacks up to 12.",
-    category: "talent",
-    heroId: blightmother.id,
-    tier: 2,
-    path: "right",
-    maxStacks: 1,
-    requiresAnyOfUpgradeIds: T1,
-    excludesUpgradeIds: ["blightmother-miasma"],
-    unlocksRuneSocket: true,
-    statModifiers: [{ target: { kind: "dot-max-stacks" }, kind: "flat", value: 4 }],
-  },
-  {
-    id: "blightmother-pandemic",
-    name: "Pandemic",
-    description: "Plague Cloud lasts twice as long.",
-    category: "talent",
-    heroId: blightmother.id,
-    tier: 3,
-    path: "left",
-    maxStacks: 1,
-    requiresAnyOfUpgradeIds: T2,
-    excludesUpgradeIds: ["blightmother-black-rot"],
-    statModifiers: [{ target: { kind: "zone-duration", abilityId: plagueCloud.id }, kind: "percent", value: 1 }],
-  },
-  {
-    id: "blightmother-black-rot",
-    name: "Black Rot",
-    description: "Caustic Spit adds 4 Poison stacks and Disorients its target.",
-    category: "talent",
-    heroId: blightmother.id,
-    tier: 3,
-    path: "right",
-    maxStacks: 1,
-    requiresAnyOfUpgradeIds: T2,
-    excludesUpgradeIds: ["blightmother-pandemic"],
     statModifiers: [],
     abilityChanges: [
       {
-        abilityId: causticSpit.id,
-        setEffects: [
-          { kind: "strip-shield" },
-          { kind: "damage", amount: 40 },
-          poison(4),
-          { kind: "apply-condition", condition: "disoriented" },
-        ],
+        abilityId: pandemic.id,
+        setEffects: [{ kind: "pandemic", stackMultiplier: 2, durationTicks: 120, tickRateMultiplier: 2, spread: { radiusUnits: 30, fraction: 1 } }],
+      },
+    ],
+  },
+  {
+    id: "blightmother-black-death",
+    name: "Black Death",
+    description: "Pandemic also Bursts every enemy it leaves at 10 or more stacks without spending them, and while it lasts enemies Burst at 10 stacks instead of 20.",
+    category: "level",
+    heroId: blightmother.id,
+    level: 4,
+    path: "right",
+    maxStacks: 1,
+    statModifiers: [],
+    abilityChanges: [
+      {
+        abilityId: pandemic.id,
+        setEffects: [{ kind: "pandemic", stackMultiplier: 2, durationTicks: 120, tickRateMultiplier: 2, burstAtStacks: 10 }],
       },
     ],
   },

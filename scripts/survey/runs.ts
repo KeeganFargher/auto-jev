@@ -90,7 +90,7 @@ export function playRun(job: RunJob, catalogue: Catalogue): RunJobResult {
   const seats: SeatOutcome[] = Object.values(state.players).map((seat) => {
     const heroIds = seat.heroBuilds.map((build) => build.heroId);
     const itemIds = seat.items.map((piece) => piece.pieceId);
-    const runeIds = seat.runes.map((piece) => piece.pieceId);
+    const gemIds = seat.gems.map((piece) => piece.pieceId);
     const upgradeIds: string[] = [];
 
     for (const build of seat.heroBuilds) {
@@ -106,7 +106,7 @@ export function playRun(job: RunJob, catalogue: Catalogue): RunJobResult {
       heroIds,
       upgradeIds,
       itemIds,
-      runeIds,
+      gemIds,
       eliminatedInRound: eliminatedInRound.get(seat.playerId) ?? null,
       runHealth: seat.runHealth,
       placement: 0,

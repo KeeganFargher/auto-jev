@@ -1,22 +1,26 @@
 import {
+  SKILL_SLOTS,
   cellSize,
   compileBuild,
-  findSignatureAbilityId,
+  skillIdFor,
   TICK_RATE,
   type CompiledUnitStats,
   type HeroBuild,
+  type HeroDefinition,
+  type SkillSlot,
 } from "@jev-game/game";
 import { boardArena } from "@jev-game/content";
 import { el } from "./dom.js";
-import { conditionIcon, schoolIcon, talentIcon } from "./icons.js";
+import { conditionIcon, levelIcon, schoolIcon } from "./icons.js";
+import { buildLevel, levelBadge, levelPicks, romanLevel } from "./levels.js";
 import { heroArt, pieceArt } from "./icon-art.js";
 import { attachTip, richText, tipHint } from "./tooltip.js";
-import { pieceTip, type PieceKind } from "./tips.js";
+import { cardPassive, passiveName, passiveSummary, passiveTip, pieceTip, type PieceKind } from "./tips.js";
 import { abilityDefinition, gameCatalogue, heroDefinition, heroName, upgradeDefinition } from "../game/catalogues.js";
 
 export type StatSource = Pick<
   CompiledUnitStats,
-  "abilities" | "abilityCooldownDurations" | "damageMultiplier" | "armor" | "critChance" | "maxHp" | "signatureAbilityId"
+  "abilities" | "abilityCooldownDurations" | "damageMultiplier" | "attackDamageMultiplier" | "armor" | "critChance" | "maxHp" | "ultimateId"
 >;
 
 export interface CardStats {
@@ -28,6 +32,7 @@ export interface CardStats {
   crit: number;
   rangeCells: number;
   manaCost: number | null;
+  abilityCooldownTicks: number | null;
 }
 
 export type StatKey = "damage" | "rate" | "dps" | "armor" | "crit" | "dealt";
@@ -108,17 +113,18 @@ export function cardStats(source: StatSource, heroId: string, speedBonus: number
 
   const cooldown = source.abilityCooldownDurations[hero.basicAttackId] ?? basic?.cooldownTicks ?? 0;
   const effective = speedBonus > 0 ? Math.max(1, Math.round(cooldown / (1 + speedBonus))) : cooldown;
-  const signature = source.signatureAbilityId === null ? undefined : source.abilities[source.signatureAbilityId];
+  const ultimate = source.ultimateId === null ? undefined : source.abilities[source.ultimateId];
 
   return {
     maxHp: source.maxHp,
-    damageLow: low * source.damageMultiplier,
-    damageHigh: high * source.damageMultiplier,
+    damageLow: low * source.damageMultiplier * source.attackDamageMultiplier,
+    damageHigh: high * source.damageMultiplier * source.attackDamageMultiplier,
     attackRate: effective > 0 ? TICK_RATE / effective : 0,
     armor: source.armor,
     crit: source.critChance,
     rangeCells: (basic?.range ?? 0) / cellSize(boardArena),
-    manaCost: signature?.manaCost ?? null,
+    manaCost: ultimate?.manaCost ?? null,
+    abilityCooldownTicks: hero.abilityId === undefined ? null : (source.abilityCooldownDurations[hero.abilityId] ?? null),
   };
 }
 
@@ -167,7 +173,7 @@ function cardBadge(icon: SVGSVGElement): HTMLElement {
   return el("span", "unit-card-badge", icon);
 }
 
-function kitChip(pieceId: string, kind: PieceKind, heroId: string, tips: boolean, key: string): HTMLElement {
+function kitChip(pieceId: string, kind: PieceKind, heroId: string, skill: SkillSlot | null, tips: boolean, key: string): HTMLElement {
   const chip = el("span", `piece-chip is-${kind}`, pieceArt(pieceId, kind));
   const definition = upgradeDefinition(pieceId);
   chip.dataset.rarity = definition?.rarity ?? "common";
@@ -175,10 +181,76 @@ function kitChip(pieceId: string, kind: PieceKind, heroId: string, tips: boolean
   chip.setAttribute("aria-label", definition?.name ?? pieceId);
 
   if (tips) {
-    attachTip(chip, { key, side: "right", live: false, render: () => pieceTip(pieceId, kind, { kind: "hero", heroId }, [heroId], null) });
+    attachTip(chip, { key, side: "right", live: false, render: () => pieceTip(pieceId, kind, { kind: "hero", heroId, skill }, [heroId], null) });
   }
 
   return chip;
+}
+
+const SKILL_LABELS: Readonly<Record<SkillSlot, string>> = { ability: "Ability", ultimate: "Ultimate" };
+
+function skillCost(slot: SkillSlot, cooldownTicks: number, manaCost: number | null): string {
+  return slot === "ultimate" && manaCost !== null ? `${manaCost} mana` : `every ${trimmed(cooldownTicks / TICK_RATE)} s`;
+}
+
+function skillBlock(hero: HeroDefinition, slot: SkillSlot, stats: CardStats | null): HTMLElement | null {
+  const skillId = skillIdFor(hero, slot);
+  const skill = skillId === null ? undefined : abilityDefinition(skillId);
+
+  if (skill === undefined) {
+    return null;
+  }
+
+  return el(
+    "div",
+    "unit-card-ability",
+    el(
+      "div",
+      "unit-card-ability-head",
+      el("span", "unit-card-skill-kind", SKILL_LABELS[slot]),
+      el("span", "unit-card-ability-name", skill.name),
+      el("span", "unit-card-mana", skillCost(slot, (slot === "ability" ? stats?.abilityCooldownTicks : null) ?? skill.cooldownTicks, stats?.manaCost ?? null)),
+    ),
+    skill.description === undefined ? null : el("p", "tip-text", ...richText(skill.description)),
+  );
+}
+
+function passiveBlocks(hero: HeroDefinition, tips: boolean): HTMLElement[] {
+  const blocks: HTMLElement[] = [];
+
+  for (const passive of hero.passives ?? []) {
+    if (passive.kind === "stacks" || passive.kind === "damage-store") {
+      blocks.push(
+        el(
+          "div",
+          "unit-card-ability",
+          el("div", "unit-card-ability-head", el("span", "unit-card-skill-kind", "Passive"), el("span", "unit-card-ability-name", passive.name)),
+          el("p", "tip-text", ...richText(passive.description)),
+        ),
+      );
+    }
+
+    const shown = cardPassive(passive);
+
+    if (shown === null) {
+      continue;
+    }
+
+    const block = el(
+      "div",
+      "unit-card-ability",
+      el("div", "unit-card-ability-head", el("span", "unit-card-skill-kind", "Passive"), el("span", "unit-card-ability-name", passiveName(shown))),
+      el("p", "tip-text", ...richText(passiveSummary(shown))),
+    );
+
+    if (tips) {
+      attachTip(block, { key: `card:${hero.id}:passive:${shown.kind}`, side: "right", live: false, render: () => passiveTip(shown) });
+    }
+
+    blocks.push(block);
+  }
+
+  return blocks;
 }
 
 function reachText(stats: CardStats | null): string | null {
@@ -237,7 +309,12 @@ export function buildCard(heroId: string, build: HeroBuild, stats: CardStats | n
   }
 
   const parts: HTMLElement[] = [
-    el("div", "unit-card-head", el("div", "unit-card-name", heroName(heroId)), sub === "" ? null : el("div", "unit-card-sub", sub)),
+    el(
+      "div",
+      "unit-card-head",
+      el("div", "unit-card-name", heroName(heroId), hero?.summon === true ? null : levelBadge(buildLevel(build), "unit-card-level")),
+      sub === "" ? null : el("div", "unit-card-sub", sub),
+    ),
     el(
       "div",
       "unit-card-art",
@@ -254,41 +331,30 @@ export function buildCard(heroId: string, build: HeroBuild, stats: CardStats | n
     parts.push(el("div", "unit-card-stats", ...rows.values()));
   }
 
-  const signatureId = hero === undefined ? null : findSignatureAbilityId(hero, gameCatalogue);
-  const signature = signatureId === null ? undefined : abilityDefinition(signatureId);
+  if (hero !== undefined) {
+    for (const slot of SKILL_SLOTS) {
+      const block = skillBlock(hero, slot, stats);
 
-  if (signature !== undefined) {
-    parts.push(
-      el(
-        "div",
-        "unit-card-ability",
-        el(
-          "div",
-          "unit-card-ability-head",
-          el("span", "unit-card-ability-name", signature.name),
-          stats?.manaCost === null || stats?.manaCost === undefined ? null : el("span", "unit-card-mana", `${stats.manaCost} mana`),
-        ),
-        signature.description === undefined ? null : el("p", "tip-text", ...richText(signature.description)),
-      ),
-    );
+      if (block !== null) {
+        parts.push(block);
+      }
+    }
+
+    parts.push(...passiveBlocks(hero, options.live));
   }
 
   const kit: HTMLElement[] = [];
 
   (build.itemIds ?? []).forEach((itemId, index) => {
-    kit.push(kitChip(itemId, "item", heroId, options.live, `card:${heroId}:item:${index}`));
+    kit.push(kitChip(itemId, "item", heroId, null, options.live, `card:${heroId}:item:${index}`));
   });
 
-  (build.runeIds ?? []).forEach((runeId, index) => {
-    kit.push(kitChip(runeId, "rune", heroId, options.live, `card:${heroId}:rune:${index}`));
+  (build.gems ?? []).forEach((gem, index) => {
+    kit.push(kitChip(gem.gemId, "gem", heroId, gem.slot, options.live, `card:${heroId}:gem:${index}`));
   });
 
-  for (const selection of build.upgrades) {
-    const talent = upgradeDefinition(selection.upgradeId);
-
-    if (talent?.category === "talent") {
-      kit.push(el("span", "unit-card-talent", talentIcon(), talent.name));
-    }
+  for (const pick of levelPicks(build)) {
+    kit.push(el("span", "unit-card-pick", levelIcon(), `${romanLevel(pick.level ?? 2)} ${pick.name}`));
   }
 
   if (kit.length > 0) {

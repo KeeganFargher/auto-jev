@@ -4,6 +4,7 @@ import { isSeatReady } from "./readiness.js";
 import type {
   ControllerKind,
   HeroOffer,
+  OwnedGem,
   OwnedPiece,
   PendingDecision,
   PlayerSeat,
@@ -25,7 +26,7 @@ export interface OwnSeat extends PublicSeat {
   heroBuilds: HeroBuild[];
   formation: BoardCell[];
   items: OwnedPiece[];
-  runes: OwnedPiece[];
+  gems: OwnedGem[];
   decisionRevision: number;
   ready: boolean;
 }
@@ -80,7 +81,7 @@ export function getPlayerView(state: RunState, playerId: PlayerId): PlayerView |
       heroBuilds: seat.heroBuilds,
       formation: seat.formation,
       items: seat.items,
-      runes: seat.runes,
+      gems: seat.gems,
       decisionRevision: seat.decisionRevision,
       ready: isSeatReady(state, playerId),
     },

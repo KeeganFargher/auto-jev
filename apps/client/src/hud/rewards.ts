@@ -1,20 +1,23 @@
 import {
+  SKILL_SLOTS,
   applyUpgrade,
   createHeroBuild,
-  findSignatureAbilityId,
-  runeFitsHero,
+  fittingSlots,
+  skillIdFor,
   withEquipment,
   type Catalogue,
   type ComboKind,
   type HeroBuild,
+  type SkillSlot,
 } from "@jev-game/game";
 import type { PendingDecision, PlayerView, RewardOffer } from "@jev-game/run";
 import { button, el } from "./dom.js";
-import { conditionIcon, itemIcon, plusIcon, roleIcon, runeIcon, schoolIcon } from "./icons.js";
-import { heroArt, heroFaceArt, pieceArt, talentArt } from "./icon-art.js";
+import { conditionIcon, gemIcon, itemIcon, plusIcon, roleIcon, schoolIcon } from "./icons.js";
+import { heroArt, heroFaceArt, levelArt, pieceArt } from "./icon-art.js";
+import { levelBadge, levelStepName, romanLevel } from "./levels.js";
 import { comboGains, loadoutBuilds, teamTraits } from "./loadout.js";
 import { attachTip, tipCard, tipSection, tipText } from "./tooltip.js";
-import { comboGainTip, comboName, runeFitTip } from "./tips.js";
+import { comboGainTip, comboName, gemFitTip, skillName } from "./tips.js";
 import { heroTip } from "./hero-card.js";
 import { abilityDefinition, heroDefinition, heroName, upgradeDefinition } from "../game/catalogues.js";
 
@@ -24,30 +27,37 @@ const CONDITION_FOR_COMBO: Readonly<Record<ComboKind, string>> = {
   crush: "disoriented",
 };
 
-function withItem(build: HeroBuild, pieceId: string, runes: boolean): HeroBuild {
-  const itemIds = runes ? (build.itemIds ?? []) : [...(build.itemIds ?? []), pieceId];
-  const runeIds = runes ? [...(build.runeIds ?? []), pieceId] : (build.runeIds ?? []);
+function withItem(build: HeroBuild, pieceId: string): HeroBuild {
+  return withEquipment(build, [...(build.itemIds ?? []), pieceId], build.gems ?? []);
+}
 
-  return withEquipment(build, itemIds, runeIds);
+function withGem(build: HeroBuild, gemId: string, slot: SkillSlot): HeroBuild {
+  return withEquipment(build, build.itemIds ?? [], [...(build.gems ?? []), { gemId, slot }]);
 }
 
 function candidateTeams(offer: RewardOffer, builds: readonly HeroBuild[], catalogue: Catalogue): HeroBuild[][] {
   const teams: HeroBuild[][] = [];
 
-  if ((offer.kind === "item" || offer.kind === "rune") && offer.pieceId !== null) {
+  if (offer.kind === "item" && offer.pieceId !== null) {
+    const pieceId = offer.pieceId;
+
+    builds.forEach((_build, slot) => {
+      teams.push(builds.map((candidate, index) => (index === slot ? withItem(candidate, pieceId) : candidate)));
+    });
+  }
+
+  if (offer.kind === "gem" && offer.pieceId !== null) {
     const pieceId = offer.pieceId;
     const piece = catalogue.upgrades[pieceId];
 
     builds.forEach((build, slot) => {
-      if (offer.kind === "rune" && (piece === undefined || !runeFitsHero(piece, build.heroId, catalogue))) {
-        return;
+      for (const skill of piece === undefined ? [] : fittingSlots(piece, build.heroId, catalogue)) {
+        teams.push(builds.map((candidate, index) => (index === slot ? withGem(candidate, pieceId, skill) : candidate)));
       }
-
-      teams.push(builds.map((candidate, index) => (index === slot ? withItem(candidate, pieceId, offer.kind === "rune") : candidate)));
     });
   }
 
-  if (offer.kind === "talent" && offer.pieceId !== null && offer.heroSlot !== null) {
+  if (offer.kind === "level" && offer.pieceId !== null && offer.heroSlot !== null) {
     const slot = offer.heroSlot;
     const pieceId = offer.pieceId;
 
@@ -93,18 +103,20 @@ function gainChips(offer: RewardOffer, builds: readonly HeroBuild[], catalogue: 
 function fitsRow(offer: RewardOffer, builds: readonly HeroBuild[], catalogue: Catalogue): HTMLElement | null {
   const piece = offer.pieceId === null ? undefined : catalogue.upgrades[offer.pieceId];
 
-  if (offer.kind !== "rune" || piece === undefined) {
+  if (offer.kind !== "gem" || piece === undefined) {
     return null;
   }
 
   const chips: HTMLElement[] = [];
 
   for (const build of builds) {
-    if (runeFitsHero(piece, build.heroId, catalogue)) {
+    const skills = fittingSlots(piece, build.heroId, catalogue);
+
+    if (skills.length > 0) {
       const chip = el("span", "role-chip", heroFaceArt(build.heroId));
       const heroId = build.heroId;
       chip.dataset.role = heroId;
-      attachTip(chip, { key: `fit:${offer.offerId}:${heroId}`, side: "top", live: false, render: () => runeFitTip(heroId, piece.name) });
+      attachTip(chip, { key: `fit:${offer.offerId}:${heroId}`, side: "top", live: false, render: () => gemFitTip(heroId, piece.name, skills) });
       chips.push(chip);
     }
   }
@@ -127,18 +139,18 @@ interface PrizeParts {
   cursed?: boolean;
 }
 
-function prizeParts(offer: RewardOffer, decision: PendingDecision, view: PlayerView, catalogue: Catalogue): PrizeParts {
+function prizeParts(offer: RewardOffer, decision: PendingDecision, view: PlayerView): PrizeParts {
   switch (offer.kind) {
     case "item":
-    case "rune": {
+    case "gem": {
       const definition = offer.pieceId === null ? undefined : upgradeDefinition(offer.pieceId);
       const rarity = offer.rarity ?? definition?.rarity ?? "common";
       const cursed = definition?.cursed === true;
 
       return {
         glyph: pieceArt(offer.pieceId ?? "", offer.kind),
-        badge: offer.kind === "item" ? itemIcon() : runeIcon(),
-        tag: cursed ? "Cursed" : capitalised(rarity),
+        badge: offer.kind === "item" ? itemIcon() : gemIcon(),
+        tag: cursed ? "Cursed" : offer.kind === "gem" ? "Gem" : capitalised(rarity),
         name: definition?.name ?? offer.pieceId ?? "",
         description: definition?.description ?? "",
         rarity,
@@ -147,15 +159,16 @@ function prizeParts(offer: RewardOffer, decision: PendingDecision, view: PlayerV
       };
     }
 
-    case "talent": {
+    case "level": {
       const definition = offer.pieceId === null ? undefined : upgradeDefinition(offer.pieceId);
       const slot = offer.heroSlot ?? decision.heroSlot;
       const heroId = slot === null ? null : (view.you.heroBuilds[slot]?.heroId ?? null);
+      const level = decision.level ?? definition?.level ?? 2;
 
       return {
-        glyph: talentArt(offer.pieceId ?? ""),
+        glyph: levelArt(offer.pieceId ?? ""),
         badge: heroId === null ? null : roleIcon(heroId),
-        tag: `Tier ${decision.tier ?? definition?.tier ?? 1}`,
+        tag: `${levelStepName(level)} · ${definition?.path === "right" ? "B" : "A"}`,
         name: definition?.name ?? offer.pieceId ?? "",
         description: definition?.description ?? "",
         rarity: null,
@@ -165,15 +178,15 @@ function prizeParts(offer: RewardOffer, decision: PendingDecision, view: PlayerV
 
     case "recruit": {
       const hero = offer.heroId === null ? undefined : heroDefinition(offer.heroId);
-      const signatureId = hero === undefined ? null : findSignatureAbilityId(hero, catalogue);
-      const signature = signatureId === null ? "" : (abilityDefinition(signatureId)?.name ?? "");
+      const ultimateId = hero === undefined ? null : skillIdFor(hero, "ultimate");
+      const ultimate = ultimateId === null ? "" : (abilityDefinition(ultimateId)?.name ?? "");
 
       return {
         glyph: heroArt(offer.heroId ?? ""),
         badge: hero?.school === undefined ? null : schoolIcon(hero.school),
         tag: hero?.archetype === undefined ? "Hero" : capitalised(hero.archetype),
         name: heroName(offer.heroId ?? ""),
-        description: [hero?.title ?? "", signature].filter((part) => part !== "").join(" · "),
+        description: [hero?.title ?? "", ultimate].filter((part) => part !== "").join(" · "),
         rarity: null,
         role: offer.heroId,
       };
@@ -185,7 +198,7 @@ function prizeParts(offer: RewardOffer, decision: PendingDecision, view: PlayerV
         badge: offer.heroId === null ? null : roleIcon(offer.heroId),
         tag: "Train",
         name: `Train ${heroName(offer.heroId ?? "")}`,
-        description: "+1 rune socket on this hero.",
+        description: "+1 gem socket in the skill you pick.",
         rarity: null,
         role: offer.heroId,
       };
@@ -198,15 +211,31 @@ function prizeParts(offer: RewardOffer, decision: PendingDecision, view: PlayerV
   }
 }
 
+function trainSkills(offer: RewardOffer, catalogue: Catalogue): SkillSlot[] {
+  const hero = offer.heroId === null ? undefined : catalogue.heroes[offer.heroId];
+
+  return hero === undefined ? [] : SKILL_SLOTS.filter((skill) => skillIdFor(hero, skill) !== null);
+}
+
+function trainButtons(offer: RewardOffer, catalogue: Catalogue, onChoose: (skill: SkillSlot | null) => void): HTMLElement {
+  const heroId = offer.heroId ?? "";
+
+  return el(
+    "span",
+    "prize-skills",
+    ...trainSkills(offer, catalogue).map((skill) => button("prize-skill", () => onChoose(skill), `+ ${skillName(heroId, skill) ?? skill}`)),
+  );
+}
+
 function prizeRow(
   offer: RewardOffer,
   decision: PendingDecision,
   view: PlayerView,
   catalogue: Catalogue,
-  onChoose: () => void,
-): HTMLButtonElement {
+  onChoose: (skill: SkillSlot | null) => void,
+): HTMLElement {
   const builds = loadoutBuilds(view.you);
-  const parts = prizeParts(offer, decision, view, catalogue);
+  const parts = prizeParts(offer, decision, view);
 
   const icon = el(
     "span",
@@ -218,14 +247,14 @@ function prizeRow(
 
   const gains = gainChips(offer, builds, catalogue);
   const fits = fitsRow(offer, builds, catalogue);
-  const extras = gains === null && fits === null ? null : el("span", "prize-extras", fits, gains);
+  const skills = offer.kind === "train" && trainSkills(offer, catalogue).length > 1 ? trainButtons(offer, catalogue, onChoose) : null;
+  const extras = gains === null && fits === null && skills === null ? null : el("span", "prize-extras", fits, gains, skills);
+  const text = el("span", "prize-text", el("span", "prize-name", parts.name), el("span", "prize-desc", parts.description), extras);
 
-  const row = button(
-    `prize-row is-${offer.kind}`,
-    onChoose,
-    icon,
-    el("span", "prize-text", el("span", "prize-name", parts.name), el("span", "prize-desc", parts.description), extras),
-  );
+  const row =
+    skills === null
+      ? button(`prize-row is-${offer.kind}`, () => onChoose(offer.kind === "train" ? (trainSkills(offer, catalogue)[0] ?? null) : null), icon, text)
+      : el("div", `prize-row is-${offer.kind}`, icon, text);
 
   if (parts.rarity !== null) {
     row.dataset.rarity = parts.rarity;
@@ -248,27 +277,39 @@ function prizeRow(
 function decisionHeadline(decision: PendingDecision, view: PlayerView): HTMLElement {
   switch (decision.kind) {
     case "item":
-      return el("div", "reward-head", "Choose an item");
+      return el("div", "reward-head", decision.offers.some((offer) => offer.kind === "gem") ? "Choose an item or a gem" : "Choose an item");
 
-    case "rune":
-      return el("div", "reward-head", "Choose a rune");
+    case "gem":
+      return el("div", "reward-head", "Choose a gem");
 
     case "recruit":
       return el("div", "reward-head", "Recruit a hero, or train one");
 
-    case "talent": {
+    case "level": {
       const slot = decision.heroSlot;
       const build = slot === null ? undefined : view.you.heroBuilds[slot];
+      const level = decision.level ?? 2;
 
       if (build === undefined) {
-        return el("div", "reward-head", `Talent · tier ${decision.tier ?? 1}`);
+        return el("div", "reward-head", `Level ${romanLevel(level)} · ${levelStepName(level)}`);
       }
 
       const chip = el("span", "role-chip", heroFaceArt(build.heroId));
       chip.dataset.role = build.heroId;
       attachTip(chip, { key: `reward-hero:${slot}`, side: "bottom", live: false, render: () => heroTip(build, slot, null) });
 
-      return el("div", "reward-head", chip, `${heroName(build.heroId)} · talent tier ${decision.tier ?? 1}`);
+      const head = el(
+        "div",
+        "reward-head is-level-up",
+        chip,
+        `${heroName(build.heroId)} reaches level`,
+        levelBadge(level, "reward-level"),
+        el("span", "reward-level-step", levelStepName(level)),
+      );
+
+      head.dataset.level = String(level);
+
+      return head;
     }
 
     default: {
@@ -312,7 +353,7 @@ export function renderRewardPanel(
   root: HTMLElement,
   view: PlayerView,
   catalogue: Catalogue,
-  onChoose: (decisionId: string, offerId: string) => void,
+  onChoose: (decisionId: string, offerId: string, skill: SkillSlot | null) => void,
 ): HTMLElement | null {
   const decision = view.pendingDecisions[0];
 
@@ -320,7 +361,9 @@ export function renderRewardPanel(
     return null;
   }
 
-  const rows = decision.offers.map((offer) => prizeRow(offer, decision, view, catalogue, () => onChoose(decision.decisionId, offer.offerId)));
+  const rows = decision.offers.map((offer) =>
+    prizeRow(offer, decision, view, catalogue, (skill) => onChoose(decision.decisionId, offer.offerId, skill)),
+  );
 
   const panel = el(
     "div",

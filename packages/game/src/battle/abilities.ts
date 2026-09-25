@@ -1,10 +1,10 @@
 import type { AbilityDefinitionId, UnitId } from "../ids.js";
-import type { AbilityDefinition, Catalogue } from "../definitions.js";
+import type { AbilityDefinition } from "../definitions.js";
 import type { UnitState } from "./state.js";
 import { distance, isWithinRange } from "../math/vector.js";
-import { resolveCastTarget } from "./targeting.js";
+import { isCorpse, isRevivable, puppetPartner, resolveCastTarget, resolveTarget } from "./targeting.js";
 import { unitsInArea } from "./areas.js";
-import { findBloodContract } from "../builds/compile-build.js";
+import { findBloodPact } from "../builds/compile-build.js";
 
 export interface ActionProposal {
   sourceUnitId: UnitId;
@@ -13,24 +13,25 @@ export interface ActionProposal {
   isBasicAttack: boolean;
 }
 
-function abilityFor(unit: UnitState, abilityId: AbilityDefinitionId, catalogue: Catalogue): AbilityDefinition | undefined {
-  return unit.abilities[abilityId] ?? catalogue.abilities[abilityId];
+export function activeBasicAttackId(unit: UnitState): AbilityDefinitionId {
+  const swapped = unit.form?.definition.basicAttackId;
+
+  return swapped !== undefined && unit.abilities[swapped] !== undefined ? swapped : unit.basicAttackId;
 }
 
-export function getEngageRange(unit: UnitState, catalogue: Catalogue): number {
-  const hero = catalogue.heroes[unit.heroId];
+export function getEngageRange(unit: UnitState): number {
+  return unit.abilities[activeBasicAttackId(unit)]?.range ?? 0;
+}
 
-  if (hero === undefined) {
-    return 0;
+function canPaySkill(unit: UnitState, abilityId: AbilityDefinitionId, manaCost: number | undefined): boolean {
+  const pact = findBloodPact(unit.passives);
+  const skill = abilityId === unit.abilityId || abilityId === unit.ultimateId;
+
+  if (pact !== null && skill) {
+    return unit.hp > unit.maxHp * pact.minHpFraction;
   }
 
-  return abilityFor(unit, hero.basicAttackId, catalogue)?.range ?? 0;
-}
-
-function canPaySignature(unit: UnitState, manaCost: number): boolean {
-  const contract = findBloodContract(unit.passives);
-
-  return contract === null ? unit.mana >= manaCost : unit.hp > unit.maxHp * contract.minHpFraction;
+  return manaCost === undefined || unit.mana >= manaCost;
 }
 
 function hasEnoughTargets(ability: AbilityDefinition, unit: UnitState, target: UnitState, units: readonly UnitState[]): boolean {
@@ -43,32 +44,72 @@ function hasEnoughTargets(ability: AbilityDefinition, unit: UnitState, target: U
   return unitsInArea(units, unit, ability.area, target.position, side).length >= ability.minTargets;
 }
 
-export function proposeAction(
-  unit: UnitState,
-  units: readonly UnitState[],
-  tick: number,
-  catalogue: Catalogue,
-): ActionProposal | null {
-  const hero = catalogue.heroes[unit.heroId];
+function hasEnoughPoisoned(ability: AbilityDefinition, unit: UnitState, target: UnitState, units: readonly UnitState[]): boolean {
+  const gate = ability.requiresPoisoned;
 
-  if (hero === undefined || unit.control !== null) {
+  if (gate === undefined) {
+    return true;
+  }
+
+  const pool = ability.area === undefined ? units.filter((candidate) => candidate.alive && candidate.teamId !== unit.teamId) : unitsInArea(units, unit, ability.area, target.position, "enemies");
+  const poisoned = pool.filter((candidate) => candidate.dots.some((dot) => dot.dot === "poison" && dot.sourceUnitId === unit.unitId && dot.stacks >= gate.stacks));
+
+  return poisoned.length >= gate.targets;
+}
+
+function worthResurrecting(ability: AbilityDefinition, unit: UnitState, units: readonly UnitState[]): boolean {
+  for (const effect of ability.effects) {
+    if (effect.kind === "resurrect") {
+      return unit.hp < unit.maxHp * effect.dangerHpFraction || units.some((other) => isRevivable(unit, other));
+    }
+  }
+
+  return true;
+}
+
+function worthRaising(ability: AbilityDefinition, units: readonly UnitState[]): boolean {
+  return !ability.effects.some((effect) => effect.kind === "raise-army") || units.some((other) => isCorpse(other) && other.summonerUnitId === null);
+}
+
+function candidateIds(unit: UnitState, units: readonly UnitState[]): AbilityDefinitionId[] {
+  if (puppetPartner(unit, units) !== null) {
+    return [activeBasicAttackId(unit)];
+  }
+
+  const ids: AbilityDefinitionId[] = [];
+
+  if (unit.ultimateId !== null) {
+    ids.push(unit.ultimateId);
+  }
+
+  if (unit.abilityId !== null) {
+    ids.push(unit.abilityId);
+  }
+
+  ids.push(activeBasicAttackId(unit));
+
+  return ids;
+}
+
+export function proposeAction(unit: UnitState, units: readonly UnitState[], tick: number): ActionProposal | null {
+  if (unit.control !== null) {
     return null;
   }
 
-  const candidateIds = [...hero.abilityIds, hero.basicAttackId];
-
-  for (const abilityId of candidateIds) {
-    const ability = abilityFor(unit, abilityId, catalogue);
+  for (const abilityId of candidateIds(unit, units)) {
+    const ability = unit.abilities[abilityId];
 
     if (ability === undefined) {
       continue;
     }
 
-    if (ability.manaCost !== undefined && !canPaySignature(unit, ability.manaCost)) {
+    if (!canPaySkill(unit, abilityId, ability.manaCost)) {
       continue;
     }
 
-    if (abilityId === hero.basicAttackId && unit.channel !== null) {
+    const basic = activeBasicAttackId(unit);
+
+    if (abilityId === basic && unit.channel !== null) {
       continue;
     }
 
@@ -78,7 +119,7 @@ export function proposeAction(
       continue;
     }
 
-    const target = resolveCastTarget(ability, unit, units);
+    const target = abilityId === basic ? resolveTarget(unit, units) : resolveCastTarget(ability, unit, units);
 
     if (target === null) {
       continue;
@@ -88,7 +129,7 @@ export function proposeAction(
       continue;
     }
 
-    if (!hasEnoughTargets(ability, unit, target, units)) {
+    if (!hasEnoughTargets(ability, unit, target, units) || !hasEnoughPoisoned(ability, unit, target, units) || !worthResurrecting(ability, unit, units) || !worthRaising(ability, units)) {
       continue;
     }
 
@@ -96,7 +137,7 @@ export function proposeAction(
       sourceUnitId: unit.unitId,
       abilityId,
       targetUnitId: target.unitId,
-      isBasicAttack: abilityId === hero.basicAttackId,
+      isBasicAttack: abilityId === basic,
     };
   }
 

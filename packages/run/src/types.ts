@@ -5,6 +5,7 @@ import type {
   HeroBuild,
   HeroDefinitionId,
   Rarity,
+  SkillSlot,
   UpgradeDefinitionId,
 } from "@jev-game/game";
 import type { BattleId, PlayerId, RunId } from "./ids.js";
@@ -19,6 +20,10 @@ export interface OwnedPiece {
   heroSlot: number | null;
 }
 
+export interface OwnedGem extends OwnedPiece {
+  skill: SkillSlot | null;
+}
+
 export interface PlayerSeat {
   playerId: PlayerId;
   displayName: string;
@@ -26,7 +31,7 @@ export interface PlayerSeat {
   heroBuilds: HeroBuild[];
   formation: BoardCell[];
   items: OwnedPiece[];
-  runes: OwnedPiece[];
+  gems: OwnedGem[];
   nextInstanceId: number;
   runHealth: number;
   eliminated: boolean;
@@ -48,7 +53,7 @@ export interface HeroOffer {
   heroId: HeroDefinitionId;
 }
 
-export type RewardOfferKind = "item" | "rune" | "talent" | "recruit" | "train";
+export type RewardOfferKind = "item" | "gem" | "level" | "recruit" | "train";
 
 export interface RewardOffer {
   offerId: string;
@@ -59,13 +64,13 @@ export interface RewardOffer {
   rarity: Rarity | null;
 }
 
-export type DecisionKind = "item" | "rune" | "talent" | "recruit";
+export type DecisionKind = "item" | "gem" | "level" | "recruit";
 
 export interface PendingDecision {
   decisionId: string;
   kind: DecisionKind;
   heroSlot: number | null;
-  tier: number | null;
+  level: number | null;
   offers: RewardOffer[];
 }
 

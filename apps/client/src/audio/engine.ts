@@ -31,6 +31,7 @@ export interface SoundStats {
 export interface AudioEngine {
   readonly settings: AudioSettingsStore;
   play(id: SoundId, options?: PlayOptions): number;
+  duration(id: SoundId): number;
   stopBus(bus: OneShotBus): void;
   setMusic(id: MusicId | null): void;
   preload(group: PreloadGroup): Promise<void>;
@@ -216,7 +217,7 @@ export function createAudioEngine(): AudioEngine {
       panner.connect(buses[definition.bus]);
     }
 
-    const voice: Voice = { soundId: id, startedAt: performance.now(), bus: definition.bus, source, gain };
+    const voice: Voice = { soundId: id, startedAt: performance.now(), priority: definition.priority, bus: definition.bus, source, gain };
     source.addEventListener("ended", () => removeVoice(voice));
     voices.push(voice);
     source.start();
@@ -355,6 +356,10 @@ export function createAudioEngine(): AudioEngine {
       stats.started += 1;
 
       return startVoice(id, buffer, options);
+    },
+
+    duration(id) {
+      return buffers.get(id)?.duration ?? 0;
     },
 
     stopBus(bus) {

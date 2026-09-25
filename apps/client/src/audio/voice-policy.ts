@@ -4,11 +4,13 @@ export interface VoiceRules {
   maxVoices: number;
   cooldownMs: number;
   onLimit: LimitBehaviour;
+  priority: number;
 }
 
 export interface VoiceSlot {
   soundId: string;
   startedAt: number;
+  priority: number;
 }
 
 export type VoiceDecision<V extends VoiceSlot> =
@@ -39,7 +41,15 @@ export function decideVoice<V extends VoiceSlot>(
   }
 
   if (active.length >= globalLimit) {
-    return { kind: "steal", victim: oldest(active) };
+    const yielding = active.filter((voice) => voice.priority <= rules.priority);
+
+    if (yielding.length === 0) {
+      return { kind: "skip", reason: "limit" };
+    }
+
+    const lowest = Math.min(...yielding.map((voice) => voice.priority));
+
+    return { kind: "steal", victim: oldest(yielding.filter((voice) => voice.priority === lowest)) };
   }
 
   return { kind: "play" };

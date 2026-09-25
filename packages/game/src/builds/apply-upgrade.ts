@@ -1,4 +1,4 @@
-import type { Catalogue, UpgradeDefinition } from "../definitions.js";
+import type { Catalogue, PickLevel, UpgradeDefinition } from "../definitions.js";
 import type { UpgradeDefinitionId } from "../ids.js";
 import type { HeroBuild } from "./state.js";
 
@@ -6,7 +6,25 @@ function currentStacks(build: HeroBuild, upgradeId: UpgradeDefinitionId): number
   return build.upgrades.find((selection) => selection.upgradeId === upgradeId)?.stacks ?? 0;
 }
 
-export function isUpgradeEligible(build: HeroBuild, upgrade: UpgradeDefinition): boolean {
+export function pickedLevels(build: HeroBuild, catalogue: Catalogue): Set<number> {
+  const levels = new Set<number>();
+
+  for (const selection of build.upgrades) {
+    const upgrade = catalogue.upgrades[selection.upgradeId];
+
+    if (upgrade?.category === "level" && upgrade.level !== undefined) {
+      levels.add(upgrade.level);
+    }
+  }
+
+  return levels;
+}
+
+export function heroLevel(build: HeroBuild, catalogue: Catalogue): number {
+  return 1 + pickedLevels(build, catalogue).size;
+}
+
+export function isUpgradeEligible(build: HeroBuild, upgrade: UpgradeDefinition, catalogue: Catalogue): boolean {
   if (upgrade.heroId !== undefined && upgrade.heroId !== build.heroId) {
     return false;
   }
@@ -15,22 +33,18 @@ export function isUpgradeEligible(build: HeroBuild, upgrade: UpgradeDefinition):
     return false;
   }
 
-  const requiresAnyOf = upgrade.requiresAnyOfUpgradeIds ?? [];
-
-  if (requiresAnyOf.length > 0 && !requiresAnyOf.some((id) => currentStacks(build, id) > 0)) {
-    return false;
+  if (upgrade.category !== "level") {
+    return true;
   }
 
-  if ((upgrade.excludesUpgradeIds ?? []).some((id) => currentStacks(build, id) > 0)) {
-    return false;
-  }
+  const picked = pickedLevels(build, catalogue);
 
-  return true;
+  return upgrade.level !== undefined && !picked.has(upgrade.level) && (upgrade.level === 2 || picked.has(upgrade.level - 1));
 }
 
-export function eligibleTalents(build: HeroBuild, catalogue: Catalogue, tier: number): UpgradeDefinition[] {
+export function eligibleLevelPicks(build: HeroBuild, catalogue: Catalogue, level: PickLevel): UpgradeDefinition[] {
   return Object.values(catalogue.upgrades).filter(
-    (upgrade) => upgrade.category === "talent" && upgrade.tier === tier && isUpgradeEligible(build, upgrade),
+    (upgrade) => upgrade.category === "level" && upgrade.level === level && isUpgradeEligible(build, upgrade, catalogue),
   );
 }
 
@@ -45,7 +59,7 @@ export function applyUpgrade(
     throw new Error(`unknown upgrade id "${upgradeId}"`);
   }
 
-  if (!isUpgradeEligible(build, upgrade)) {
+  if (!isUpgradeEligible(build, upgrade, catalogue)) {
     throw new Error(`upgrade "${upgradeId}" is not a legal choice for build "${build.buildId}"`);
   }
 

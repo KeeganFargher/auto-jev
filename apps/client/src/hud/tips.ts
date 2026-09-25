@@ -3,6 +3,7 @@ import {
   ATTUNEMENT_CUNNING_CRIT_CHANCE,
   ATTUNEMENT_MIGHT_MAX_HP,
   ATTUNEMENT_THRESHOLD,
+  carriedShot,
   cellSize,
   COMBO_FOR_CONDITION,
   CONDITION_DURATION_TICKS,
@@ -10,15 +11,17 @@ import {
   CRUSH_BONUS_FRACTION,
   CRUSH_MANA_DRAIN_FRACTION,
   DETONATED_BY,
-  findSignatureAbilityId,
+  fittingSlots,
+  gemWorksOnShot,
+  MAX_HERO_LEVEL,
   OVERLOAD_BONUS_FRACTION,
   OVERLOAD_KNOCKDOWN_TICKS,
   OVERLOAD_SPLASH_RANGE_UNITS,
-  runeFitsHero,
   SCHOOLS,
   SHATTER_CRIT_MULTIPLIER,
   SHATTER_SHARD_FRACTION,
   SHATTER_SHARD_RANGE_UNITS,
+  skillIdFor,
   TICK_RATE,
   TIER_TWO_BRITTLE_DURATION_TICKS,
   TIER_TWO_CRUSH_SLOW_FRACTION,
@@ -31,21 +34,27 @@ import {
   type ComboTrait,
   type ConditionKind,
   type EffectDefinition,
+  type GemFit,
   type HeroBuild,
+  type PassiveDefinition,
   type School,
+  type SkillSlot,
   type TeamTraits,
   type UpgradeDefinition,
 } from "@jev-game/game";
 import { boardArena } from "@jev-game/content";
 import { el } from "./dom.js";
-import { conditionIcon, roleIcon, schoolIcon, talentIcon } from "./icons.js";
+import { conditionIcon, heartIcon, levelIcon, meterIcon, roleIcon, schoolIcon, statusIcon } from "./icons.js";
+import { buildLevel, levelPicks, romanLevel } from "./levels.js";
 import { heroFaceArt, pieceArt } from "./icon-art.js";
 import { richText, tipCard, tipHint, tipSection, tipText } from "./tooltip.js";
 import { abilityDefinition, gameCatalogue, heroDefinition, heroName, upgradeDefinition } from "../game/catalogues.js";
 
-export type PieceKind = "item" | "rune";
+export type PieceKind = "item" | "gem";
 
-export type PiecePlace = { kind: "hero"; heroId: string } | { kind: "stash" } | { kind: "offer" };
+export type PiecePlace = { kind: "hero"; heroId: string; skill: SkillSlot | null } | { kind: "stash" } | { kind: "offer" };
+
+export type CardPassive = Extract<PassiveDefinition, { kind: "deep-freeze" | "virulence" | "withering" | "blessed-overflow" | "harvest" | "overclock" }>;
 
 interface ComboLinks {
   applies: ConditionKind[];
@@ -116,6 +125,13 @@ function capitalised(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
+export function titleCase(id: string): string {
+  return id
+    .split("-")
+    .flatMap((word) => (word === "" ? [] : [capitalised(word)]))
+    .join(" ");
+}
+
 function comboRules(combo: ComboKind): ComboRules {
   switch (combo) {
     case "overload":
@@ -180,10 +196,6 @@ export function heroChip(heroId: string): HTMLElement {
   chip.dataset.role = heroId;
 
   return chip;
-}
-
-function heroChips(heroIds: readonly string[], empty: string): HTMLElement {
-  return heroIds.length === 0 ? el("span", "tip-empty", empty) : el("span", "tip-heroes", ...heroIds.map(heroChip));
 }
 
 function pipsOf(filled: number, total: number, tone: string): HTMLElement {
@@ -272,10 +284,6 @@ function effectConditions(effects: readonly EffectDefinition[] | undefined, into
     if (effect.kind === "apply-condition") {
       into.add(effect.condition);
     }
-
-    if (effect.kind === "dot" && effect.conditionAtStacks !== undefined) {
-      into.add(effect.conditionAtStacks.condition);
-    }
   }
 }
 
@@ -284,7 +292,7 @@ function pieceComboLinks(definition: UpgradeDefinition): ComboLinks {
   const detonates = new Set<School>();
 
   for (const passive of definition.grantsPassives ?? []) {
-    if (passive.kind === "every-nth-basic-attack" || passive.kind === "first-hit-per-enemy") {
+    if (passive.kind === "every-nth-attack" || passive.kind === "first-hit-per-enemy") {
       effectConditions(passive.effects, applies);
     }
 
@@ -302,17 +310,13 @@ function pieceComboLinks(definition: UpgradeDefinition): ComboLinks {
   for (const change of definition.abilityChanges ?? []) {
     effectConditions(change.addEffects, applies);
     effectConditions(change.setEffects, applies);
-
-    if (change.setSchool !== undefined) {
-      detonates.add(change.setSchool);
-    }
   }
 
-  if (definition.rune?.kind === "primer") {
-    applies.add(definition.rune.condition);
+  if (definition.gem?.kind === "primer") {
+    applies.add(definition.gem.condition);
   }
 
-  const resonance = definition.rune?.kind === "resonance";
+  const resonance = definition.gem?.kind === "resonance";
 
   if (resonance) {
     for (const school of SCHOOLS) {
@@ -353,24 +357,85 @@ function comboLinkSection(definition: UpgradeDefinition): HTMLElement | null {
   return lines.length === 0 ? null : tipSection("Combos", ...lines);
 }
 
-function runeFitSection(definition: UpgradeDefinition, place: PiecePlace, teamHeroIds: readonly string[]): HTMLElement | null {
-  if (place.kind === "hero") {
-    const hero = heroDefinition(place.heroId);
-    const signatureId = hero === undefined ? null : findSignatureAbilityId(hero, gameCatalogue);
-    const signature = signatureId === null ? undefined : abilityDefinition(signatureId);
+const FIT_PHRASES: Readonly<Record<GemFit, string>> = {
+  any: "any skill",
+  attack: "attack skills",
+  spell: "spells",
+  damaging: "damaging skills",
+  strike: "strikes",
+  target: "single-target skills",
+  projectile: "projectiles",
+  area: "area skills",
+  line: "line skills",
+  dash: "dashes",
+  delayed: "delayed skills",
+  channel: "channels",
+  zone: "ground effects",
+  summon: "summons",
+  link: "binds",
+  self: "self skills",
+  heal: "heals",
+};
 
-    return tipSection("Socketed", el("p", "tip-text", heroChip(place.heroId), signature === undefined ? "" : ` · ${signature.name}`));
+function fitsPhrase(fits: readonly GemFit[]): string {
+  return fits.map((fit) => FIT_PHRASES[fit]).join(", ");
+}
+
+export function skillName(heroId: string, skill: SkillSlot): string | null {
+  const hero = heroDefinition(heroId);
+  const skillId = hero === undefined ? null : skillIdFor(hero, skill);
+
+  return skillId === null ? null : (abilityDefinition(skillId)?.name ?? null);
+}
+
+function skillNames(heroId: string, skills: readonly SkillSlot[]): string[] {
+  return skills.flatMap((skill) => {
+    const name = skillName(heroId, skill);
+
+    return name === null ? [] : [name];
+  });
+}
+
+function gemSkillNames(definition: UpgradeDefinition, heroId: string, skills: readonly SkillSlot[]): string[] {
+  const hero = heroDefinition(heroId);
+
+  return skills.flatMap((slot) => {
+    const skillId = hero === undefined ? null : skillIdFor(hero, slot);
+    const skill = skillId === null ? undefined : abilityDefinition(skillId);
+
+    if (skill === undefined) {
+      return [];
+    }
+
+    const shot = carriedShot(skill, gameCatalogue);
+    const carrier = skill.effects.find((effect) => effect.kind === "summon" && effect.carriesGems === true);
+
+    return [shot !== null && carrier?.kind === "summon" && gemWorksOnShot(definition, shot) ? `${skill.name} (on ${summonName(carrier.heroId)} shots)` : skill.name];
+  });
+}
+
+function fitLine(definition: UpgradeDefinition, heroId: string, skills: readonly SkillSlot[]): HTMLElement {
+  const names = gemSkillNames(definition, heroId, skills);
+
+  return el("p", "tip-text", heroChip(heroId), names.length === 0 ? "" : ` · ${names.join(" or ")}`);
+}
+
+function gemFitSection(definition: UpgradeDefinition, place: PiecePlace, teamHeroIds: readonly string[]): HTMLElement | null {
+  if (place.kind === "hero") {
+    return tipSection("Socketed", fitLine(definition, place.heroId, place.skill === null ? [] : [place.skill]));
   }
 
-  const fits: string[] = [];
+  const lines: HTMLElement[] = [];
 
   for (const heroId of new Set(teamHeroIds)) {
-    if (runeFitsHero(definition, heroId, gameCatalogue)) {
-      fits.push(heroId);
+    const skills = fittingSlots(definition, heroId, gameCatalogue);
+
+    if (skills.length > 0) {
+      lines.push(fitLine(definition, heroId, skills));
     }
   }
 
-  return tipSection("Fits", heroChips(fits, "No hero on your team can use it yet."));
+  return tipSection("Fits", ...(lines.length === 0 ? [el("span", "tip-empty", "No skill on your team can use it yet.")] : lines));
 }
 
 export function pieceTip(pieceId: string, kind: PieceKind, place: PiecePlace, teamHeroIds: readonly string[], hint: string | null): HTMLElement {
@@ -382,7 +447,10 @@ export function pieceTip(pieceId: string, kind: PieceKind, place: PiecePlace, te
 
   const cursed = definition.cursed === true;
   const rarity = cursed ? "cursed" : (definition.rarity ?? "common");
-  const stacking = kind === "rune" ? "Changes its hero's signature ability" : definition.maxStacks > 1 ? `Up to ${definition.maxStacks} on one hero` : "1 per hero";
+
+  const stacking =
+    kind === "gem" ? `Fits ${fitsPhrase(definition.gemFits ?? [])}` : definition.maxStacks > 1 ? `Up to ${definition.maxStacks} on one hero` : "1 per hero";
+
   const sections: HTMLElement[] = [tipSection(null, tipText(definition.description))];
   const combos = comboLinkSection(definition);
 
@@ -390,8 +458,8 @@ export function pieceTip(pieceId: string, kind: PieceKind, place: PiecePlace, te
     sections.push(combos);
   }
 
-  if (kind === "rune") {
-    const fit = runeFitSection(definition, place, teamHeroIds);
+  if (kind === "gem") {
+    const fit = gemFitSection(definition, place, teamHeroIds);
 
     if (fit !== null) {
       sections.push(fit);
@@ -408,7 +476,7 @@ export function pieceTip(pieceId: string, kind: PieceKind, place: PiecePlace, te
     icon: pieceArt(pieceId, kind),
     accent: `var(--color-rarity-${rarity})`,
     title: definition.name,
-    subtitle: `${capitalised(rarity)} ${kind} · ${stacking}`,
+    subtitle: kind === "gem" ? `Gem · ${stacking}` : `${capitalised(rarity)} ${kind} · ${stacking}`,
     tag: cursed ? "Cursed" : place.kind === "stash" ? "In stash" : null,
     sections,
   });
@@ -418,21 +486,21 @@ export function pieceTip(pieceId: string, kind: PieceKind, place: PiecePlace, te
   return card;
 }
 
-export function emptySocketTip(kind: PieceKind, heroId: string, interactive: boolean): HTMLElement {
+export function emptySocketTip(kind: PieceKind, heroId: string, skill: SkillSlot | null, interactive: boolean): HTMLElement {
   const hero = heroName(heroId);
-
-  const text = kind === "item" ? "Items come from round rewards." : `A rune upgrades ${hero}'s signature ability.`;
+  const named = skill === null ? null : skillName(heroId, skill);
+  const text = kind === "item" ? "Items come from round rewards." : `A gem changes how ${hero}'s ${named ?? "skill"} works.`;
   const sections = [tipSection(null, tipText(text))];
 
   if (interactive) {
-    sections.push(tipHint(`Pick up an ${kind}, then click here`));
+    sections.push(tipHint(kind === "item" ? "Pick up an item, then click here" : "Pick up a gem, then click here"));
   }
 
   return tipCard({
     icon: null,
     accent: null,
-    title: kind === "item" ? "Empty item slot" : "Empty rune socket",
-    subtitle: hero,
+    title: kind === "item" ? "Empty item slot" : "Empty gem socket",
+    subtitle: named === null ? hero : `${hero} · ${named}`,
     tag: null,
     sections,
   });
@@ -493,18 +561,16 @@ export function comboGainTip(combo: ComboKind, tier: number): HTMLElement {
   return card;
 }
 
-export function runeFitTip(heroId: string, runeName: string): HTMLElement {
-  const hero = heroDefinition(heroId);
-  const signatureId = hero === undefined ? null : findSignatureAbilityId(hero, gameCatalogue);
-  const signature = signatureId === null ? undefined : abilityDefinition(signatureId);
+export function gemFitTip(heroId: string, gemName: string, skills: readonly SkillSlot[]): HTMLElement {
+  const names = skillNames(heroId, skills);
 
   const card = tipCard({
     icon: heroFaceArt(heroId),
     accent: "var(--role)",
     title: heroName(heroId),
-    subtitle: signature === undefined ? null : `Signature · ${signature.name}`,
+    subtitle: names.length === 0 ? null : names.join(" · "),
     tag: null,
-    sections: [tipSection(null, tipText(`${runeName} works on ${heroName(heroId)}'s ${signature?.name ?? "signature ability"}.`))],
+    sections: [tipSection(null, tipText(`${gemName} works in ${heroName(heroId)}'s ${names.join(" or ")}.`))],
   });
 
   card.dataset.role = heroId;
@@ -591,33 +657,151 @@ export function combosOverviewTip(traits: TeamTraits): HTMLElement {
   });
 }
 
-function talentLines(build: HeroBuild): HTMLElement[] {
-  const lines: HTMLElement[] = [];
+export function levelsTip(build: HeroBuild): HTMLElement {
+  const level = buildLevel(build);
 
-  for (const selection of build.upgrades) {
-    const talent = upgradeDefinition(selection.upgradeId);
-
-    if (talent?.category === "talent") {
-      lines.push(el("p", "tip-text", el("b", "tip-name", talent.name), " ", ...richText(talent.description)));
-    }
-  }
-
-  return lines;
-}
-
-export function talentsTip(build: HeroBuild, max: number): HTMLElement {
-  const lines = talentLines(build);
+  const lines = levelPicks(build).map((pick) =>
+    el("p", "tip-text", el("b", "tip-name", `${romanLevel(pick.level ?? 2)} · ${pick.name}`), " ", ...richText(pick.description)),
+  );
 
   const card = tipCard({
-    icon: talentIcon(),
+    icon: levelIcon(),
     accent: "var(--role)",
-    title: "Talents",
-    subtitle: `${heroName(build.heroId)} · ${lines.length} of ${max}`,
+    title: `Level ${romanLevel(level)}`,
+    subtitle: `${heroName(build.heroId)} · ${lines.length} of ${MAX_HERO_LEVEL - 1} picks`,
     tag: null,
-    sections: [tipSection(null, ...(lines.length === 0 ? [el("p", "tip-empty", "No talents yet. Talent picks come from round rewards.")] : lines))],
+    sections: [tipSection(null, ...(lines.length === 0 ? [el("p", "tip-empty", "No level-ups yet. Each one adds a pick to the hero's kit.")] : lines))],
   });
 
   card.dataset.role = build.heroId;
+
+  return card;
+}
+
+export function cardPassive(passive: PassiveDefinition): CardPassive | null {
+  switch (passive.kind) {
+    case "deep-freeze":
+    case "virulence":
+    case "withering":
+    case "blessed-overflow":
+    case "harvest":
+    case "overclock":
+      return passive;
+
+    default:
+      return null;
+  }
+}
+
+function summonName(heroId: string): string {
+  return heroName(heroId).toLowerCase();
+}
+
+export function passiveName(passive: CardPassive): string {
+  return passive.kind === "withering" ? "Withering" : passive.name;
+}
+
+export function passiveSummary(passive: CardPassive): string {
+  switch (passive.kind) {
+    case "deep-freeze":
+      return `Frozen at ${passive.chillsToFreeze} Chill, then ${conditionName(passive.condition)}`;
+
+    case "virulence":
+      return `${conditionName(passive.condition)} at ${passive.conditionAtStacks} stacks · Bursts at ${passive.burstAtStacks}`;
+
+    case "withering":
+      return `Poisoned enemies heal up to ${percent(passive.healingReduction)} less`;
+
+    case "blessed-overflow":
+      return `Overhealing becomes a Blessed shield, up to ${percent(passive.capMaxHpFraction)} of max HP`;
+
+    case "harvest":
+      return passive.soulsPer === 1 ? `Every death raises a ${summonName(passive.heroId)}` : `Every ${passive.soulsPer} deaths raise a ${summonName(passive.heroId)}`;
+
+    case "overclock":
+      return `${capitalised(summonName(passive.heroId))}s near another ${summonName(passive.heroId)} spin up +${percent(passive.bonusPerSecond)} fire rate a second, to +${percent(passive.maxBonus)}`;
+  }
+}
+
+function passiveRule(passive: CardPassive): string {
+  switch (passive.kind) {
+    case "deep-freeze":
+      return `Her frost hits add a Chill stack for ${seconds(passive.chillTicks)}. At ${passive.chillsToFreeze} Chill the enemy is Frozen for ${seconds(passive.freezeTicks)} and becomes ${conditionName(passive.condition)}. Frozen enemies don't gain Chill.`;
+
+    case "virulence":
+      return `Her Poison has no stack limit. At ${passive.conditionAtStacks} stacks an enemy is ${conditionName(passive.condition)}. At ${passive.burstAtStacks} stacks it Bursts: all its remaining Poison damage lands at once, and ${percent(passive.spreadFraction)} of its stacks spread among enemies within ${cells(passive.spreadRadiusUnits)}. An enemy Bursts at most once every ${seconds(passive.windowTicks)}.`;
+
+    case "withering":
+      return passive.fullAtStacks === undefined
+        ? `Enemies carrying her Poison heal ${percent(passive.healingReduction)} less and gain ${percent(passive.manaReduction)} less mana.`
+        : `Enemies carrying her Poison heal up to ${percent(passive.healingReduction)} less and gain up to ${percent(passive.manaReduction)} less mana. The cut grows with each stack and is full at ${passive.fullAtStacks} stacks.`;
+
+    case "blessed-overflow":
+      return `Overhealing from her heals becomes a Blessed shield on that ally, up to ${percent(passive.capMaxHpFraction)} of their max HP, for ${seconds(passive.durationTicks)}. When a Blessed shield breaks, it explodes for ${percent(passive.burstFraction)} of its peak to enemies within ${cells(passive.burstRadiusUnits)}.`;
+
+    case "harvest":
+      return `Every death on either side is a Soul, except his own summons. ${passive.soulsPer === 1 ? "Every Soul raises" : `Every ${passive.soulsPer} Souls raise`} a ${summonName(passive.heroId)} beside him, up to ${passive.maxActive} at once.`;
+
+    case "overclock":
+      return `A ${summonName(passive.heroId)} with another ${summonName(passive.heroId)} within ${cells(passive.rangeUnits)} gains +${percent(passive.bonusPerSecond)} fire rate every second, up to +${percent(passive.maxBonus)}. The bonus resets when it stands alone.`;
+  }
+}
+
+function passiveIcon(passive: CardPassive): SVGSVGElement {
+  switch (passive.kind) {
+    case "deep-freeze":
+      return statusIcon("frozen");
+
+    case "virulence":
+      return statusIcon("poison");
+
+    case "withering":
+      return heartIcon();
+
+    case "blessed-overflow":
+      return meterIcon("shielding");
+
+    case "harvest":
+      return statusIcon("grave-marked");
+
+    case "overclock":
+      return statusIcon("overclock");
+  }
+}
+
+function passiveAccent(passive: CardPassive): string {
+  switch (passive.kind) {
+    case "deep-freeze":
+    case "virulence":
+      return "var(--condition)";
+
+    case "withering":
+      return "var(--color-poison)";
+
+    case "blessed-overflow":
+      return "var(--color-gold-400)";
+
+    case "harvest":
+      return "var(--color-role-bonecaller)";
+
+    case "overclock":
+      return "var(--color-role-clockwright)";
+  }
+}
+
+export function passiveTip(passive: CardPassive): HTMLElement {
+  const card = tipCard({
+    icon: passiveIcon(passive),
+    accent: passiveAccent(passive),
+    title: passiveName(passive),
+    subtitle: "Passive",
+    tag: null,
+    sections: [tipSection(null, tipText(passiveRule(passive)))],
+  });
+
+  if (passive.kind === "deep-freeze" || passive.kind === "virulence") {
+    card.dataset.condition = passive.condition;
+  }
 
   return card;
 }

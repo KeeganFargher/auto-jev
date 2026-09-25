@@ -1,4 +1,4 @@
-import type { Catalogue } from "@jev-game/game";
+import { heroLevel, type Catalogue } from "@jev-game/game";
 import { piecesOnHero, stashedPieces, type PlayerView } from "@jev-game/run";
 import type { JevState } from "../provider/types.js";
 import { COMBO_RULES, describeTraits, heroName, heroRole, loadoutTraits, pieceName } from "./describe.js";
@@ -71,14 +71,14 @@ export function buildObservation(view: PlayerView, catalogue: Catalogue, history
   const you = view.you;
 
   const team = you.heroBuilds.map((build, slot) => {
-    const talents = build.upgrades.map((upgrade) => pieceName(catalogue, upgrade.upgradeId));
+    const levels = build.upgrades.map((upgrade) => pieceName(catalogue, upgrade.upgradeId));
     const items = piecesOnHero(you.items, slot).map((piece) => pieceName(catalogue, piece.pieceId));
-    const runes = piecesOnHero(you.runes, slot).map((piece) => pieceName(catalogue, piece.pieceId));
+    const gems = piecesOnHero(you.gems, slot).map((gem) => `${pieceName(catalogue, gem.pieceId)} in the ${gem.skill ?? "stash"}`);
 
-    return `${heroName(catalogue, build.heroId)} (${heroRole(catalogue, build.heroId)}). Talents: ${talents.join(", ") || "none"}. Items: ${items.join(", ") || "none"}. Runes: ${runes.join(", ") || "none"}.`;
+    return `${heroName(catalogue, build.heroId)} (${heroRole(catalogue, build.heroId)}). Level ${heroLevel(build, catalogue)}, picks: ${levels.join(", ") || "none"}. Items: ${items.join(", ") || "none"}. Gems: ${gems.join(", ") || "none"}.`;
   });
 
-  const stash = [...stashedPieces(you.items), ...stashedPieces(you.runes)].map((piece) => pieceName(catalogue, piece.pieceId));
+  const stash = [...stashedPieces(you.items), ...stashedPieces(you.gems)].map((piece) => pieceName(catalogue, piece.pieceId));
 
   const opponents = Object.values(view.players)
     .filter((seat) => seat.playerId !== you.playerId)

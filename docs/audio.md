@@ -4,9 +4,10 @@ Every sound effect and hero voice line is generated with ElevenLabs,
 processed with ffmpeg into an MP3 and played by the audio engine
 (`docs/architecture.md`, "Client audio"). Each has raw takes under
 `art/audio/` and one runtime file under `apps/client/public/assets/audio/`,
-made from the chosen take. Today there are 62 sounds and 50 voice lines
+made from the chosen take. Today there are 97 sounds and 50 voice lines
 (five for each of the ten heroes). `pnpm audio:check` enforces coverage.
-Music is still missing and tracked in `missing_assets.md` entry 7.
+Only the planning music exists so far. The rest is tracked in
+`missing_assets.md` entry 7.
 
 ## Where things live
 
@@ -14,11 +15,11 @@ Music is still missing and tracked in `missing_assets.md` entry 7.
 | --- | --- | --- |
 | `art/audio/sfx/<id>-<take>.mp3` | Raw ElevenLabs takes for each sound, every take kept | LFS |
 | `art/audio/vo/<hero>-<moment>-<take>.mp3` | Raw voice line takes | LFS |
-| `art/audio/takes.json` | Per sound: prompt, duration, cap, stereo flag, chosen take and the ElevenLabs flow, node and session ids. Per line: text, voice and chosen take. Also the processing numbers below | plain |
+| `art/audio/takes.json` | Per sound: prompt, duration, cap, stereo flag, any lead cut or fade-in, chosen take and the ElevenLabs flow, node and session ids. Per line: text, voice and chosen take. Also the processing numbers below | plain |
 | `apps/client/public/assets/audio/<id>.mp3` | Runtime sound, processed from the chosen take | plain |
 | `apps/client/public/assets/audio/vo/<hero>-<moment>.mp3` | Runtime voice line | plain |
-| `apps/client/src/audio/catalogue.ts` | Each sound's file, bus, preload group, volume and overlap rules | plain |
-| `apps/client/src/audio/sound-map.ts` | Which sound each ability, summon, combo, crit, shield and teleport beat plays | plain |
+| `apps/client/src/audio/catalogue.ts` | Each sound's file, bus, preload group, volume, overlap rules and priority | plain |
+| `apps/client/src/audio/sound-map.ts` | Which sound each ability, summon, form, self-revive, emitter, passive trigger, combo, crit, shield and teleport beat plays, and the upgrades that change an impact's sounds | plain |
 | `apps/client/src/audio/voice-lines.ts` | Each hero's pick, cast, death and win lines | plain |
 | `apps/client/src/audio/line-policy.ts`, `apps/client/src/game/fx/hero-voices.ts` | The voice director: whether a line may play now | plain |
 | `scripts/audio/check.ts` | `pnpm audio:check` | plain |
@@ -66,9 +67,18 @@ the user disliked about the first set.
 
 1. Trim leading silence below −50 dBFS and trailing silence below
    −60 dBFS, keeping 2 ms before the first sample and 20 ms after the last.
+   A sound with a `leadCutSeconds` starts at least that far into the
+   take. voidheart's 0.1 s drops most of the inward rush, so the burst
+   peaks 60 ms in, while the Voidheart flash is still up.
 2. Cut sounds with a `cap` to that many seconds with an 80 ms fade-out.
    Other sounds get a 12 ms end fade. Swings and hits are capped at
-   0.55–0.6 s because they repeat constantly.
+   0.55–0.6 s because they repeat constantly. `ice-shard` is capped at
+   0.3 s, because Rime's orbs fire several shards a second. A sound with
+   a `fadeIn` also fades in from its first sample
+   (`afade=t=in:st=0:d=<seconds>:curve=cub`). supernova-fall's 0.7 s
+   turns a steady rush into a riser, and hailstorm's 0.4 s lets the
+   storm roll in instead of starting on one hard hit. voidheart's 10 ms
+   stops its lead cut from clicking.
 3. Measure momentary loudness (`ebur128=peak=sample`) and apply one gain
    so the loudest 400 ms sits at −16 LUFS, with sample peaks no higher
    than −1 dBFS.
@@ -83,7 +93,11 @@ ffmpeg -i take.mp3 -af "atrim=start=S:end=E,asetpts=PTS-STARTPTS,afade=t=out:st=
 
 Every file is equally loud after this. The mix comes from each sound's
 `volume` in `catalogue.ts`: swings 0.32, hits 0.42, abilities 0.6, big
-impacts 0.8, stingers 0.85, lines 1.
+impacts 0.8, stingers 0.85, lines 1. Each preset also has a `priority`
+for busy fights: swings and hits 0, abilities 1, big impacts 2,
+stingers, UI sounds and lines 3. When a channel is full, a hit can only
+take another hit's slot, so it never cuts off a spell
+(`docs/architecture.md`, "Overlap rules").
 
 ## Voice lines
 
@@ -99,7 +113,7 @@ account allows three speech generations at once; more than that fail.
 | Morrow (`oathkeeper`) | Blue – Commander with Grit | Stern protector, bound by an oath |
 | Gorrak (`ravager`) | Azgar the Cursed | Gleeful brute who talks to his axes |
 | Vesper (`duskblade`) | Daria | Whispering, amused assassin |
-| Cinder (`pyromancer`) | Laura | Excitable, loves explosions |
+| Cinder (`pyromancer`) | Emma - Adorable and Upbeat | Excitable, loves explosions (the user's pick) |
 | Rime (`frostweaver`) | Lady Penelope | Unhurried, aristocratic calm |
 | Moira (`hexbinder`) | Enchantress | Knowing fate-witch |
 | Nettle (`blightmother`) | Seer Morganna | Sweet old poisoner who offers tea |
@@ -125,6 +139,8 @@ line at a time:
   and plays 50% of the time for your heroes, 20% for enemies.
 - **Win:** a random hero from your team, starting 85% of the way through
   the sting.
+- **Risen copies never speak.** A hero the Sexton raises from a corpse
+  plays its abilities' sounds but none of that hero's lines.
 
 ## Adding a hero or ability
 
@@ -133,12 +149,47 @@ line at a time:
    `swing-light` + `hit-blade`). For a new sound, generate and process
    it as above, then add it to `SOUNDS` in `catalogue.ts` in the
    `battle` group.
-2. Summons go in `UNIT_SOUNDS`: a death sound and, if it rises, a spawn
-   sound.
-3. Choose a voice (`creative_list_voices`), write the five lines,
+2. An ability that drops something from the sky gets a `falling` and a
+   `landing` sound instead of cast and hit. The falling sound ends as
+   the impact lands, so it must be shorter than the delay between the
+   cast and the landing, and loudest at its end. Anything that lands
+   through `impact-landed` (Living Bomb's detonation too) uses
+   `landing`. Hex has no impact: its `landing` plays as each `hexed`
+   status lands, the first at once and the rest when their fate bolt
+   arrives 0.2 s later.
+3. An upgrade that turns an impact into something bigger goes in
+   `UPGRADE_IMPACT_SOUNDS` with its own pair. A form a hero enters goes
+   in `FORM_SOUNDS`, by form key. An upgrade that makes a hero revive
+   itself goes in `REVIVE_SOUNDS`, by upgrade id; that sound replaces
+   the form sound on the revive tick.
+4. An ability that starts an emitter (something that keeps firing shots
+   by itself for a while) gets a start sound in `EMITTER_SOUNDS`, keyed
+   by the ability that owns the emitter, even when an upgrade adds it:
+   Hailstorm is under `glacial-prison`. The shots arrive as ordinary
+   hits of the ability they shoot as (`shotsAs`, else the owner), so
+   they play that ability's `hit` sound. Hailstorm's shots are Frozen
+   Orb's, so they play `ice-shard`.
+5. A passive that should sound when it triggers goes in
+   `PASSIVE_SOUNDS`, by the `passive` name on its `passive-triggered`
+   event (its kind, or its key if it has one), such as `deep-freeze`
+   or `virulence`. If it can trigger on many enemies at once, give its
+   sound a cooldown in `SOUNDS` so they fold into one: Virulence can
+   Burst 13 enemies within 67 ms, and `plague-burst`'s 100 ms cooldown
+   plays one pop for them. Damage a passive deals comes as reaction
+   hits (`damage-dealt` with `reaction: true`), which are silent unless
+   `REACTION_SOUNDS` maps the hit's `abilityId`, the passive kind. Death
+   Knell hits every bound enemy on one tick and its cooldown folds them
+   into one toll.
+6. Summons go in `UNIT_SOUNDS`: a death sound and, if it rises, a spawn
+   sound. A hero raised from a corpse (`unit-spawned` with a
+   `corpseUnitId`) needs no entry: it plays `grave-rise` as it rises and
+   `death-bones` when it dies. Any unit that times out
+   (`unit-dismissed` at its `expiresAtTick`) also plays `death-bones`.
+   Several rises or crumbles on one tick fold into one.
+7. Choose a voice (`creative_list_voices`), write the five lines,
    generate and process them, add them to `SOUNDS` with `line()` and
    the hero to `HERO_LINES`.
-4. Run `pnpm build` so the content package has the new ids, then
+8. Run `pnpm build` so the content package has the new ids, then
    `pnpm audio:check`.
 
 ## Commands
@@ -150,6 +201,12 @@ pnpm audio:check
 Fails when:
 - an ability has no sound entry, or a hero with an archetype has no lines;
 - a sound entry names an ability or hero that isn't in the catalogue;
+- `UPGRADE_IMPACT_SOUNDS` names an upgrade that doesn't change that
+  ability, `REVIVE_SOUNDS` an upgrade that grants no revive, or
+  `FORM_SOUNDS` a form no ability, passive or upgrade creates;
+- `EMITTER_SOUNDS` names an ability that neither has an emitter nor
+  gains one from an upgrade, or `PASSIVE_SOUNDS` or `REACTION_SOUNDS` a
+  passive kind or key that no hero or upgrade has;
 - a catalogue file is missing;
 - an MP3 under `apps/client/public/assets/audio/` isn't used.
 

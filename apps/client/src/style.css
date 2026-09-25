@@ -747,21 +747,6 @@
     box-shadow: 0 0 4px var(--school);
   }
 
-  .badge-pips.is-talents {
-    margin-left: auto;
-    gap: 3px;
-  }
-
-  .badge-pips.is-talents .badge-pip {
-    width: 9px;
-    height: 4px;
-  }
-
-  .badge-pips.is-talents .badge-pip.is-on {
-    background: var(--role);
-    box-shadow: 0 0 4px var(--role);
-  }
-
   .loadout-row {
     display: flex;
     align-items: center;
@@ -834,6 +819,41 @@
     box-shadow: 0 0 0 2px var(--color-stone-400);
   }
 
+  .level-badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 17px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 4px;
+    font-family: var(--font-display);
+    font-size: 10px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: var(--color-gold-200);
+    background: linear-gradient(180deg, var(--color-gold-600), var(--color-gold-800));
+    box-shadow: 0 0 0 1.5px var(--color-night-950), inset 0 0 0 1px color-mix(in oklab, var(--color-gold-400) 70%, transparent);
+    text-shadow: 0 1px 0 rgb(0 0 0 / 0.5);
+  }
+
+  .level-badge[data-level="1"] {
+    color: var(--color-stone-200);
+    background: linear-gradient(180deg, var(--color-stone-600), var(--color-stone-800));
+    box-shadow: 0 0 0 1.5px var(--color-night-950), inset 0 0 0 1px color-mix(in oklab, var(--color-stone-400) 60%, transparent);
+  }
+
+  .level-badge[data-level="4"] {
+    color: #fff;
+    background: linear-gradient(180deg, var(--color-gold-400), var(--color-gold-600));
+    box-shadow: 0 0 0 1.5px var(--color-night-950), 0 0 8px color-mix(in oklab, var(--color-gold-400) 70%, transparent);
+  }
+
+  .loadout-level {
+    position: absolute;
+    left: -4px;
+    bottom: -4px;
+  }
+
   .loadout-gear {
     flex: 1;
     min-width: 0;
@@ -849,13 +869,19 @@
     gap: 5px;
   }
 
-  .loadout-runes {
+  .loadout-gems {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 9px;
+    gap: 16px;
     min-height: 17px;
     padding-left: 3px;
+  }
+
+  .loadout-skill {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
   }
 
   .piece-chip {
@@ -918,7 +944,7 @@
     filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.5));
   }
 
-  .piece-chip.is-rune {
+  .piece-chip.is-gem {
     width: 16px;
     height: 16px;
     border-radius: 4px;
@@ -926,7 +952,7 @@
     transform: rotate(45deg);
   }
 
-  .piece-chip.is-rune svg {
+  .piece-chip.is-gem svg {
     width: 12px;
     height: 12px;
     transform: rotate(-45deg);
@@ -947,7 +973,7 @@
     transform: scale(1.08);
   }
 
-  button.piece-chip.is-rune:hover {
+  button.piece-chip.is-gem:hover {
     transform: rotate(45deg) scale(1.12);
   }
 
@@ -1059,6 +1085,25 @@
   .reward-head .role-chip {
     width: 34px;
     height: 34px;
+  }
+
+  .reward-head.is-level-up {
+    gap: 8px;
+  }
+
+  .reward-level {
+    min-width: 34px;
+    height: 28px;
+    padding: 0 6px;
+    border-radius: 7px;
+    font-size: 20px;
+    animation: level-up-pop 620ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  }
+
+  .reward-level-step {
+    font-size: 0.6em;
+    color: var(--color-gold-200);
+    animation: level-up-step 420ms 260ms ease-out both;
   }
 
   .reward-steps {
@@ -1227,6 +1272,32 @@
   .prize-fits {
     display: inline-flex;
     gap: 4px;
+  }
+
+  .prize-skills {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .prize-skill {
+    padding: 4px 10px;
+    border: 1px solid rgb(255 255 255 / 0.22);
+    border-radius: 999px;
+    font-family: var(--font-label);
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-gold-200);
+    background: rgb(12 11 29 / 0.55);
+    cursor: pointer;
+    transition:
+      transform 120ms ease-out,
+      border-color 120ms ease-out;
+  }
+
+  .prize-skill:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-gold-400);
   }
 
   .prize-fits .role-chip {
@@ -2002,6 +2073,21 @@
     will-change: transform;
   }
 
+  .unit-plate-bar-row {
+    position: relative;
+    width: 100%;
+  }
+
+  .unit-plate-level {
+    position: absolute;
+    right: calc(100% + 3px);
+    top: 50%;
+    translate: 0 -50%;
+    min-width: 15px;
+    height: 13px;
+    font-size: 9px;
+  }
+
   .unit-plate-bar {
     position: relative;
     width: 100%;
@@ -2047,6 +2133,11 @@
     height: 3px;
     background: var(--color-shield);
     box-shadow: 0 0 4px var(--color-shield);
+  }
+
+  .unit-plate-shield.is-blessed {
+    background: var(--color-gold-400);
+    box-shadow: 0 0 5px var(--color-gold-400);
   }
 
   .unit-plate-label {
@@ -2096,7 +2187,9 @@
     font-size: 36px;
   }
 
-  .float-number.is-combo {
+  .float-number.is-combo,
+  .float-number.is-burst,
+  .float-number.is-voidheart {
     z-index: 1;
     color: var(--condition);
     font-size: 32px;
@@ -2106,7 +2199,15 @@
       0 0 14px var(--condition);
   }
 
-  .float-number.is-combo::before {
+  .float-number.is-burst {
+    --condition: var(--color-poison);
+  }
+
+  .float-number.is-voidheart {
+    --condition: #e45cff;
+  }
+
+  .float-number[data-label]::before {
     position: absolute;
     bottom: 100%;
     left: 50%;
@@ -2197,6 +2298,34 @@
     --status-color: #9be36b;
   }
 
+  .status-chip[data-status="chill"] {
+    --status-color: #c4ecff;
+  }
+
+  .status-chip[data-status="pandemic"] {
+    --status-color: var(--color-poison);
+  }
+
+  .status-chip[data-status^="form:"] {
+    --status-color: var(--color-gold-400);
+  }
+
+  .status-chip[data-status="form:lich"] {
+    --status-color: var(--color-role-bonecaller);
+  }
+
+  .status-chip[data-status="form:mech"] {
+    --status-color: var(--color-role-clockwright);
+  }
+
+  .status-chip[data-status="puppeted"] {
+    --status-color: #ff6ad9;
+  }
+
+  .status-chip[data-status="grave-marked"] {
+    --status-color: var(--color-role-bonecaller);
+  }
+
   .status-chip[data-status="frozen"] {
     --status-color: var(--color-brittle);
   }
@@ -2242,6 +2371,102 @@
   .unit-plate-mana.is-full .unit-plate-mana-fill {
     background: #d9f0ff;
     box-shadow: 0 0 6px #9fd0ff;
+  }
+
+  .unit-plate-stacks {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+  }
+
+  .unit-plate-stack {
+    width: 7px;
+    height: 4px;
+    border: 1px solid rgb(0 0 0 / 0.7);
+    border-radius: 1px;
+    background: rgb(12 11 29 / 0.85);
+  }
+
+  .unit-plate-stack.is-on {
+    background: #c9a2ff;
+  }
+
+  .unit-plate-stacks.is-full .unit-plate-stack.is-on {
+    background: #efe2ff;
+    box-shadow: 0 0 5px #b58cff;
+  }
+
+  .unit-plate-meter {
+    width: 100%;
+    height: 3px;
+    overflow: hidden;
+    border: 1px solid rgb(0 0 0 / 0.7);
+    border-radius: 2px;
+    background: rgb(12 11 29 / 0.85);
+  }
+
+  .unit-plate-meter-fill {
+    width: 0;
+    height: 100%;
+    background: #ff4fae;
+    transition: width 120ms ease-out;
+  }
+
+  .unit-plate-meter[data-passive="heat"] .unit-plate-meter-fill {
+    background: #ffe066;
+  }
+
+  .unit-plate-meter[data-passive="heat"].is-full .unit-plate-meter-fill {
+    background: #fff4c2;
+    box-shadow: 0 0 5px #ffe066;
+  }
+
+  .unit-plate-meter[data-passive="vengeance"] .unit-plate-meter-fill {
+    background: #c9955a;
+  }
+
+  .unit-plate-meter[data-passive="vengeance"].is-full .unit-plate-meter-fill {
+    background: #f2d2a4;
+    box-shadow: 0 0 5px #c9955a;
+  }
+
+  .unit-plate-meter[data-passive="threads"] .unit-plate-meter-fill {
+    background: #d46bff;
+  }
+
+  .unit-plate-meter[data-passive="threads"].is-full .unit-plate-meter-fill {
+    background: #f1ccff;
+    box-shadow: 0 0 5px #d46bff;
+  }
+
+  .unit-plate-meter.is-full .unit-plate-meter-fill {
+    background: #ffc2e3;
+    box-shadow: 0 0 5px #ff4fae;
+  }
+
+  .unit-plate-chain {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    translate: -50% 0;
+    font-family: var(--font-display);
+    font-size: 17px;
+    line-height: 1;
+    white-space: nowrap;
+    color: #fff3dc;
+    text-shadow:
+      0 2px 0 rgb(0 0 0 / 0.75),
+      0 0 8px rgb(255 186 90 / 0.6);
+    pointer-events: none;
+  }
+
+  .unit-plate-chain.is-flourish {
+    font-size: 22px;
+    color: #ffd86b;
+    text-shadow:
+      0 2px 0 rgb(0 0 0 / 0.8),
+      0 0 14px rgb(255 160 60 / 0.9);
   }
 
   .battle-header {
@@ -2711,6 +2936,33 @@
 
   100% {
     transform: scale(1);
+  }
+}
+
+@keyframes level-up-pop {
+  0% {
+    transform: scale(0.4) rotate(-12deg);
+    filter: brightness(2.2);
+  }
+
+  60% {
+    transform: scale(1.35) rotate(3deg);
+    filter: brightness(1.6);
+  }
+
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+@keyframes level-up-step {
+  from {
+    transform: translateY(6px);
+  }
+
+  to {
+    transform: translateY(0);
   }
 }
 
@@ -4160,6 +4412,10 @@
     background: linear-gradient(180deg, #e8f3ff, #9cc8ff);
   }
 
+  .unit-card-hp-shield.is-blessed {
+    background: linear-gradient(180deg, var(--color-gold-200), var(--color-gold-400));
+  }
+
   .unit-card-mana-fill {
     background: linear-gradient(180deg, #7fb4ff, #3f6fd0);
   }
@@ -4224,6 +4480,26 @@
 
   .unit-status.is-mark svg {
     color: var(--condition);
+  }
+
+  .unit-status[data-status="blessed"],
+  .unit-status[data-status^="form:"] {
+    --tint: var(--color-gold-400);
+    background: color-mix(in oklab, var(--tint) 20%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tint) 55%, transparent);
+  }
+
+  .unit-status[data-status="form:lich"] {
+    --tint: var(--color-role-bonecaller);
+  }
+
+  .unit-status[data-status="form:mech"] {
+    --tint: var(--color-role-clockwright);
+  }
+
+  .unit-status[data-status="blessed"] svg,
+  .unit-status[data-status^="form:"] svg {
+    color: color-mix(in oklab, var(--tint) 60%, white);
   }
 
   .unit-card-fallen {
@@ -4313,7 +4589,6 @@
   .unit-card-ability-head {
     display: flex;
     align-items: baseline;
-    justify-content: space-between;
     gap: 8px;
     margin-bottom: 3px;
   }
@@ -4323,6 +4598,20 @@
     font-size: 14px;
     text-transform: uppercase;
     color: var(--color-gold-200);
+  }
+
+  .unit-card-skill-kind {
+    flex: none;
+    font-family: var(--font-label);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 0.5);
+  }
+
+  .unit-card-ability-head .unit-card-mana {
+    margin-left: auto;
   }
 
   .unit-card-mana {
@@ -4349,13 +4638,18 @@
     height: 26px;
   }
 
-  .unit-card-kit .piece-chip.is-rune {
+  .unit-card-kit .piece-chip.is-gem {
     width: 15px;
     height: 15px;
     margin: 0 3px;
   }
 
-  .unit-card-talent {
+  .unit-card-level {
+    margin-left: 7px;
+    vertical-align: 3px;
+  }
+
+  .unit-card-pick {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -4368,7 +4662,7 @@
     box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--role) 45%, transparent);
   }
 
-  .unit-card-talent svg {
+  .unit-card-pick svg {
     width: 11px;
     height: 11px;
     color: var(--color-gold-200);

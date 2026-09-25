@@ -21,8 +21,8 @@ const MAX_NOTABLE_PER_JOB = 3;
 
 interface UnitCounters {
   casts: number;
-  signatureCasts: number;
-  firstSignatureTick: number | null;
+  ultimateCasts: number;
+  firstUltimateTick: number | null;
 }
 
 interface PlayedBattle {
@@ -48,7 +48,7 @@ function teamUnits(teamId: string, picks: readonly HeroPick[], side: BoardSide, 
     return {
       unitId,
       teamId,
-      build: withEquipment(createHeroBuild(unitId, pick.heroId, pick.upgradeIds, catalogue), pick.itemIds ?? [], pick.runeIds ?? []),
+      build: withEquipment(createHeroBuild(unitId, pick.heroId, pick.upgradeIds, catalogue), pick.itemIds ?? [], pick.gems ?? []),
       spawn: ownCellCenter(boardArena, side, cell),
     };
   });
@@ -79,7 +79,7 @@ export function playBattle(setup: BattleSetup, catalogue: Catalogue): PlayedBatt
   let combos = 0;
 
   for (const unit of state.units) {
-    counters[unit.unitId] = { casts: 0, signatureCasts: 0, firstSignatureTick: null };
+    counters[unit.unitId] = { casts: 0, ultimateCasts: 0, firstUltimateTick: null };
   }
 
   while (state.result === null) {
@@ -108,9 +108,9 @@ export function playBattle(setup: BattleSetup, catalogue: Catalogue): PlayedBatt
 
       counter.casts += 1;
 
-      if (event.signature === true) {
-        counter.signatureCasts += 1;
-        counter.firstSignatureTick ??= event.tick;
+      if (event.ultimate === true && event.triggered !== true) {
+        counter.ultimateCasts += 1;
+        counter.firstUltimateTick ??= event.tick;
       }
     }
   }
@@ -136,9 +136,9 @@ function emptyTally(): HeroTally {
     damageDealt: 0,
     deaths: 0,
     casts: 0,
-    signatureCasts: 0,
-    firstSignatureTickSum: 0,
-    firstSignatureSamples: 0,
+    ultimateCasts: 0,
+    firstUltimateTickSum: 0,
+    firstUltimateSamples: 0,
   };
 }
 
@@ -174,11 +174,11 @@ function tallyUnits(played: PlayedBattle, tallies: Record<string, HeroTally>): v
     }
 
     tally.casts += counter?.casts ?? 0;
-    tally.signatureCasts += counter?.signatureCasts ?? 0;
+    tally.ultimateCasts += counter?.ultimateCasts ?? 0;
 
-    if (counter !== undefined && counter.firstSignatureTick !== null) {
-      tally.firstSignatureTickSum += counter.firstSignatureTick;
-      tally.firstSignatureSamples += 1;
+    if (counter !== undefined && counter.firstUltimateTick !== null) {
+      tally.firstUltimateTickSum += counter.firstUltimateTick;
+      tally.firstUltimateSamples += 1;
     }
 
     tallies[heroId] = tally;

@@ -1,5 +1,5 @@
 import type { PlayerId, PlayerView, PublicSeat, RoundBattle } from "@jev-game/run";
-import type { BoardCell } from "@jev-game/game";
+import type { BoardCell, SkillSlot } from "@jev-game/game";
 
 export interface ResolvedRound {
   round: number;
@@ -41,9 +41,9 @@ export interface MatchSession {
   startMatch(): void;
   selectHeroes(offerIds: readonly string[]): void;
   pickHeroes(offerIds: readonly string[]): void;
-  chooseOffer(decisionId: string, offerId: string, heroSlot: number | null): void;
+  chooseOffer(decisionId: string, offerId: string, heroSlot: number | null, skill: SkillSlot | null): void;
   moveItem(instanceId: string, heroSlot: number | null): void;
-  socketRune(instanceId: string, heroSlot: number | null): void;
+  socketGem(instanceId: string, heroSlot: number | null, skill: SkillSlot | null): void;
   discardItem(instanceId: string): void;
   confirmReady(): void;
   markWatched(): void;

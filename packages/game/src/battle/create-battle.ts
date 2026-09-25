@@ -1,5 +1,5 @@
 import type { ArenaDefinitionId, TeamId, UnitId } from "../ids.js";
-import type { Catalogue, HeroDefinition } from "../definitions.js";
+import type { Catalogue } from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
 import type { BattleState, TeamComboTiers, UnitMemory, UnitState } from "./state.js";
 import type { HeroBuild } from "../builds/state.js";
@@ -39,11 +39,11 @@ function isWithinArena(vector: Vector2, arenaWidth: number, arenaHeight: number)
   );
 }
 
-function initialAbilityCooldowns(abilityIds: readonly string[]) {
+function initialAbilityCooldowns(compiled: CompiledUnitStats, abilityIds: readonly string[]) {
   const cooldowns: Record<string, number> = {};
 
   for (const abilityId of abilityIds) {
-    cooldowns[abilityId] = 0;
+    cooldowns[abilityId] = compiled.abilities[abilityId]?.initialCooldownTicks ?? 0;
   }
 
   return cooldowns;
@@ -51,26 +51,46 @@ function initialAbilityCooldowns(abilityIds: readonly string[]) {
 
 export function emptyUnitMemory(): UnitMemory {
   return {
-    firedThresholds: [],
-    slowHistory: {},
-    grudgeStacks: 0,
-    retributionPool: 0,
-    retributionEndsAtTick: 0,
-    damageSinceRetaliate: 0,
+    damageSinceTrigger: 0,
     firstHitTargets: [],
-    basicAttackCounts: {},
+    attackCounts: {},
+    attackCountedStrike: {},
+    siphonedAt: {},
+    ruthlessStunned: {},
     revived: false,
-    signatureCasts: 0,
-    refillUsed: false,
     souls: 0,
-    lastRitesUsed: 0,
+    fellAtTick: -1,
+    resurrected: false,
+    corpseSpent: false,
     summonsRaised: 0,
-    openerFired: false,
-    lastWordUsed: false,
+    overclockTicks: 0,
+    spentTriggers: [],
+    triggerReadyAt: {},
+    stacks: {},
+    stacksGainedAt: {},
+    stackProgress: {},
+    stored: {},
+    storedIncoming: {},
+    skillUses: {},
+    attackCasts: 0,
     mirrorUsed: false,
     sentinelUsed: false,
-    tandemReadyTick: 0,
+    tetherPending: 0,
   };
+}
+
+function skillIds(compiled: CompiledUnitStats): string[] {
+  const ids = [compiled.basicAttackId];
+
+  if (compiled.abilityId !== null) {
+    ids.push(compiled.abilityId);
+  }
+
+  if (compiled.ultimateId !== null) {
+    ids.push(compiled.ultimateId);
+  }
+
+  return ids;
 }
 
 export function createUnitState(
@@ -78,15 +98,14 @@ export function createUnitState(
   teamId: TeamId,
   build: HeroBuild,
   spawn: Vector2,
-  hero: HeroDefinition,
   compiled: CompiledUnitStats,
   summonerUnitId: UnitId | null,
 ): UnitState {
   const memory = emptyUnitMemory();
 
   for (const passive of compiled.passives) {
-    if (passive.kind === "soul-well") {
-      memory.souls += passive.souls;
+    if (passive.kind === "stacks" && passive.startsAt !== undefined) {
+      memory.stacks[passive.key] = Math.min(passive.max, passive.startsAt);
     }
   }
 
@@ -100,7 +119,7 @@ export function createUnitState(
     maxHp: compiled.maxHp,
     moveSpeedUnitsPerSecond: compiled.moveSpeedUnitsPerSecond,
     targetUnitId: null,
-    abilityCooldowns: initialAbilityCooldowns([...hero.abilityIds, hero.basicAttackId]),
+    abilityCooldowns: initialAbilityCooldowns(compiled, skillIds(compiled)),
     abilityCooldownDurations: compiled.abilityCooldownDurations,
     shield: null,
     slow: null,
@@ -111,15 +130,17 @@ export function createUnitState(
     critChance: compiled.critChance,
     critMultiplier: compiled.critMultiplier,
     damageMultiplier: compiled.damageMultiplier,
+    attackDamageMultiplier: compiled.attackDamageMultiplier,
+    spellDamageMultiplier: compiled.spellDamageMultiplier,
     lifesteal: compiled.lifesteal,
     slowStrengthBonus: compiled.slowStrengthBonus,
     conditionDurationBonusTicks: compiled.conditionDurationBonusTicks,
-    dotDamageMultiplier: compiled.dotDamageMultiplier,
-    dotMaxStacksBonus: compiled.dotMaxStacksBonus,
-    mana: compiled.maxMana > 0 ? Math.min(compiled.maxMana, compiled.startingMana) : 0,
+    mana: 0,
     maxMana: compiled.maxMana,
     manaPerAttack: compiled.manaPerAttack,
-    signatureAbilityId: compiled.signatureAbilityId,
+    basicAttackId: compiled.basicAttackId,
+    abilityId: compiled.abilityId,
+    ultimateId: compiled.ultimateId,
     abilities: compiled.abilities,
     passives: compiled.passives,
     condition: null,
@@ -127,12 +148,20 @@ export function createUnitState(
     taunt: null,
     invulnerableUntilTick: 0,
     untargetableUntilTick: 0,
+    expiresAtTick: 0,
     dots: [],
     attackSpeedBonus: 0,
+    speedBuffs: [],
+    marks: [],
+    chill: null,
+    pandemic: null,
+    graveMark: null,
+    burstLockedUntilTick: 0,
     memory,
     summonerUnitId,
     link: null,
     channel: null,
+    form: null,
   };
 }
 
@@ -243,16 +272,16 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
       throw new Error(`hero "${hero.id}" has an unknown basic attack id "${hero.basicAttackId}"`);
     }
 
-    for (const abilityId of hero.abilityIds) {
-      if (catalogue.abilities[abilityId] === undefined) {
-        throw new Error(`hero "${hero.id}" has an unknown ability id "${abilityId}"`);
+    for (const abilityId of [hero.abilityId, hero.ultimateId]) {
+      if (abilityId !== undefined && catalogue.abilities[abilityId] === undefined) {
+        throw new Error(`hero "${hero.id}" has an unknown skill id "${abilityId}"`);
       }
     }
 
     const compiled = compileBuild(unitSetup.build, catalogue);
     compiledByUnit.set(unitSetup.unitId, compiled);
 
-    return createUnitState(unitSetup.unitId, unitSetup.teamId, unitSetup.build, unitSetup.spawn, hero, compiled, null);
+    return createUnitState(unitSetup.unitId, unitSetup.teamId, unitSetup.build, unitSetup.spawn, compiled, null);
   });
 
   const comboTiers = applyAttunement(units, compiledByUnit, catalogue);
@@ -282,7 +311,17 @@ export function createBattle(setup: BattleSetup, catalogue: Catalogue): BattleSt
     resolutionPriority,
     impacts: [],
     zones: [],
-    echoes: [],
+    pendingCasts: [],
+    pendingStrikes: [],
+    sequences: [],
+    showers: [],
+    emitters: [],
+    bombs: [],
+    bursts: [],
+    blessedBursts: [],
+    corpseBlasts: [],
+    detonations: [],
+    castChains: {},
     comboTiers,
     nextEntityId: 1,
   };

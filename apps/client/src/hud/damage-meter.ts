@@ -2,6 +2,7 @@ import { BASIC_ATTACK_ABILITY, type BattleEvent, type BattleSnapshot, type Damag
 import { button, el } from "./dom.js";
 import { meterIcon } from "./icons.js";
 import { heroFaceArt } from "./icon-art.js";
+import { titleCase } from "./tips.js";
 import { attachTip, richText, tipCard, tipHint, tipSection, tipText } from "./tooltip.js";
 import { abilityDefinition, heroDefinition, heroName, upgradeDefinition } from "../game/catalogues.js";
 
@@ -55,7 +56,6 @@ const METRIC_HELP: Readonly<Record<MeterMetric, string>> = {
 const SOURCE_LABELS = new Map<string, string>([
   ["lifesteal", "Lifesteal"],
   ["leech", "Leech"],
-  ["on-kill", "Kill heal"],
   ["combo-splash", "Combo splash"],
   ["overload", "Overload splash"],
   ["shatter", "Shatter shards"],
@@ -86,13 +86,6 @@ function saveMetric(metric: MeterMetric): void {
   } catch {
     return;
   }
-}
-
-function titleCase(id: string): string {
-  return id
-    .split("-")
-    .flatMap((word) => (word === "" ? [] : [word.charAt(0).toUpperCase() + word.slice(1)]))
-    .join(" ");
 }
 
 function formatAmount(value: number): string {
@@ -339,11 +332,18 @@ export function createDamageMeter(): DamageMeter {
     dirty = true;
   }
 
+  function summonLabel(heroId: string): string {
+    return heroDefinition(heroId)?.summon === true ? heroName(heroId) : `Risen ${heroName(heroId)}`;
+  }
+
   function sourceLabel(unitId: string, abilityId: string): string {
     const heroId = heroOfUnit.get(unitId);
 
     if (heroId !== undefined && summons.has(unitId)) {
-      return heroName(heroId);
+      const hero = heroDefinition(heroId);
+      const named = hero?.summon === true && hero.basicAttackId !== abilityId ? abilityDefinition(abilityId)?.name : undefined;
+
+      return named ?? summonLabel(heroId);
     }
 
     if (abilityId === BASIC_ATTACK_ABILITY || (heroId !== undefined && heroDefinition(heroId)?.basicAttackId === abilityId)) {
@@ -360,7 +360,11 @@ export function createDamageMeter(): DamageMeter {
 
     const heroId = heroOfUnit.get(event.sourceUnitId);
 
-    return heroId === undefined ? titleCase(event.sourceUnitId) : heroName(heroId);
+    if (heroId === undefined) {
+      return titleCase(event.sourceUnitId);
+    }
+
+    return summons.has(event.sourceUnitId) ? summonLabel(heroId) : heroName(heroId);
   }
 
   function ingestDamage(event: DamageDealtEvent): void {

@@ -188,7 +188,7 @@ function digestOf(state: RunState): string {
       eliminated: seat.eliminated,
       heroBuilds: seat.heroBuilds,
       items: seat.items,
-      runes: seat.runes,
+      gems: seat.gems,
       formation: seat.formation,
     }));
 

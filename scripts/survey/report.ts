@@ -274,7 +274,7 @@ function renderMarkdown(report: SurveyReport, comparison: string): string {
       "\"One swap\" is the balance number: it pits teams that differ by exactly one hero against each other, so across heroes it averages 50% and a gap means one hero beats another. \"Only one side\" counts matchups where just one team has the hero, which rewards heroes that make a varied team. \"Every copy\" counts each copy in every battle and always averages 50%. Draws count as half a win.",
       "",
       table(
-        ["Hero", "One swap", "Only one side", "Every copy", "Hero-battles", "Damage per fight", "Death rate", "Signature casts per fight", "First signature"],
+        ["Hero", "One swap", "Only one side", "Every copy", "Hero-battles", "Damage per fight", "Death rate", "Ultimate casts per fight", "First ultimate"],
         report.heroes.map((hero) => [
           hero.heroId,
           percent(hero.swapWinRate),
@@ -283,8 +283,8 @@ function renderMarkdown(report: SurveyReport, comparison: string): string {
           String(hero.battles),
           hero.damagePerAppearance.toFixed(0),
           percent(hero.deathRate),
-          hero.signatureCastsPerAppearance.toFixed(2),
-          hero.firstSignatureTick === null ? "never" : seconds(hero.firstSignatureTick),
+          hero.ultimateCastsPerAppearance.toFixed(2),
+          hero.firstUltimateTick === null ? "never" : seconds(hero.firstUltimateTick),
         ]),
       ),
     );
@@ -322,7 +322,7 @@ function renderMarkdown(report: SurveyReport, comparison: string): string {
       "",
       "## Pieces, one change at a time",
       "",
-      "Change in win rate when one copy of the hero carries the piece, against the same opponents and seeds. Legendaries and tier-3 talents are allowed to be rare power spikes, so they're held to a looser line.",
+      "Change in win rate when one copy of the hero carries the piece, against the same opponents and seeds. Legendaries and level-4 picks are allowed to be rare power spikes, so they're held to a looser line.",
       "",
       table(
         ["Piece", "Kind", "Hero", "Change", "Pairs"],
@@ -350,7 +350,7 @@ function renderMarkdown(report: SurveyReport, comparison: string): string {
       "",
       `${runs.runs} runs with ${params.seatCount} random bot seats: health ${params.startingHealth}, a loss costs 1 + surviving enemies up to ${params.maxLossCost}, round cap ${params.roundCap}. Finished ${runs.finished}, stalled ${runs.stalled}, aborted ${runs.aborted}. Median length ${runs.medianRounds} rounds, longest ${runs.maxRounds}.`,
       "",
-      "Placement numbers for late pieces (tier-3 talents, legendaries) are flattered: only seats that survive long enough ever see them.",
+      "Placement numbers for late pieces (level-4 picks, legendaries) are flattered: only seats that survive long enough ever see them.",
       "",
       "Heroes, by average placement (1 is best):",
       "",
@@ -372,9 +372,9 @@ function renderMarkdown(report: SurveyReport, comparison: string): string {
     }
 
     const pickTables: [string, typeof runs.heroes][] = [
-      ["Talents and upgrades", runs.upgrades],
+      ["Level picks and upgrades", runs.upgrades],
       ["Items", runs.items],
-      ["Runes", runs.runes],
+      ["Gems", runs.gems],
     ];
 
     for (const [title, rows] of pickTables) {
@@ -442,7 +442,7 @@ export function writeReport(outputRoot: string, directoryName: string, report: S
   writeFileSync(
     join(directory, "heroes.csv"),
     csv(
-      ["hero", "swap_win_rate", "one_side_win_rate", "win_rate", "hero_battles", "damage_per_fight", "death_rate", "signature_casts_per_fight", "first_signature_ticks"],
+      ["hero", "swap_win_rate", "one_side_win_rate", "win_rate", "hero_battles", "damage_per_fight", "death_rate", "ultimate_casts_per_fight", "first_ultimate_ticks"],
       report.heroes.map((hero) => [
         hero.heroId,
         hero.swapWinRate.toFixed(4),
@@ -451,8 +451,8 @@ export function writeReport(outputRoot: string, directoryName: string, report: S
         hero.battles,
         hero.damagePerAppearance.toFixed(1),
         hero.deathRate.toFixed(4),
-        hero.signatureCastsPerAppearance.toFixed(3),
-        hero.firstSignatureTick === null ? "" : hero.firstSignatureTick.toFixed(1),
+        hero.ultimateCastsPerAppearance.toFixed(3),
+        hero.firstUltimateTick === null ? "" : hero.firstUltimateTick.toFixed(1),
       ]),
     ),
   );
@@ -476,7 +476,7 @@ export function writeReport(outputRoot: string, directoryName: string, report: S
           ...report.runs.heroes.map((row) => ["hero", row.id, row.picks, row.pickRate.toFixed(4), row.averagePlacement.toFixed(3), row.winRate.toFixed(4)]),
           ...report.runs.upgrades.map((row) => ["upgrade", row.id, row.picks, row.pickRate.toFixed(4), row.averagePlacement.toFixed(3), row.winRate.toFixed(4)]),
           ...report.runs.items.map((row) => ["item", row.id, row.picks, row.pickRate.toFixed(4), row.averagePlacement.toFixed(3), row.winRate.toFixed(4)]),
-          ...report.runs.runes.map((row) => ["rune", row.id, row.picks, row.pickRate.toFixed(4), row.averagePlacement.toFixed(3), row.winRate.toFixed(4)]),
+          ...report.runs.gems.map((row) => ["gem", row.id, row.picks, row.pickRate.toFixed(4), row.averagePlacement.toFixed(3), row.winRate.toFixed(4)]),
         ],
       ),
     );

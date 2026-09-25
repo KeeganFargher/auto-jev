@@ -55,6 +55,12 @@ function describe(event: BattleEvent): string {
     case "impact-landed":
       return `${event.abilityId} landed`;
 
+    case "emitter-started":
+      return `${event.sourceUnitId} sent out ${event.abilityId}`;
+
+    case "emitter-fired":
+      return `${event.abilityId} shot at ${event.targetUnitId}`;
+
     case "zone-created":
       return `${event.sourceUnitId} left ${event.abilityId} on the ground`;
 
@@ -72,6 +78,9 @@ function describe(event: BattleEvent): string {
 
     case "unit-dismissed":
       return `${event.unitId} was dismissed`;
+
+    case "corpse-spent":
+      return `${event.unitId}'s corpse was used up`;
 
     case "passive-triggered":
       return `${event.unitId}: ${event.passive}`;

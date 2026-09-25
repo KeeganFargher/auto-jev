@@ -11,10 +11,10 @@ works with its current text and glyph placeholders.
 and say so — wiring them into the UI is a code change, not part of the
 asset. 3D models (entries 8–9) are different: their listed path is a
 source under `art/`, and a build command writes what the game loads
-(`docs/models.md`). Item, rune and talent icons and hero portraits are
-all delivered; new ones go through `docs/icons.md`. Sound effects and
-hero voice lines are all delivered too; new ones go through
-`docs/audio.md`.
+(`docs/models.md`). Item, gem and level-pick icons and hero portraits
+are all delivered, including slice 1 of the hero redesign; new ones go
+through `docs/icons.md`. Sound effects and hero voice lines are all
+delivered too; new ones go through `docs/audio.md`.
 
 ## Shared style guide
 
@@ -101,7 +101,7 @@ to read at that size; the reward disc shows art at 62 px):
   below. Either use a vector-capable generator or trace the output; the
   prompt describes the target either way.
 
-**Generating the PNG entries** (used for every item, rune and talent
+**Generating the PNG entries** (used for every item, gem and level-pick
 icon and every hero portrait; `art/icons/prompts.json` has the exact
 prompts):
 Cloudflare Workers AI, model `openai/gpt-image-2.5-sunburst`, with
@@ -406,6 +406,9 @@ busy they pull attention from the board.
   her portrait, not the placeholder's hat.
 
 Every hero below is still a placeholder figure built from simple shapes.
+Seven of them are no longer human (`docs/lore.md`, "Bodies"): their
+placeholders already show the new bodies, and the looks below describe
+them.
 
 **Files to deliver:**
 
@@ -414,7 +417,6 @@ Every hero below is still a placeholder figure built from simple shapes.
 | `apps/client/public/assets/models/heroes/oathkeeper.glb` | Morrow, the Oathkeeper |
 | `apps/client/public/assets/models/heroes/duskblade.glb` | Vesper, the Duskblade |
 | `apps/client/public/assets/models/heroes/frostweaver.glb` | Rime, the Frostweaver |
-| `apps/client/public/assets/models/heroes/hexbinder.glb` | Moira, the Hexbinder |
 | `apps/client/public/assets/models/heroes/blightmother.glb` | Nettle, the Blightmother |
 | `apps/client/public/assets/models/heroes/bonecaller.glb` | Sexton, the Bonecaller |
 | `apps/client/public/assets/models/heroes/clockwright.glb` | Brassjack, the Clockwright |
@@ -434,8 +436,21 @@ Every hero below is still a placeholder figure built from simple shapes.
   plume). The game tints it blue for your side and red for theirs, so
   don't put team-agnostic detail on it. Every other material must avoid
   blue `#4ea1ff` and red `#ff6b6b` as a main colour.
-- **Rig:** one humanoid skeleton, at most 60 bones; the weapon is part
-  of the mesh, skinned or parented to the hand bone.
+- **Rig:** one skeleton, at most 60 bones, shaped to the body: two legs,
+  four, six, a tripod, roots or none. The weapon is part of the mesh,
+  skinned or parented to its bone. A body that isn't a person keeps the
+  same clip names (a panther's `run` is a lope, a floating eye's `run`
+  is a drift, a beetle's `death` rolls it onto its back).
+- **Floating and wide bodies:** today `pnpm models:build` wants the
+  lowest point on the ground and a 0.5 m reach at 1.8 m tall. Moira
+  floats and Rime, Morrow and Sexton are wide, so each needs a written
+  allowance in `scripts/models/contract.ts` (Gorrak's footprint
+  allowance is the pattern) before its model can pass.
+- **Read from above:** the board camera looks down at about 55°, from
+  behind your own heroes. A long, narrow animal seen end-on reads as a
+  standing person, so keep four-legged bodies low, splay the legs out
+  past the body and sweep the tail to one side. The placeholder panther
+  in `apps/client/src/game/views/hero-figures.ts` shows the pose.
 - **Animation clips, named exactly** (lower case):
 
 | Clip | Loops | Length | Notes |
@@ -476,18 +491,17 @@ that the turret has no `run` clip.
 Stylised low-poly fantasy game character, <LOOK>, chunky exaggerated
 proportions like a painted tabletop miniature, warm hand-painted
 texture, a plain white cloth sash or trim piece for the team colour,
-T-pose, full body, clean topology, game-ready, no base, no background.
+neutral pose, full body, clean topology, game-ready, no base, no background.
 ```
 
 **Looks:**
 
-- `oathkeeper` (Morrow, the Oathkeeper): a battle-priestess in white-and-gold plate with a two-handed warhammer whose head glows gold, a sun-disc halo behind her head, warm gold (#f2d27a) accents.
-- `duskblade` (Vesper, the Duskblade): a slim hooded assassin with twin curved daggers, face half in shadow, dark leathers with violet (#b58cff) trim.
-- `frostweaver` (Rime, the Frostweaver): a calm arctic sorceress in pale layered robes, frost in her long hair, ice crystals orbiting one hand, ice-blue (#9fe8ff) accents.
-- `hexbinder` (Moira, the Hexbinder): a tall fate-witch in a hooded robe with long sleeves, glowing violet threads and rings of light around her fingers, magenta (#c86bff) accents.
-- `blightmother` (Nettle, the Blightmother): a hunched marsh witch in a wide leafy skirt and mantle, swinging a censer that leaks green smoke, sickly green (#8fd14f) accents.
-- `bonecaller` (Sexton, the Bonecaller): a gaunt gravedigger-necromancer in a long coat and tall hat, a spade staff topped with a skull, a lantern at his belt, pale teal (#9fe0d0) glow.
-- `clockwright` (Brassjack, the Clockwright): a stocky tinkerer in goggles and a leather apron, a backpack of gears and pipes, a huge wrench, brass and copper (#e0a458) fittings.
+- `oathkeeper` (Morrow, the Oathkeeper): an ancient, gentle tortoise carrying her village's little wooden shrine on her shell, a gold sun-disc and a bell on the shrine, moss on the shell rim, warm gold (#f2d27a) accents; four stubby legs, a wide low silhouette.
+- `duskblade` (Vesper, the Duskblade): a lean shadow panther, fur so dark it reads as a silhouette, violet (#b58cff) eyes and a ridge of violet shadow-flame along the spine, claws like curved daggers; four legs, pounce-ready.
+- `frostweaver` (Rime, the Frostweaver): a small, calm ice dragon with pale frosted scales, crystal spines along her back, folded translucent wings and old, patient eyes, ice-blue (#9fe8ff) accents; four legs and wings, long tail.
+- `blightmother` (Nettle, the Blightmother): a walking tree on splayed root legs, bark face with two glowing eyes, a leafy crown studded with sickly flowers, branch arms, sickly green (#8fd14f) accents.
+- `bonecaller` (Sexton, the Bonecaller): a giant black burying beetle (a real "sexton beetle") with the two orange-red wing bands as the team pieces, clubbed antennae glowing pale teal (#9fe0d0), a grave-lantern hanging from his mandible and a spade strapped across his back; six legs.
+- `clockwright` (Brassjack, the Clockwright): a walking clock tower on three brass legs, a big cream clock face for a face, a bell on top, a wrench and a hammer for hands, brass and copper (#e0a458) fittings.
 - `thrall` (Thrall (Sexton's summon)): a small rattling skeleton warrior in rusted scraps of armour with a notched sword and a small round shield.
 - `bone-golem` (Bone Golem (Sexton's summon)): a hulking heap of bones and skulls that stood up, massive arms, tiny skull head, twice the bulk of a hero.
 - `turret` (Turret (Brassjack's summon)): a brass tripod turret with a round riveted body and a short rotating barrel; it never walks, so it needs only idle, attack, hit and death clips.
@@ -802,3 +816,35 @@ at 13px.
 
 **Avoid:** outlines-only styles, gradients, text labels, circular
 button backgrounds (the meter supplies the pill).
+
+## 25. Hero redesign, slice 2: gem icons
+
+**Used in:** the reward disc, the ITEMS panel, tooltips and the hero
+cards. Until these exist each draws its SVG glyph, so nothing is broken.
+Every icon follows `docs/icons.md`. The art session has the prompts;
+they wait on the tablet-or-cut-gem decision in `docs/icons.md`.
+
+**Gem icons** (`art/icons/gems/<id>.png`):
+
+| Id | Glyph |
+| --- | --- |
+| `gem-barrage` | three arrows fanning out |
+| `gem-pierce` | one arrow through three rings |
+| `gem-concentrate` | a big circle squeezed into a small bright one |
+| `gem-vortex` | a tight spiral with inward arrows |
+| `gem-cast-on-dash` | a boot print with a spark burst |
+| `gem-spellblade` | a sword with a small rune at its tip and four notches |
+| `gem-ruthless` | a heavy fist with three stars |
+| `gem-culling-strike` | a scythe over a nearly empty bar |
+
+## 30. Brassjack's Mech Suit and turrets in 3D
+
+**Nice to have** (3D model and animation work for the Blender side, not
+the icon pipeline):
+
+- **Mech Suit shell.** In the mech the client just scales Brassjack to
+  1.3× and flashes brass plates around him. A brass war-frame model or
+  overlay (rocket rack on one shoulder) would make the ultimate read at
+  a glance.
+- **Turret walk cycle.** With Walking Fortress the turrets follow him
+  and currently slide; the tripod legs could step.

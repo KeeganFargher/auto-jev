@@ -1,6 +1,6 @@
 import type { HeroDefinitionId } from "@jev-game/game";
 import { DUEL_TEAM_A, gameCatalogue, MAX_LAB_TEAM_SIZE, THREE_VERSUS_THREE_TEAM_A } from "@jev-game/content";
-import type { BattleLabSession, LabScenarioKind, LabTeams, TeamAUpgradeIdsByHero } from "../session/types.js";
+import type { BattleLabSession, LabScenarioKind, LabTeams, LabPicksByHero } from "../session/types.js";
 import { heroName } from "../game/catalogues.js";
 import { createUpgradePickerView } from "./upgrade-picker.js";
 
@@ -166,7 +166,7 @@ export function createBattleControlsView(
   upgradesContainer: HTMLElement,
   session: BattleLabSession,
   onReplay: () => void,
-  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero, teams?: LabTeams) => void,
+  onReset: (seed: number, scenario?: LabScenarioKind, teamAPicksByHero?: LabPicksByHero, teams?: LabTeams) => void,
 ): BattleControlsView {
   const playButton = iconButton(barContainer, "▶", "Play");
   const pauseButton = iconButton(barContainer, "‖", "Pause");

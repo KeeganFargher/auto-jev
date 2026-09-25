@@ -2,7 +2,7 @@ import { TICK_RATE, type ConditionKind, type ControlKind, type DotKind, type Uni
 import { el } from "./dom.js";
 import { conditionIcon, meterIcon, statusIcon } from "./icons.js";
 import { buildCard, cardStats, fillStats, formatCount, type CardParts } from "./hero-card.js";
-import { conditionName } from "./tips.js";
+import { conditionName, titleCase } from "./tips.js";
 
 export interface UnitInspectorView {
   update(unit: UnitState | null, tick: number): void;
@@ -49,7 +49,7 @@ function unitStatuses(unit: UnitState, tick: number): UnitStatus[] {
     return statuses;
   }
 
-  const { condition, control, taunt, slow, shield } = unit;
+  const { condition, control, taunt, slow, chill, pandemic, graveMark, shield, form } = unit;
 
   if (condition !== null) {
     statuses.push({
@@ -91,6 +91,16 @@ function unitStatuses(unit: UnitState, tick: number): UnitStatus[] {
     });
   }
 
+  if (chill !== null) {
+    statuses.push({
+      key: "chill",
+      label: `Chill ×${chill.stacks} ${secondsLeft(chill.expiresAtTick, tick)}`,
+      tone: "debuff",
+      condition: null,
+      icon: () => statusIcon("chill"),
+    });
+  }
+
   for (const dot of unit.dots) {
     statuses.push({
       key: `dot:${dot.dot}`,
@@ -101,14 +111,44 @@ function unitStatuses(unit: UnitState, tick: number): UnitStatus[] {
     });
   }
 
+  if (pandemic !== null) {
+    statuses.push({
+      key: "pandemic",
+      label: `Pandemic ${secondsLeft(pandemic.expiresAtTick, tick)}`,
+      tone: "debuff",
+      condition: null,
+      icon: () => statusIcon("pandemic"),
+    });
+  }
+
+  if (graveMark !== null) {
+    statuses.push({
+      key: "grave-marked",
+      label: `Grave-marked ${secondsLeft(graveMark.expiresAtTick, tick)}`,
+      tone: "debuff",
+      condition: null,
+      icon: () => statusIcon("grave-marked"),
+    });
+  }
+
   if (unit.link !== null) {
     statuses.push({ key: "linked", label: "Linked", tone: "debuff", condition: null, icon: () => statusIcon("linked") });
+
+    if (unit.link.puppetUntilTick !== 0) {
+      statuses.push({
+        key: "puppeted",
+        label: `Puppeted ${secondsLeft(unit.link.puppetUntilTick, tick)}`,
+        tone: "debuff",
+        condition: null,
+        icon: () => statusIcon("puppeted"),
+      });
+    }
   }
 
   if (shield !== null && shield.amount > 0) {
     statuses.push({
-      key: "shield",
-      label: `Shield ${formatCount(shield.amount)}`,
+      key: shield.blessed === null ? "shield" : "blessed",
+      label: `${shield.blessed === null ? "Shield" : "Blessed shield"} ${formatCount(shield.amount)}`,
       tone: "buff",
       condition: null,
       icon: () => meterIcon("shielding"),
@@ -127,6 +167,18 @@ function unitStatuses(unit: UnitState, tick: number): UnitStatus[] {
     statuses.push({ key: "channeling", label: "Channeling", tone: "buff", condition: null, icon: () => statusIcon("channeling") });
   }
 
+  if (form !== null) {
+    const kind = `form:${form.definition.key}`;
+
+    statuses.push({
+      key: kind,
+      label: `${titleCase(form.definition.key)} ${form.definition.endsWhenShieldBreaks === true ? "until its shield breaks" : secondsLeft(form.endsAtTick, tick)}`,
+      tone: "buff",
+      condition: null,
+      icon: () => statusIcon(kind),
+    });
+  }
+
   return statuses;
 }
 
@@ -141,6 +193,7 @@ function syncStatuses(inspected: Inspected, statuses: readonly UnitStatus[]): vo
       const label = el("span", "unit-status-label", status.label);
       inspected.statusLabels.push(label);
       const chip = el("span", `unit-status is-${status.tone}`, status.icon(), label);
+      chip.dataset.status = status.key;
 
       if (status.condition !== null) {
         chip.dataset.condition = status.condition;
@@ -206,6 +259,7 @@ export function createUnitInspectorView(container: HTMLElement, friendlyTeamId: 
       parts.hpFill.style.setProperty("--fill", String(hpRatio));
       parts.hpShield.style.setProperty("--from", String(hpRatio));
       parts.hpShield.style.setProperty("--fill", String(shieldRatio));
+      parts.hpShield.classList.toggle("is-blessed", unit.shield !== null && unit.shield.blessed !== null);
       parts.hpValue.textContent = `${formatCount(Math.max(0, unit.hp))} / ${formatCount(unit.maxHp)}`;
       parts.mana.hidden = unit.maxMana <= 0;
 

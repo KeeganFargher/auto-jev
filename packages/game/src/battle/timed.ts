@@ -1,38 +1,50 @@
-import type { UnitState } from "./state.js";
-import type { CompiledAbility } from "../builds/compile-build.js";
+import type { ActiveBomb, ActiveForm, PendingBurst, UnitState } from "./state.js";
 import { TICK_RATE } from "../constants.js";
 import { unitsInCircle } from "./areas.js";
 import {
   CAST_FLAGS,
   DOT_FLAGS,
-  OPENER_STAGGER_SLOTS,
-  OPENER_STAGGER_TICKS,
-  RETRIBUTION_FLAGS,
-  RUNE_TRIGGER_FLAGS,
   REACTION_FLAGS,
+  advanceEmitter,
+  blessedBurst,
+  burstForm,
+  burstPoison,
   createZone,
+  detonateBomb,
+  dotPeriod,
+  endForm,
+  fireShowerMarker,
   dealHitAndReport,
-  echoFlags,
   findPassive,
   findUnit,
+  passivesOfKind,
   payHp,
+  processCorpseBlasts,
+  processDetonations,
+  pullToward,
+  recheckBurst,
   resolveCast,
   resolveCastPayload,
   resolveOnTarget,
-  type HitFlags,
+  settleStoredDamage,
+  settleTether,
+  spreadEpidemic,
+  withStun,
   type ResolutionContext,
 } from "./combat.js";
-import { emptyRunes } from "../builds/compile-build.js";
-import { resolveCastTarget } from "./targeting.js";
-import { isUntargetable } from "./statuses.js";
+import { isCastTarget, resolveCastTarget } from "./targeting.js";
+import { channelHaste, priorityRank, processOpeners, processPendingCasts, processPendingStrikes, processStackDecay, type BudgetBreach } from "./triggers.js";
+import { processSequences } from "./sequences.js";
 
-export const MAX_TRIGGERED_CASTS_PER_TICK = 16;
+export const MAX_REACTIONS_PER_TICK = 16;
 
 function processDots(ctx: ResolutionContext): void {
   const tick = ctx.state.tick;
 
-  for (const unit of ctx.state.units) {
-    if (!unit.alive || unit.dots.length === 0) {
+  for (const unitId of ctx.state.resolutionPriority) {
+    const unit = findUnit(ctx.state, unitId);
+
+    if (unit === null || !unit.alive || unit.dots.length === 0) {
       continue;
     }
 
@@ -46,21 +58,32 @@ function processDots(ctx: ResolutionContext): void {
       }
 
       if (tick >= dot.nextTickAt) {
-        dot.nextTickAt += TICK_RATE;
+        dot.nextTickAt += dotPeriod(unit, dot);
         const source = findUnit(ctx.state, dot.sourceUnitId);
 
         if (source !== null) {
+          const causeSequence = ctx.nextSequence();
           dealHitAndReport(ctx, {
             source,
             target: unit,
             amount: dot.stacks * dot.damagePerStackPerSecond,
             abilityId: dot.dot,
-            causeSequence: ctx.nextSequence(),
+            causeSequence,
             school: null,
-            isBasicAttack: false,
+            isAttack: false,
             flags: DOT_FLAGS,
             dot: dot.dot,
           });
+
+          const spread = unit.pandemic?.sourceUnitId === source.unitId ? unit.pandemic.spread : null;
+
+          if (unit.alive && spread !== null) {
+            spreadEpidemic(ctx, source, unit, dot, spread, causeSequence);
+          }
+
+          if (unit.alive) {
+            recheckBurst(ctx, source, unit, dot, causeSequence);
+          }
         }
       }
 
@@ -72,68 +95,156 @@ function processDots(ctx: ResolutionContext): void {
   }
 }
 
-function processRetribution(ctx: ResolutionContext): void {
+function processBursts(ctx: ResolutionContext): void {
   const tick = ctx.state.tick;
+  const due = ctx.state.bursts.filter((burst) => burst.dueTick <= tick);
 
-  for (const unit of ctx.state.units) {
-    if (unit.memory.retributionEndsAtTick === 0 || tick < unit.memory.retributionEndsAtTick) {
+  if (due.length === 0) {
+    return;
+  }
+
+  ctx.state.bursts = ctx.state.bursts.filter((burst) => burst.dueTick > tick);
+  const rank = priorityRank(ctx.state);
+  due.sort((a, b) => (rank.get(a.targetUnitId) ?? Number.POSITIVE_INFINITY) - (rank.get(b.targetUnitId) ?? Number.POSITIVE_INFINITY) || Number(a.spreads) - Number(b.spreads));
+  const pairKey = (burst: PendingBurst) => `${burst.holderUnitId}:${burst.targetUnitId}`;
+  const popped = new Set(due.filter((burst) => !burst.spreads).map(pairKey));
+  const doubled = new Set(due.filter((burst) => burst.spreads && popped.has(pairKey(burst))).map(pairKey));
+
+  for (const burst of due) {
+    if (!burst.spreads && doubled.has(pairKey(burst))) {
       continue;
     }
 
-    const pool = unit.memory.retributionPool;
-    const retribution = findPassive(unit, "retribution");
-    unit.memory.retributionEndsAtTick = 0;
-    unit.memory.retributionPool = 0;
+    burstPoison(ctx, burst, doubled.has(pairKey(burst)) ? 2 : 1);
+  }
+}
 
-    if (!unit.alive || retribution === null || pool <= 0) {
-      continue;
-    }
+function processBlessedBursts(ctx: ResolutionContext): void {
+  const tick = ctx.state.tick;
+  const due = ctx.state.blessedBursts.filter((burst) => burst.dueTick <= tick);
 
-    const causeSequence = ctx.nextSequence();
-    ctx.events.push({ kind: "passive-triggered", tick, sequence: causeSequence, unitId: unit.unitId, passive: "retribution" });
+  if (due.length === 0) {
+    return;
+  }
 
-    const cast = { source: unit, ability: retributionAbility(unit), castSequence: causeSequence, isBasicAttack: false, scale: 1, flags: RETRIBUTION_FLAGS };
+  ctx.state.blessedBursts = ctx.state.blessedBursts.filter((burst) => burst.dueTick > tick);
+  const rank = priorityRank(ctx.state);
+  due.sort((a, b) => (rank.get(a.allyUnitId) ?? Number.POSITIVE_INFINITY) - (rank.get(b.allyUnitId) ?? Number.POSITIVE_INFINITY));
 
-    for (const victim of unitsInCircle(ctx.state.units, unit, unit.position, retribution.radiusUnits, "enemies")) {
-      resolveOnTarget(ctx, cast, victim, [
-        { kind: "damage", amount: Math.max(1, Math.round(pool * retribution.fraction)) },
-        { kind: "apply-condition", condition: "staggered" },
-      ]);
+  for (const burst of due) {
+    blessedBurst(ctx, burst);
+  }
+}
+
+function drainFormStacks(unit: UnitState, tick: number): void {
+  const form = unit.form;
+  const key = form?.definition.drainsStacksKey;
+
+  if (form === null || key === undefined) {
+    return;
+  }
+
+  for (const passive of passivesOfKind(unit, "stacks")) {
+    if (passive.key === key) {
+      const remaining = Math.max(0, form.endsAtTick - tick) / Math.max(1, form.definition.durationTicks);
+      unit.memory.stacks[key] = Math.round(passive.max * remaining);
     }
   }
 }
 
-function retributionAbility(unit: UnitState): CompiledAbility {
-  return {
-    id: "retribution",
-    name: "Retribution",
-    cooldownTicks: 0,
-    targetPolicy: "self",
-    range: 0,
-    effects: [],
-    school: unit.school ?? "might",
-    runes: emptyRunes(),
-  };
+function processShowers(ctx: ResolutionContext): void {
+  if (ctx.state.showers.length === 0) {
+    return;
+  }
+
+  const rank = priorityRank(ctx.state);
+  const due = ctx.state.showers.filter((shower) => shower.nextTick <= ctx.state.tick);
+  due.sort((a, b) => (rank.get(a.sourceUnitId) ?? Number.POSITIVE_INFINITY) - (rank.get(b.sourceUnitId) ?? Number.POSITIVE_INFINITY) || a.showerId - b.showerId);
+
+  for (const shower of due) {
+    fireShowerMarker(ctx, shower);
+  }
+
+  ctx.state.showers = ctx.state.showers.filter((shower) => shower.remaining > 0);
 }
 
-function processOpeners(ctx: ResolutionContext): void {
-  const tick = ctx.state.tick;
+function processEmitters(ctx: ResolutionContext): void {
+  if (ctx.state.emitters.length === 0) {
+    return;
+  }
 
-  for (const [index, unitId] of ctx.state.resolutionPriority.entries()) {
+  const rank = priorityRank(ctx.state);
+
+  const ordered = [...ctx.state.emitters].sort(
+    (a, b) => (rank.get(a.sourceUnitId) ?? Number.POSITIVE_INFINITY) - (rank.get(b.sourceUnitId) ?? Number.POSITIVE_INFINITY) || a.emitterId - b.emitterId,
+  );
+
+  for (const emitter of ordered) {
+    advanceEmitter(ctx, emitter);
+  }
+
+  ctx.state.emitters = ctx.state.emitters.filter((emitter) => emitter.endsAtTick > ctx.state.tick);
+}
+
+function processBombs(ctx: ResolutionContext): void {
+  if (ctx.state.bombs.length === 0) {
+    return;
+  }
+
+  const ready: ActiveBomb[] = [];
+
+  for (const bomb of ctx.state.bombs) {
+    const target = findUnit(ctx.state, bomb.targetUnitId);
+
+    if (target !== null && target.alive) {
+      bomb.position = { x: target.position.x, y: target.position.y };
+    }
+
+    if (ctx.state.tick >= bomb.detonatesAtTick || target === null || !target.alive) {
+      ready.push(bomb);
+    }
+  }
+
+  ctx.state.bombs = ctx.state.bombs.filter((bomb) => !ready.includes(bomb));
+
+  for (const bomb of ready) {
+    detonateBomb(ctx, bomb);
+  }
+}
+
+function pullTowardImpacts(ctx: ResolutionContext): void {
+  for (const impact of ctx.state.impacts) {
+    const source = impact.pull === null ? null : findUnit(ctx.state, impact.sourceUnitId);
+
+    if (source !== null && impact.pull !== null && ctx.state.tick < impact.landsAtTick) {
+      pullToward(ctx, source, impact.center, impact.pull.radiusUnits, impact.pull.distanceUnits);
+    }
+  }
+}
+
+function processForms(ctx: ResolutionContext): void {
+  const ending: { unit: UnitState; form: ActiveForm }[] = [];
+
+  for (const unit of ctx.state.units) {
+    if (unit.alive) {
+      drainFormStacks(unit, ctx.state.tick);
+    }
+  }
+
+  for (const unitId of ctx.state.resolutionPriority) {
     const unit = findUnit(ctx.state, unitId);
-    const signatureId = unit?.signatureAbilityId ?? null;
-    const opener = unit === null || signatureId === null ? null : (unit.abilities[signatureId]?.runes.opener ?? null);
 
-    if (unit === null || signatureId === null || opener === null || !unit.alive || unit.memory.openerFired) {
-      continue;
+    if (unit?.form !== null && unit !== null && (!unit.alive || ctx.state.tick >= unit.form.endsAtTick || (unit.form.definition.endsWhenShieldBreaks === true && unit.shield === null))) {
+      const form = endForm(ctx, unit);
+
+      if (form !== null) {
+        ending.push({ unit, form });
+      }
     }
+  }
 
-    if (tick < opener.atTick + (index % OPENER_STAGGER_SLOTS) * OPENER_STAGGER_TICKS) {
-      continue;
-    }
-
-    unit.memory.openerFired = true;
-    ctx.triggered.push({ sourceUnitId: unit.unitId, abilityId: signatureId, scale: 1, flags: RUNE_TRIGGER_FLAGS, causeSequence: ctx.nextSequence() });
+  for (const { unit, form } of ending) {
+    burstForm(ctx, unit, form);
   }
 }
 
@@ -157,29 +268,30 @@ function processZones(ctx: ResolutionContext): void {
   for (const zone of ctx.state.zones) {
     const source = findUnit(ctx.state, zone.sourceUnitId);
 
+    if (zone.followsUnitId !== null) {
+      if (source === null || !source.alive) {
+        zone.expiresAtTick = Math.min(zone.expiresAtTick, tick);
+      } else {
+        zone.center = { x: source.position.x, y: source.position.y };
+      }
+    }
+
     if (source !== null && tick >= zone.nextPulseTick && tick < zone.expiresAtTick) {
       zone.nextPulseTick += zone.periodTicks;
       const ability = source.abilities[zone.abilityId];
       const causeSequence = ctx.nextSequence();
 
       if (ability !== undefined) {
+        const flags = zone.fullHits ? CAST_FLAGS : REACTION_FLAGS;
+        const pulse = { source, ability, castSequence: causeSequence, isBasicAttack: false, scale: 1, flags, critBonus: 0, repeat: null };
+
         for (const victim of unitsInCircle(ctx.state.units, source, zone.center, zone.radiusUnits, "enemies")) {
-          resolveOnTarget(
-            ctx,
-            { source, ability, castSequence: causeSequence, isBasicAttack: false, scale: 1, flags: REACTION_FLAGS },
-            victim,
-            zone.effects,
-          );
+          resolveOnTarget(ctx, pulse, victim, zone.effects);
         }
 
         if (zone.allyEffects.length > 0) {
           for (const ally of unitsInCircle(ctx.state.units, source, zone.center, zone.radiusUnits, "allies")) {
-            resolveOnTarget(
-              ctx,
-              { source, ability, castSequence: causeSequence, isBasicAttack: false, scale: 1, flags: REACTION_FLAGS },
-              ally,
-              zone.allyEffects,
-            );
+            resolveOnTarget(ctx, pulse, ally, zone.allyEffects);
           }
         }
       }
@@ -222,8 +334,7 @@ function processImpacts(ctx: ResolutionContext): void {
       radiusUnits,
     });
 
-    const flags: HitFlags = impact.triggered ? RUNE_TRIGGER_FLAGS : CAST_FLAGS;
-    const cast = { source, ability, castSequence: impact.causeSequence, isBasicAttack: false, scale: impact.scale, flags };
+    const cast = withStun({ source, ability, castSequence: impact.causeSequence, isBasicAttack: false, scale: impact.scale, flags: CAST_FLAGS, critBonus: 0, repeat: null }, impact.stun);
 
     resolveCastPayload(ctx, cast, null, impact.center);
 
@@ -233,96 +344,72 @@ function processImpacts(ctx: ResolutionContext): void {
   }
 }
 
-function processEchoes(ctx: ResolutionContext): void {
-  const tick = ctx.state.tick;
-  const due = ctx.state.echoes.filter((echo) => tick >= echo.castAtTick);
-
-  if (due.length === 0) {
-    return;
-  }
-
-  ctx.state.echoes = ctx.state.echoes.filter((echo) => tick < echo.castAtTick);
-
-  for (const echo of due) {
-    const source = findUnit(ctx.state, echo.sourceUnitId);
-    const ability = source?.abilities[echo.abilityId];
-
-    if (source === null || !source.alive || ability === undefined) {
-      continue;
-    }
-
-    const original = findUnit(ctx.state, echo.targetUnitId);
-    const stillLegal = original !== null && original.alive && (original.teamId === source.teamId || !isUntargetable(original));
-    const target = stillLegal ? original : resolveCastTarget(ability, source, ctx.state.units);
-
-    if (target === null) {
-      continue;
-    }
-
-    const castSequence = ctx.nextSequence();
-
-    ctx.events.push({
-      kind: "cast",
-      tick,
-      sequence: castSequence,
-      sourceUnitId: source.unitId,
-      abilityId: ability.id,
-      targetUnitId: target.unitId,
-      isBasicAttack: false,
-      triggered: true,
-    });
-
-    resolveCast(ctx, { source, ability, castSequence, isBasicAttack: false, scale: echo.scale, flags: echoFlags(source) }, target);
-  }
-}
-
 function processChannels(ctx: ResolutionContext): void {
   const tick = ctx.state.tick;
 
-  for (const unit of ctx.state.units) {
-    const channel = unit.channel;
+  for (const unitId of ctx.state.resolutionPriority) {
+    const unit = findUnit(ctx.state, unitId);
+    const channel = unit?.channel ?? null;
 
-    if (!unit.alive || channel === null || tick < channel.nextPulseTick || tick >= channel.endsAtTick) {
+    if (unit === null || !unit.alive || channel === null || tick < channel.nextPulseTick || tick >= channel.endsAtTick) {
       continue;
     }
 
-    channel.nextPulseTick += channel.periodTicks;
+    channel.nextPulseTick += Math.max(1, Math.round(channel.periodTicks / (1 + channelHaste(unit))));
     const ability = unit.abilities[channel.abilityId];
 
     if (ability === undefined) {
       continue;
     }
 
-    const castSequence = ctx.nextSequence();
+    if (channel.pull !== null) {
+      pullToward(ctx, unit, unit.position, channel.pull.radiusUnits, channel.pull.distanceUnits);
+    }
+
+    const pulse = withStun({ source: unit, ability, castSequence: channel.castSequence, isBasicAttack: false, scale: 1, flags: CAST_FLAGS, critBonus: 0, repeat: null }, channel.stun);
 
     for (const victim of unitsInCircle(ctx.state.units, unit, unit.position, channel.radiusUnits, "enemies")) {
-      resolveOnTarget(ctx, { source: unit, ability, castSequence, isBasicAttack: false, scale: 1, flags: CAST_FLAGS }, victim, channel.effects);
+      resolveOnTarget(ctx, pulse, victim, channel.effects);
     }
   }
 }
 
-export function processTimedEffects(ctx: ResolutionContext): void {
+export function processTimedEffects(ctx: ResolutionContext): BudgetBreach | null {
+  settleStoredDamage(ctx);
+  processStackDecay(ctx);
   processSoulbound(ctx);
   processDots(ctx);
-  processRetribution(ctx);
+  processBursts(ctx);
+  processBlessedBursts(ctx);
+  processCorpseBlasts(ctx);
+  processDetonations(ctx);
+  settleTether(ctx);
+  processForms(ctx);
   processOpeners(ctx);
   processZones(ctx);
   processChannels(ctx);
+  processSequences(ctx);
+  processShowers(ctx);
+  processEmitters(ctx);
+  pullTowardImpacts(ctx);
   processImpacts(ctx);
-  processEchoes(ctx);
+  processBombs(ctx);
+  processPendingStrikes(ctx);
+
+  return processPendingCasts(ctx);
 }
 
-export function processTriggeredCasts(ctx: ResolutionContext): { rootActionSequence: number; depthReached: number } | null {
+export function processReactions(ctx: ResolutionContext): BudgetBreach | null {
   let processed = 0;
 
-  while (ctx.triggered.length > 0) {
-    const job = ctx.triggered.shift();
+  while (ctx.reactions.length > 0) {
+    const job = ctx.reactions.shift();
 
     if (job === undefined) {
       break;
     }
 
-    if (processed >= MAX_TRIGGERED_CASTS_PER_TICK) {
+    if (processed >= MAX_REACTIONS_PER_TICK) {
       return { rootActionSequence: job.causeSequence, depthReached: processed };
     }
 
@@ -331,13 +418,13 @@ export function processTriggeredCasts(ctx: ResolutionContext): { rootActionSeque
     const source = findUnit(ctx.state, job.sourceUnitId);
     const ability = source?.abilities[job.abilityId];
 
-    if (source === null || (!source.alive && job.fromCorpse !== true) || ability === undefined) {
+    if (source === null || !source.alive || ability === undefined) {
       continue;
     }
 
-    const target = resolveCastTarget(ability, source, ctx.state.units);
+    const target = job.targetUnitId === undefined ? resolveCastTarget(ability, source, ctx.state.units) : findUnit(ctx.state, job.targetUnitId);
 
-    if (target === null) {
+    if (target === null || !isCastTarget(ability, source, target)) {
       continue;
     }
 
@@ -354,7 +441,7 @@ export function processTriggeredCasts(ctx: ResolutionContext): { rootActionSeque
       triggered: true,
     });
 
-    resolveCast(ctx, { source, ability, castSequence, isBasicAttack: false, scale: job.scale, flags: job.flags }, target);
+    resolveCast(ctx, { source, ability, castSequence, isBasicAttack: false, scale: 1, flags: CAST_FLAGS, critBonus: 0, repeat: null, triggered: true }, target);
   }
 
   return null;

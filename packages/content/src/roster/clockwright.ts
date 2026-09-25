@@ -3,11 +3,29 @@ import type { AbilityDefinition, HeroDefinition, UpgradeDefinition } from "@jev-
 export const turretShot: AbilityDefinition = {
   id: "turret-shot",
   name: "Turret Shot",
+  hitType: "attack",
   cooldownTicks: 42,
   targetPolicy: "nearest-enemy",
   range: 40,
   effects: [{ kind: "damage", amount: 31, maxAmount: 39 }],
   tags: ["projectile", "target"],
+};
+
+export const turretBlast: AbilityDefinition = {
+  id: "self-destruct",
+  name: "Self-Destruct",
+  hitType: "spell",
+  description: "The turret blows apart, hitting every enemy within 1.5 cells and Staggering them.",
+  cooldownTicks: 1,
+  targetPolicy: "self",
+  range: 0,
+  area: { kind: "circle", center: "self", radiusUnits: 15 },
+  effects: [
+    { kind: "damage", amount: 90 },
+    { kind: "apply-condition", condition: "staggered" },
+  ],
+  canCrit: false,
+  tags: ["area"],
 };
 
 export const turret: HeroDefinition = {
@@ -16,17 +34,17 @@ export const turret: HeroDefinition = {
   title: "Every one of them has a name",
   school: "cunning",
   summon: true,
-  maxHp: 640,
+  maxHp: 800,
   armor: 0.1,
   moveSpeedUnitsPerSecond: 0,
   basicAttackId: turretShot.id,
-  abilityIds: [],
-  passives: [{ kind: "overclock", rangeUnits: 20, attackSpeedBonus: 0.2 }],
+  passives: [{ kind: "first-hit-per-enemy", key: "flash-round", effects: [{ kind: "apply-condition", condition: "disoriented" }] }],
 };
 
 export const rivetGun: AbilityDefinition = {
   id: "rivet-gun",
   name: "Rivet Gun",
+  hitType: "attack",
   cooldownTicks: 50,
   targetPolicy: "nearest-enemy",
   range: 40,
@@ -34,32 +52,42 @@ export const rivetGun: AbilityDefinition = {
   tags: ["projectile", "target"],
 };
 
+export const mechRocket: AbilityDefinition = {
+  id: "mech-rocket",
+  name: "Rocket",
+  hitType: "attack",
+  cooldownTicks: 50,
+  targetPolicy: "nearest-enemy",
+  range: 40,
+  area: { kind: "circle", center: "target", radiusUnits: 10 },
+  effects: [{ kind: "damage", amount: 56, maxAmount: 66 }],
+  tags: ["projectile", "area", "target"],
+};
+
 export const deployTurret: AbilityDefinition = {
   id: "deploy-turret",
   name: "Deploy Turret",
-  description: "Builds a turret beside Brassjack, up to 3 at once. Turrets near another turret fire 20% faster.",
-  cooldownTicks: 30,
-  manaCost: 70,
+  hitType: "spell",
+  description: "Builds a turret beside Brassjack, up to 3 at once. Its shots carry every gem socketed here, and its first shot at each enemy Disorients it.",
+  cooldownTicks: 210,
   targetPolicy: "self",
   range: 0,
-  effects: [{ kind: "summon", heroId: turret.id, count: 1, maxActive: 3 }],
-  tags: ["self", "summon"],
+  effects: [{ kind: "summon", heroId: turret.id, count: 1, maxActive: 3, carriesGems: true }],
+  tags: ["summon", "projectile"],
 };
 
-export const flashbang: AbilityDefinition = {
-  id: "flashbang",
-  name: "Flashbang",
-  description: "Hits the densest enemy group and Disorients everything in it.",
-  cooldownTicks: 378,
-  targetPolicy: "densest-enemy-cluster",
-  range: 50,
-  area: { kind: "circle", center: "target", radiusUnits: 15 },
-  effects: [
-    { kind: "damage", amount: 50 },
-    { kind: "apply-condition", condition: "disoriented" },
-  ],
-  canCrit: false,
-  tags: ["area"],
+export const mechSuit: AbilityDefinition = {
+  id: "mech-suit",
+  name: "Mech Suit",
+  hitType: "spell",
+  description: "Brassjack climbs into a mech for 6 s, with a shield worth half his max HP. He fires rockets that hit everything within 1 cell of the target, every turret fires at his target, and he builds no mana until he climbs out.",
+  cooldownTicks: 30,
+  manaCost: 110,
+  targetPolicy: "self",
+  range: 0,
+  form: { key: "mech", durationTicks: 180, basicAttackId: mechRocket.id, commandsSummons: true, locksMana: true },
+  effects: [{ kind: "shield", amount: 0, maxHpFraction: 0.5, durationTicks: 180 }],
+  tags: ["self", "channel"],
 };
 
 export const clockwright: HeroDefinition = {
@@ -75,100 +103,99 @@ export const clockwright: HeroDefinition = {
   critChance: 0.1,
   manaPerAttack: 21,
   basicAttackId: rivetGun.id,
-  abilityIds: [deployTurret.id, flashbang.id],
+  abilityId: deployTurret.id,
+  ultimateId: mechSuit.id,
+  passives: [{ kind: "overclock", name: "Overclock", heroId: turret.id, rangeUnits: 20, bonusPerSecond: 0.1, maxBonus: 1 }],
 };
 
 export const clockwrightSummons: HeroDefinition[] = [turret];
 
-export const clockwrightAbilities: AbilityDefinition[] = [turretShot, rivetGun, deployTurret, flashbang];
+export const clockwrightAbilities: AbilityDefinition[] = [turretShot, turretBlast, rivetGun, mechRocket, deployTurret, mechSuit];
 
-const T1 = ["clockwright-reinforced-plating", "clockwright-quick-build"];
-
-const T2 = ["clockwright-barrier-turrets", "clockwright-flash-powder"];
-
-export const clockwrightTalents: UpgradeDefinition[] = [
+export const clockwrightLevels: UpgradeDefinition[] = [
   {
-    id: "clockwright-reinforced-plating",
-    name: "Reinforced Plating",
-    description: "Turrets have 40% more HP.",
-    category: "talent",
+    id: "clockwright-twin-deploy",
+    name: "Twin Deploy",
+    description: "Deploy Turret builds two turrets at once, but recharges in 16 s instead of 7.",
+    category: "level",
     heroId: clockwright.id,
-    tier: 1,
+    level: 2,
     path: "left",
     maxStacks: 1,
-    excludesUpgradeIds: ["clockwright-quick-build"],
-    statModifiers: [],
-    grantsPassives: [{ kind: "empower-summons", key: "plating", heroId: turret.id, hpScale: 1.4 }],
+    statModifiers: [{ target: { kind: "ability-cooldown", abilityId: deployTurret.id }, kind: "percent", value: 1.25 }],
+    abilityChanges: [{ abilityId: deployTurret.id, setEffects: [{ kind: "summon", heroId: turret.id, count: 2, maxActive: 3, carriesGems: true }] }],
   },
   {
-    id: "clockwright-quick-build",
-    name: "Quick Build",
-    description: "Deploy Turret costs 25% less mana.",
-    category: "talent",
+    id: "clockwright-tesla-coils",
+    name: "Tesla Coils",
+    description: "Turret shots chain to one more enemy nearby for 60% damage.",
+    category: "level",
     heroId: clockwright.id,
-    tier: 1,
+    level: 2,
     path: "right",
     maxStacks: 1,
-    excludesUpgradeIds: ["clockwright-reinforced-plating"],
-    statModifiers: [{ target: { kind: "ability-mana-cost", abilityId: deployTurret.id }, kind: "percent", value: -0.25 }],
+    statModifiers: [],
+    grantsPassives: [{ kind: "empower-summons", key: "tesla-coils", heroId: turret.id, gems: [{ kind: "chain", extraTargets: 1, fraction: 0.6, rangeUnits: 25 }] }],
   },
   {
-    id: "clockwright-barrier-turrets",
-    name: "Barrier Turrets",
-    description: "Turrets arrive with a shield worth 30% of their HP.",
-    category: "talent",
+    id: "clockwright-gadgeteer",
+    name: "Gadgeteer",
+    description: "Turrets carry copies of Brassjack's items.",
+    category: "level",
     heroId: clockwright.id,
-    tier: 2,
+    level: 3,
     path: "left",
     maxStacks: 1,
-    requiresAnyOfUpgradeIds: T1,
-    excludesUpgradeIds: ["clockwright-flash-powder"],
-    unlocksRuneSocket: true,
     statModifiers: [],
-    grantsPassives: [{ kind: "empower-summons", key: "barrier", heroId: turret.id, shieldFraction: 0.3 }],
+    grantsPassives: [{ kind: "heart-of-the-swarm" }],
   },
   {
-    id: "clockwright-flash-powder",
-    name: "Flash Powder",
-    description: "Flashbang is 50% wider.",
-    category: "talent",
+    id: "clockwright-self-destruct",
+    name: "Self-Destruct",
+    description: "Turrets explode when destroyed or replaced, dealing 90 to every enemy within 1.5 cells and Staggering them.",
+    category: "level",
     heroId: clockwright.id,
-    tier: 2,
+    level: 3,
     path: "right",
     maxStacks: 1,
-    requiresAnyOfUpgradeIds: T1,
-    excludesUpgradeIds: ["clockwright-barrier-turrets"],
-    unlocksRuneSocket: true,
-    statModifiers: [{ target: { kind: "ability-area", abilityId: flashbang.id }, kind: "percent", value: 0.5 }],
-  },
-  {
-    id: "clockwright-fortress",
-    name: "Fortress",
-    description: "Up to 5 turrets at once.",
-    category: "talent",
-    heroId: clockwright.id,
-    tier: 3,
-    path: "left",
-    maxStacks: 1,
-    requiresAnyOfUpgradeIds: T2,
-    excludesUpgradeIds: ["clockwright-twin-barrels"],
-    statModifiers: [],
-    abilityChanges: [{ abilityId: deployTurret.id, setEffects: [{ kind: "summon", heroId: turret.id, count: 1, maxActive: 5 }] }],
-  },
-  {
-    id: "clockwright-twin-barrels",
-    name: "Twin Barrels",
-    description: "Turret shots also hit every enemy next to the target for 50%.",
-    category: "talent",
-    heroId: clockwright.id,
-    tier: 3,
-    path: "right",
-    maxStacks: 1,
-    requiresAnyOfUpgradeIds: T2,
-    excludesUpgradeIds: ["clockwright-fortress"],
     statModifiers: [],
     grantsPassives: [
-      { kind: "empower-summons", key: "barrels", heroId: turret.id, passives: [{ kind: "cleave", fraction: 0.5, radiusUnits: 12 }] },
+      { kind: "empower-summons", key: "self-destruct", heroId: turret.id, passives: [{ kind: "self-destruct", abilityId: turretBlast.id, delayTicks: 9 }] },
+    ],
+  },
+  {
+    id: "clockwright-walking-fortress",
+    name: "Walking Fortress",
+    description: "The Mech Suit lasts until its shield breaks, and his turrets walk with him.",
+    category: "level",
+    heroId: clockwright.id,
+    level: 4,
+    path: "left",
+    maxStacks: 1,
+    statModifiers: [],
+    abilityChanges: [
+      {
+        abilityId: mechSuit.id,
+        patchForm: { durationTicks: 3600, endsWhenShieldBreaks: true, summonsFollow: true },
+        setEffects: [{ kind: "shield", amount: 0, maxHpFraction: 0.5, durationTicks: 3600 }],
+      },
+    ],
+  },
+  {
+    id: "clockwright-doomsday",
+    name: "Doomsday",
+    description: "The Mech Suit ends in an explosion that deals a quarter of Brassjack's max HP to every enemy within 2 cells.",
+    category: "level",
+    heroId: clockwright.id,
+    level: 4,
+    path: "right",
+    maxStacks: 1,
+    statModifiers: [],
+    abilityChanges: [
+      {
+        abilityId: mechSuit.id,
+        patchForm: { endBurst: { damageTakenFraction: 0, radiusUnits: 20, effects: [{ kind: "damage", amount: 0, casterMaxHpFraction: 0.25 }] } },
+      },
     ],
   },
 ];

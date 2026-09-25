@@ -1,5 +1,5 @@
 import type { HeroDefinitionId, UpgradeDefinitionId } from "../ids.js";
-import type { Catalogue } from "../definitions.js";
+import type { Catalogue, SkillSlot } from "../definitions.js";
 import { applyUpgrade } from "./apply-upgrade.js";
 
 export interface HeroBuildUpgradeSelection {
@@ -7,13 +7,18 @@ export interface HeroBuildUpgradeSelection {
   stacks: number;
 }
 
+export interface EquippedGem {
+  gemId: UpgradeDefinitionId;
+  slot: SkillSlot;
+}
+
 export interface HeroBuild {
   buildId: string;
   heroId: HeroDefinitionId;
   upgrades: HeroBuildUpgradeSelection[];
   itemIds?: UpgradeDefinitionId[];
-  runeIds?: UpgradeDefinitionId[];
-  extraRuneSockets?: number;
+  gems?: EquippedGem[];
+  trainedSockets?: Partial<Record<SkillSlot, number>>;
 }
 
 export function createHeroBuild(
@@ -23,8 +28,9 @@ export function createHeroBuild(
   catalogue: Catalogue,
 ): HeroBuild {
   let build: HeroBuild = { buildId, heroId, upgrades: [] };
+  const ordered = [...upgradeIds].sort((a, b) => (catalogue.upgrades[a]?.level ?? 0) - (catalogue.upgrades[b]?.level ?? 0));
 
-  for (const upgradeId of upgradeIds) {
+  for (const upgradeId of ordered) {
     build = applyUpgrade(build, upgradeId, catalogue);
   }
 
@@ -34,7 +40,7 @@ export function createHeroBuild(
 export function withEquipment(
   build: HeroBuild,
   itemIds: readonly UpgradeDefinitionId[],
-  runeIds: readonly UpgradeDefinitionId[],
+  gems: readonly EquippedGem[],
 ): HeroBuild {
   const equipped: HeroBuild = { ...build };
 
@@ -44,11 +50,19 @@ export function withEquipment(
     delete equipped.itemIds;
   }
 
-  if (runeIds.length > 0) {
-    equipped.runeIds = [...runeIds];
+  if (gems.length > 0) {
+    equipped.gems = gems.map((gem) => ({ gemId: gem.gemId, slot: gem.slot }));
   } else {
-    delete equipped.runeIds;
+    delete equipped.gems;
   }
 
   return equipped;
+}
+
+export function trainedSocketCount(build: HeroBuild, slot: SkillSlot): number {
+  return build.trainedSockets?.[slot] ?? 0;
+}
+
+export function withTrainedSocket(build: HeroBuild, slot: SkillSlot): HeroBuild {
+  return { ...build, trainedSockets: { ...build.trainedSockets, [slot]: trainedSocketCount(build, slot) + 1 } };
 }

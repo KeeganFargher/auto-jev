@@ -1,32 +1,34 @@
 import {
-  compileBuild,
+  SKILL_SLOTS,
   createHeroBuild,
+  gemFitsSkill,
   isUpgradeEligible,
   ITEM_SLOTS,
-  runeFitsHero,
-  withEquipment,
+  skillIdFor,
+  type EquippedGem,
   type HeroBuild,
   type HeroDefinitionId,
   type Rarity,
+  type SkillSlot,
   type UpgradeDefinition,
   type UpgradeDefinitionId,
 } from "@jev-game/game";
-import { gameCatalogue } from "@jev-game/content";
-import { heroName } from "../game/catalogues.js";
-
-export type UpgradeSelection = Map<HeroDefinitionId, UpgradeDefinitionId[]>;
+import { gameCatalogue, type LabHeroPicks, type LabPicksByHero } from "@jev-game/content";
+import { abilityDefinition, heroName } from "../game/catalogues.js";
 
 export interface UpgradePickerView {
   render(heroIds: readonly HeroDefinitionId[]): void;
-  getSelection(): UpgradeSelection;
+  getSelection(): LabPicksByHero;
   dispose(): void;
 }
 
 interface HeroPicks {
-  talents: UpgradeDefinitionId[];
+  levels: UpgradeDefinitionId[];
   items: (UpgradeDefinitionId | null)[];
-  runes: UpgradeDefinitionId[];
+  gems: Record<SkillSlot, UpgradeDefinitionId[]>;
 }
+
+const LAB_GEM_SOCKETS = 3;
 
 const RARITY_ORDER: readonly Rarity[] = ["common", "rare", "legendary"];
 
@@ -42,9 +44,9 @@ function upgradesOf(predicate: (upgrade: UpgradeDefinition) => boolean): Upgrade
   return found;
 }
 
-function heroTalents(heroId: HeroDefinitionId): UpgradeDefinition[] {
-  return upgradesOf((upgrade) => upgrade.category === "talent" && upgrade.heroId === heroId).sort(
-    (a, b) => (a.tier ?? 0) - (b.tier ?? 0) || (a.path ?? "").localeCompare(b.path ?? ""),
+function heroLevelPicks(heroId: HeroDefinitionId): UpgradeDefinition[] {
+  return upgradesOf((upgrade) => upgrade.category === "level" && upgrade.heroId === heroId).sort(
+    (a, b) => (a.level ?? 0) - (b.level ?? 0) || (a.path ?? "").localeCompare(b.path ?? ""),
   );
 }
 
@@ -57,23 +59,30 @@ function allItems(): UpgradeDefinition[] {
   );
 }
 
-function fittingRunes(heroId: HeroDefinitionId): UpgradeDefinition[] {
-  return upgradesOf((upgrade) => upgrade.category === "rune" && runeFitsHero(upgrade, heroId, gameCatalogue)).sort((a, b) =>
+function fittingGems(heroId: HeroDefinitionId, slot: SkillSlot): UpgradeDefinition[] {
+  return upgradesOf((upgrade) => upgrade.category === "gem" && gemFitsSkill(upgrade, heroId, slot, gameCatalogue)).sort((a, b) =>
     a.name.localeCompare(b.name),
   );
+}
+
+function skillLabel(heroId: HeroDefinitionId, slot: SkillSlot): string | null {
+  const hero = gameCatalogue.heroes[heroId];
+  const skillId = hero === undefined ? null : skillIdFor(hero, slot);
+
+  return skillId === null ? null : (abilityDefinition(skillId)?.name ?? skillId);
 }
 
 function buildWith(heroId: HeroDefinitionId, upgradeIds: readonly UpgradeDefinitionId[]): HeroBuild {
   return createHeroBuild(`picker-${heroId}`, heroId, upgradeIds, gameCatalogue);
 }
 
-function settledTalents(heroId: HeroDefinitionId, wanted: readonly UpgradeDefinitionId[]): UpgradeDefinitionId[] {
+function settledLevelPicks(heroId: HeroDefinitionId, wanted: readonly UpgradeDefinitionId[]): UpgradeDefinitionId[] {
   const kept: UpgradeDefinitionId[] = [];
   let build = buildWith(heroId, kept);
 
-  for (const talent of heroTalents(heroId)) {
-    if (wanted.includes(talent.id) && isUpgradeEligible(build, talent)) {
-      kept.push(talent.id);
+  for (const pick of heroLevelPicks(heroId)) {
+    if (wanted.includes(pick.id) && isUpgradeEligible(build, pick, gameCatalogue)) {
+      kept.push(pick.id);
       build = buildWith(heroId, kept);
     }
   }
@@ -95,18 +104,22 @@ function settledItems(items: readonly (UpgradeDefinitionId | null)[]): UpgradeDe
   return kept;
 }
 
-function runeSockets(heroId: HeroDefinitionId, picks: HeroPicks): number {
-  return compileBuild(withEquipment(buildWith(heroId, picks.talents), settledItems(picks.items), []), gameCatalogue).runeSockets;
-}
+function settledGems(heroId: HeroDefinitionId, picks: HeroPicks): EquippedGem[] {
+  const gems: EquippedGem[] = [];
 
-function settledRunes(heroId: HeroDefinitionId, picks: HeroPicks): UpgradeDefinitionId[] {
-  const fitting = new Set(fittingRunes(heroId).map((rune) => rune.id));
+  for (const slot of SKILL_SLOTS) {
+    const fitting = new Set(fittingGems(heroId, slot).map((gem) => gem.id));
 
-  return picks.runes.filter((runeId) => fitting.has(runeId)).slice(0, runeSockets(heroId, picks));
+    for (const gemId of picks.gems[slot].filter((candidate) => fitting.has(candidate)).slice(0, LAB_GEM_SOCKETS)) {
+      gems.push({ gemId, slot });
+    }
+  }
+
+  return gems;
 }
 
 function emptyPicks(): HeroPicks {
-  return { talents: [], items: Array.from({ length: ITEM_SLOTS }, () => null), runes: [] };
+  return { levels: [], items: Array.from({ length: ITEM_SLOTS }, () => null), gems: { ability: [], ultimate: [] } };
 }
 
 function heading(text: string): HTMLElement {
@@ -180,22 +193,21 @@ export function createUpgradePickerView(container: HTMLElement, onChange: () => 
     onChange();
   }
 
-  function talentSection(heroId: HeroDefinitionId, picks: HeroPicks): HTMLElement[] {
-    const build = buildWith(heroId, picks.talents);
+  function levelSection(heroId: HeroDefinitionId, picks: HeroPicks): HTMLElement[] {
+    const build = buildWith(heroId, picks.levels);
 
-    return heroTalents(heroId).map((talent) => {
-      const selected = picks.talents.includes(talent.id);
+    return heroLevelPicks(heroId).map((pick) => {
+      const selected = picks.levels.includes(pick.id);
 
-      return checkboxOption(`T${talent.tier ?? 1} ${talent.name}`, talent.description, selected, selected || isUpgradeEligible(build, talent), (checked) => {
-        const wanted = checked ? [...picks.talents, talent.id] : picks.talents.filter((id) => id !== talent.id);
-        picks.talents = settledTalents(heroId, wanted);
-        picks.runes = settledRunes(heroId, picks);
+      return checkboxOption(`L${pick.level ?? 2} ${pick.name}`, pick.description, selected, selected || isUpgradeEligible(build, pick, gameCatalogue), (checked) => {
+        const wanted = checked ? [...picks.levels, pick.id] : picks.levels.filter((id) => id !== pick.id);
+        picks.levels = settledLevelPicks(heroId, wanted);
         changed();
       });
     });
   }
 
-  function itemSection(heroId: HeroDefinitionId, picks: HeroPicks): HTMLElement {
+  function itemSection(picks: HeroPicks): HTMLElement {
     const row = document.createElement("div");
     row.className = "hud-upgrade-items";
 
@@ -203,7 +215,6 @@ export function createUpgradePickerView(container: HTMLElement, onChange: () => 
       row.append(
         itemSelect(itemId, (picked) => {
           picks.items[slot] = picked;
-          picks.runes = settledRunes(heroId, picks);
           changed();
         }),
       );
@@ -212,18 +223,25 @@ export function createUpgradePickerView(container: HTMLElement, onChange: () => 
     return row;
   }
 
-  function runeSection(heroId: HeroDefinitionId, picks: HeroPicks): HTMLElement[] {
-    const capacity = runeSockets(heroId, picks);
+  function gemSection(heroId: HeroDefinitionId, picks: HeroPicks, slot: SkillSlot): HTMLElement[] {
+    const label = skillLabel(heroId, slot);
 
-    return fittingRunes(heroId).map((rune) => {
-      const selected = picks.runes.includes(rune.id);
+    if (label === null) {
+      return [];
+    }
 
-      return checkboxOption(rune.name, rune.description, selected, selected || picks.runes.length < capacity, (checked) => {
-        picks.runes = checked ? [...picks.runes, rune.id] : picks.runes.filter((id) => id !== rune.id);
-        picks.runes = settledRunes(heroId, picks);
+    const chosen = picks.gems[slot];
+
+    const options = fittingGems(heroId, slot).map((gem) => {
+      const selected = chosen.includes(gem.id);
+
+      return checkboxOption(gem.name, gem.description, selected, selected || chosen.length < LAB_GEM_SOCKETS, (checked) => {
+        picks.gems[slot] = checked ? [...chosen, gem.id] : chosen.filter((id) => id !== gem.id);
         changed();
       });
     });
+
+    return [heading(`gems · ${label} · ${chosen.length}/${LAB_GEM_SOCKETS}`), ...options];
   }
 
   function renderInternal(): void {
@@ -238,16 +256,13 @@ export function createUpgradePickerView(container: HTMLElement, onChange: () => 
       title.className = "hud-upgrade-hero-title";
       title.textContent = heroName(heroId);
 
-      const capacity = runeSockets(heroId, picks);
-
       section.append(
         title,
-        heading("talents"),
-        ...talentSection(heroId, picks),
+        heading("levels"),
+        ...levelSection(heroId, picks),
         heading("items"),
-        itemSection(heroId, picks),
-        heading(`runes · ${picks.runes.length}/${capacity} sockets`),
-        ...runeSection(heroId, picks),
+        itemSection(picks),
+        ...SKILL_SLOTS.flatMap((slot) => gemSection(heroId, picks, slot)),
       );
 
       container.appendChild(section);
@@ -261,11 +276,11 @@ export function createUpgradePickerView(container: HTMLElement, onChange: () => 
     },
 
     getSelection() {
-      const selection: UpgradeSelection = new Map();
+      const selection = new Map<HeroDefinitionId, LabHeroPicks>();
 
       for (const heroId of currentHeroIds) {
         const picks = picksFor(heroId);
-        selection.set(heroId, [...picks.talents, ...settledItems(picks.items), ...settledRunes(heroId, picks)]);
+        selection.set(heroId, { upgradeIds: [...picks.levels, ...settledItems(picks.items)], gems: settledGems(heroId, picks) });
       }
 
       return selection;

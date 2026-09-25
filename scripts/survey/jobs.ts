@@ -1,4 +1,4 @@
-import { isUpgradeEligible, runeFitsHero, type Catalogue, type HeroBuild, type UpgradeDefinition } from "@jev-game/game";
+import { PICK_LEVELS, fittingSlots, type Catalogue, type UpgradeDefinition } from "@jev-game/game";
 import type { BattleJob, BattleTier, HeroPick } from "./types.js";
 
 export interface PieceCase {
@@ -18,9 +18,9 @@ export interface PiecePair {
 export function pickKey(pick: HeroPick): string {
   const upgrades = pick.upgradeIds.length === 0 ? "" : `[${pick.upgradeIds.join("+")}]`;
   const items = (pick.itemIds ?? []).length === 0 ? "" : `{${(pick.itemIds ?? []).join("+")}}`;
-  const runes = (pick.runeIds ?? []).length === 0 ? "" : `<${(pick.runeIds ?? []).join("+")}>`;
+  const gems = (pick.gems ?? []).length === 0 ? "" : `<${(pick.gems ?? []).map((gem) => `${gem.gemId}@${gem.slot}`).join("+")}>`;
 
-  return `${pick.heroId}${upgrades}${items}${runes}`;
+  return `${pick.heroId}${upgrades}${items}${gems}`;
 }
 
 export function teamKey(team: readonly HeroPick[]): string {
@@ -112,65 +112,46 @@ export function addTeamJobs(
   return indices;
 }
 
-function resolvePath(catalogue: Catalogue, upgradeId: string, ordered: string[], visiting: Set<string>): boolean {
-  if (ordered.includes(upgradeId)) {
-    return true;
-  }
+function firstPickAt(catalogue: Catalogue, heroId: string, level: number): UpgradeDefinition | null {
+  let first: UpgradeDefinition | null = null;
 
-  const upgrade = catalogue.upgrades[upgradeId];
+  for (const upgrade of Object.values(catalogue.upgrades)) {
+    if (upgrade.category !== "level" || upgrade.heroId !== heroId || upgrade.level !== level) {
+      continue;
+    }
 
-  if (upgrade === undefined || visiting.has(upgradeId)) {
-    return false;
-  }
-
-  visiting.add(upgradeId);
-
-  const alternatives = upgrade.requiresAnyOfUpgradeIds ?? [];
-
-  if (alternatives.length > 0 && !alternatives.some((id) => ordered.includes(id))) {
-    const satisfied = alternatives.some((alternative) => {
-      const attempt = [...ordered];
-
-      if (resolvePath(catalogue, alternative, attempt, new Set(visiting))) {
-        ordered.splice(0, ordered.length, ...attempt);
-
-        return true;
-      }
-
-      return false;
-    });
-
-    if (!satisfied) {
-      return false;
+    if (first === null || (upgrade.path ?? "").localeCompare(first.path ?? "") < 0) {
+      first = upgrade;
     }
   }
 
-  visiting.delete(upgradeId);
-  ordered.push(upgradeId);
-
-  return true;
+  return first;
 }
 
-function upgradePath(catalogue: Catalogue, heroId: string, upgradeId: string): string[] | null {
-  const ordered: string[] = [];
-
-  if (!resolvePath(catalogue, upgradeId, ordered, new Set())) {
+function levelPath(catalogue: Catalogue, heroId: string, pick: UpgradeDefinition): string[] | null {
+  if (pick.level === undefined) {
     return null;
   }
 
-  const build: HeroBuild = { buildId: "path-check", heroId, upgrades: [] };
+  const path: string[] = [];
 
-  for (const id of ordered) {
-    const upgrade = catalogue.upgrades[id];
+  for (const level of PICK_LEVELS) {
+    if (level >= pick.level) {
+      break;
+    }
 
-    if (upgrade === undefined || !isUpgradeEligible(build, upgrade)) {
+    const earlier = firstPickAt(catalogue, heroId, level);
+
+    if (earlier === null) {
       return null;
     }
 
-    build.upgrades.push({ upgradeId: id, stacks: 1 });
+    path.push(earlier.id);
   }
 
-  return ordered;
+  path.push(pick.id);
+
+  return path;
 }
 
 function withPieceOnFirstCopy(team: readonly string[], heroId: string, pick: HeroPick): HeroPick[] {
@@ -184,7 +165,7 @@ function withPieceOnFirstCopy(team: readonly string[], heroId: string, pick: Her
         heroId: id,
         upgradeIds: [...pick.upgradeIds],
         itemIds: [...(pick.itemIds ?? [])],
-        runeIds: [...(pick.runeIds ?? [])],
+        gems: [...(pick.gems ?? [])],
       };
     }
 
@@ -207,21 +188,24 @@ function pieceVariant(catalogue: Catalogue, heroId: string, upgrade: UpgradeDefi
         label: upgrade.id,
       };
 
-    case "rune":
-      return runeFitsHero(upgrade, heroId, catalogue)
-        ? {
-            base: { heroId, upgradeIds: [] },
-            variant: { heroId, upgradeIds: [], runeIds: [upgrade.id] },
-            label: upgrade.id,
-          }
-        : null;
+    case "gem": {
+      const [slot] = fittingSlots(upgrade, heroId, catalogue);
 
-    case "talent": {
+      return slot === undefined
+        ? null
+        : {
+            base: { heroId, upgradeIds: [] },
+            variant: { heroId, upgradeIds: [], gems: [{ gemId: upgrade.id, slot }] },
+            label: `${upgrade.id} in ${slot}`,
+          };
+    }
+
+    case "level": {
       if (upgrade.heroId !== undefined && upgrade.heroId !== heroId) {
         return null;
       }
 
-      const path = upgradePath(catalogue, heroId, upgrade.id);
+      const path = levelPath(catalogue, heroId, upgrade);
 
       if (path === null) {
         return null;
@@ -290,7 +274,7 @@ export function addPieceJobs(
       cases.push({
         pieceId: upgradeId,
         category: upgrade.category ?? "upgrade",
-        rarePowerSpike: upgrade.rarity === "legendary" || (upgrade.category === "talent" && (upgrade.tier ?? 0) >= 3),
+        rarePowerSpike: upgrade.rarity === "legendary" || (upgrade.category === "level" && (upgrade.level ?? 0) >= 4),
         heroId,
         label: piece.label,
         pairs,

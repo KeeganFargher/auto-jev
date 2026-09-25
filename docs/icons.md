@@ -1,12 +1,13 @@
 # Icons: where they live and how they reach the game
 
-Painted icons (items, runes, talents) and hero portraits have one
+Painted icons (items, gems, level picks) and hero portraits have one
 master PNG and one runtime WebP each. Every hero has two: a portrait
 bust and a head crop ("face") for small spots. The master is what you
 replace or regenerate. The WebP is what the game loads, always rebuilt
 from the master with one command, never edited by hand. Every item,
-rune, talent and hero has art today (27, 19, 60 and 10). The palette,
-art style and readability rules they follow are in `missing_assets.md`'s
+level pick and hero has art (43, 60 and 10), and 21 of the 29 gems
+do. The palette, art
+style and readability rules they follow are in `missing_assets.md`'s
 style guide; the prompts are below. `pnpm icons:check` enforces the
 runtime side.
 
@@ -14,7 +15,7 @@ runtime side.
 
 | Path | What | Git |
 | --- | --- | --- |
-| `art/icons/<kind>/<id>.png` | Master, one per icon: a square PNG with alpha, 512 px (faces 256 px). `kind` is `items`, `runes`, `talents`, `heroes` or `faces`; `id` is the content id (`frost-brand`, `pyro-heavy-meteor`, `bulwark`) | LFS |
+| `art/icons/<kind>/<id>.png` | Master, one per icon: a square PNG with alpha, 512 px (faces 256 px). `kind` is `items`, `gems`, `levels`, `heroes` or `faces`; `id` is the content id (`frost-brand`, `pyro-heavy-meteor`, `bulwark`) | LFS |
 | `art/icons/prompts.json` | The exact prompt, model and settings behind every master, and the crop box behind every face | plain |
 | `apps/client/src/assets/icons/<kind>/<id>.webp` | Runtime icon, written by `pnpm icons:build` | plain |
 | `apps/client/src/hud/icon-art.ts` | Finds the runtime icons and hands out `<img>` elements | plain |
@@ -22,7 +23,7 @@ runtime side.
 
 Masters go through Git LFS with the rest of `art/` (`.gitattributes`).
 Runtime WebPs stay in plain git: icons are about 10 KB each, 1 MB for
-the whole set, and the portraits and faces add 330 KB.
+the whole set, and the portraits and faces add about 390 KB.
 
 ## Commands
 
@@ -42,13 +43,13 @@ pnpm icons:check
 
 Checks every runtime icon and prints how many ids have art. It doesn't
 need cwebp. It reads ids from `@jev-game/content`'s built `dist`, so
-after adding an item, rune, talent or hero, run `pnpm build` first or
+after adding an item, gem, level pick or hero, run `pnpm build` first or
 the check reports the new id as unknown.
 
 ## Adding or replacing an icon
 
-1. Write a one-line description of the object (items), glyph (runes) or
-   moment (talents), and fill it into the matching template below.
+1. Write a one-line description of the object (items), glyph (gems) or
+   moment (level picks), and fill it into the matching template below.
 2. Generate it through Cloudflare (the call is in `missing_assets.md`,
    "Generating the PNG entries") at medium quality, 1024×1024, with a
    transparent background.
@@ -61,8 +62,8 @@ the check reports the new id as unknown.
    `sips -z 512 512 download.png --out art/icons/items/<id>.png`.
 5. Add its prompt to `art/icons/prompts.json`.
 6. Run `pnpm icons:build <id>`, then delete the id's glyph case in
-   `apps/client/src/hud/icons.ts` if it has one (runes keep theirs; see
-   "Rune sockets" below).
+   `apps/client/src/hud/icons.ts` if it has one (gems keep theirs; see
+   "Gem sockets" below).
 
 The game picks the new file up on the next build or dev reload.
 
@@ -72,13 +73,15 @@ The game picks the new file up on the next build or dev reload.
    below) and generate it the same way, at medium quality, 1024×1024,
    transparent.
 2. Look at it on the role colour at 116 px, 84 px and, cropped to the
-   head, 42 px and 28 px. Check it doesn't share a silhouette with
-   another hero (only Vesper wears a hood) and that neither team colour
-   dominates.
+   head, 42 px and 28 px. Check its head doesn't share a silhouette with
+   another hero's, and that neither team colour dominates. Also check it
+   in the tooltip card's art band, which shows the top of a 180 px bust:
+   the head (or eye, or dial) has to sit in the upper half.
 3. Save the bust: `sips -z 512 512 download.png --out art/icons/heroes/<id>.png`.
-4. Pick a square box around the head in the 512 px master that keeps the
-   signature headgear (helm, halo, horns, crown, hat, goggles) and
-   leaves some margin. Crop it and save it at 256 px:
+4. Pick a square box around the head in the 512 px master that keeps
+   the signature feature (Anvil's helm, Gorrak's horns, Rime's crystal
+   spines, Moira's eye, Brassjack's dial and bell, Sexton's antennae)
+   and leaves some margin. Crop it and save it at 256 px:
    `sips -c <size> <size> --cropOffset <y> <x> art/icons/heroes/<id>.png --out face.png`,
    then `sips -z 256 256 face.png --out art/icons/faces/<id>.png`.
 5. In `art/icons/prompts.json`, add the prompt to `icons["heroes/<id>"]`
@@ -114,8 +117,10 @@ spreading to the edges of the canvas; any glow kept tight to the object.
 The object fills 80% of the square canvas.
 ```
 
-**Runes** (every rune is the same pale stone tablet; only the glyph
-changes, so keep it one bold symbol):
+**Gems** (for now every gem is the pale stone tablet the runes used;
+only the glyph changes, so keep it one bold symbol. Whether to restyle
+the set as cut gems is still the user's call; it would mean one new
+template and all 21 redone):
 
 ```
 Fantasy rune icon, a chunky hexagonal tablet of pale weathered grey
@@ -131,9 +136,17 @@ light; no fine engraving, cracks or small details. The tablet fills 80%
 of the square canvas.
 ```
 
-**Talents** (describe the moment, not the talent's text: quoted numbers
+**Level picks** (describe the moment, not the pick's text: quoted numbers
 like "25% more damage" get lettered into the image, and naming the hero
-invites a portrait):
+invites a portrait. When the moment is a creature silhouette, like
+Vesper's panther, change "no characters" to "no people", and ask for
+claw slashes thick and glowing. When it needs a person, like Gorrak's
+leap or soldiers frozen in Rime's ice, change it to "the figure seen
+whole, no close-up of a face" or "the figures seen whole, no close-ups
+of faces". Put each hero's six picks side by side at 32 px before
+keeping them: two whirlwind rings or two explosions read as the same
+pick, and the fix is a new silhouette, like a funnel or a clock at
+midnight, not a new detail):
 
 ```
 Fantasy ability icon, a single bold emblem centred on a transparent
@@ -149,10 +162,10 @@ edges of the canvas; any glow kept tight to the emblem. The emblem fills
 80% of the square canvas.
 ```
 
-**Hero portraits** (the Who line names the character, one signature
-feature drawn oversized for small sizes, the rim-light colour, and for
-a hero with a 3D model, what the model looks like; the per-hero lines
-are in `prompts.json`):
+**Human hero portraits** (Anvil, Cinder, Gorrak. The Who line names the
+character, one signature feature drawn oversized for small sizes, the
+rim-light colour, and for a hero with a 3D model, what the model looks
+like; the per-hero lines are in `prompts.json`):
 
 ```
 Stylised fantasy game hero portrait, a close head-and-shoulders bust in
@@ -177,18 +190,58 @@ The "characterful face" sentence came after the first Rime, made
 without it, looked glossy and pretty next to the chunky Anvil and
 Vesper.
 
+**Creature hero portraits** (the other seven: panther, tortoise, ice
+dragon, eye, tree, beetle, clock. `<FOCUS>` is what stands in for the
+head: "the head", "the eye" for Moira, "the clock face" for Brassjack):
+
+```
+Stylised fantasy game creature portrait, a close portrait of the head
+and upper body in three-quarter view facing right, centred on a
+transparent background, the body cropped by the bottom edge of the
+canvas. Mature stylised cartoon illustration with bold confident
+brushwork, chunky exaggerated proportions, simple graphic shapes and a
+subtle dark outline, hand-painted colour with soft shading, grounded and
+slightly weathered rather than cute or glossy. The face is characterful
+and a little exaggerated, never glamorous, doll-like or anime-style, and
+the creature is not cute, not a mascot and not a plush toy. The hero:
+<WHO>. It must read instantly when shrunk to 48 pixels on a dark navy
+background: <FOCUS> is large and sits in the upper half of the canvas,
+about half the canvas height; one bold, oversized signature feature
+makes the hero recognisable from silhouette alone; the figure is mostly
+bright and mid-toned with a strong rim light in the hero's colour so it
+never sinks into a dark background; very little fine texture; no
+background scenery, no floating particles, no smoke, no weapons or
+effects spreading to the edges of the canvas. No text, no numerals, no
+frame, no border.
+```
+
+What the Who lines had to spell out:
+- **Dark bodies.** Vesper's panther and Sexton's beetle are painted in
+  mid-tone plum and slate with a strong rim light, never black on
+  black, and Sexton's lantern lights his face from below.
+- **No team red.** Sexton's orange-red wing bands are team pieces on
+  his 3D model, so the portrait leaves them out.
+- **A dial with no numerals.** Brassjack's clock face has plain tick
+  marks only. His character comes from lamp eyes and hands swept up
+  like a moustache.
+- **Invented shrines.** Morrow's shrine is described as an invented
+  fantasy shrine with no real-world religious architecture or symbols.
+
 Colour conventions the existing set follows:
-- **Condition primers.** The three Primer runes glow in their
+- **Condition primers.** The three Primer gems glow in their
   condition's colour instead of gold: Staggered orange, Brittle pale
   ice, Disoriented violet.
 - **Schools.** Prism of Three and Resonance use the HUD's school colours
   (`#ff7d66` Might, `#7fb4ff` Arcana, `#7fe0a6` Cunning).
-- **Heroes.** Talents lean on their hero's colour (`--color-role-*` in
+- **Heroes.** Level picks lean on their hero's colour (`--color-role-*` in
   `style.css`), and each portrait's rim light is that colour.
 - **Frost.** Frost art is "pale icy white and aqua", never "blue", so it
   stays clear of the your-side `#4ea1ff`.
 - **No real-world religious figures.** The first Glass Idol came out
   Buddha-like; it's now an invented imp.
+- **Moira is magenta-pink.** Her thread knot came out a warmer
+  magenta than her violet-magenta role colour; it still reads clear of
+  the their-side red.
 
 ## The runtime contract
 
@@ -200,11 +253,11 @@ Rules the check enforces, from `scripts/icons/contract.ts`:
   180 px bust. Faces are 128×128 for spots of 42 CSS px and less.
 - **Alpha.** Transparent background; the HUD draws the discs, sockets
   and rarity rings.
-- **Weight.** Icons at most 20 KB, portraits 40 KB, faces 12 KB. WebP
-  at quality 85 (alpha at 90) lands at 7–14 KB for icons, 17–38 KB for
-  portraits and 5–9 KB for faces. The 256 px PNG icons they replaced
-  were 65–115 KB.
-- **Ids.** Each file's id must be an item, rune or talent in
+- **Weight.** Icons at most 20 KB, portraits 48 KB, faces 12 KB. WebP
+  at quality 85 (alpha at 90) lands at 7–14 KB for icons, 17–44 KB for
+  portraits (Nettle's leaves are the heaviest) and 5–10 KB for faces.
+  The 256 px PNG icons they replaced were 65–115 KB.
+- **Ids.** Each file's id must be an item, gem or level pick in
   `packages/content`, in the matching folder. Portraits and faces take
   hero ids; summons (thralls, golems, turrets) have none.
 - **Masters.** A runtime icon without a master can't be rebuilt, so the
@@ -230,16 +283,16 @@ Rules the check enforces, from `scripts/icons/contract.ts`:
    something draws it (a reward row, an item socket, a tooltip), about
    10 KB each, and is cached after that. The whole set is about 1 MB,
    spread across a run.
-5. **Fallback.** `pieceArt(pieceId, kind)` and `talentArt(talentId)`
+5. **Fallback.** `pieceArt(pieceId, kind)` and `levelArt(pickId)`
    return an `<img class="icon-art">` when the id has art and the
-   hand-drawn SVG glyph from `icons.ts` otherwise, so a new item, rune
-   or talent without art yet still draws something.
-6. **Rune sockets keep their glyphs.** `pieceSocketArt` (used by the
+   hand-drawn SVG glyph from `icons.ts` otherwise, so a new item, gem
+   or level pick without art yet still draws something.
+6. **Gem sockets keep their glyphs.** `pieceSocketArt` (used by the
    ITEMS panel) draws item art in the round item sockets but the SVG
-   glyph in the 16 px rune diamonds. Every rune shares the same pale
-   stone tablet, so at 12 px painted runes can't be told apart, while
-   the glyphs can. That's why the rune glyph cases in `icons.ts` stay.
-   Rune art shows in the reward disc and the rune tooltips.
+   glyph in the 16 px gem diamonds. Every gem shares the same pale
+   stone tablet, so at 12 px painted gems can't be told apart, while
+   the glyphs can. That's why the gem glyph cases in `icons.ts` stay.
+   Gem art shows in the reward disc and the gem tooltips.
 7. **Sizes.** `.icon-art` is 62 px in the reward disc (50 px on short
    screens), 24 px in item sockets and 32 px in tooltip headers
    (`style.css`).
@@ -250,9 +303,9 @@ Rules the check enforces, from `scripts/icons/contract.ts`:
    - The bust is used on the recruit reward disc (84 px) and the hero
      tooltip card and unit inspector. On those cards the bust is 180 px (144 px
      in the live inspector), centred in the wide art band, so the whole
-     head shows for every hero, even the ones with tall hats.
+     head shows for every hero, crests, horns and antennae included.
    - The face fills the ITEMS panel portrait (42 px), tooltip header
      icons (38 px), the reward role chips (24–34 px) and the damage
      meter rows (28 px).
    - The glyph stays in the 18 px hero name chips and the small corner
-     badges on talent and train rewards. Faces are unreadable at 18 px.
+     badges on level and train rewards. Faces are unreadable at 18 px.

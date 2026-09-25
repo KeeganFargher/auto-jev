@@ -1,32 +1,50 @@
 import {
-  compileBuild,
-  runeFitsHero,
+  gemFitsSkill,
+  gemSocketsFor,
   sideRows,
   withEquipment,
   type BoardCell,
   type Catalogue,
+  type EquippedGem,
   type HeroBuild,
+  type SkillSlot,
 } from "@jev-game/game";
 import { boardArena, centreOutColumns, isFrontlineHero } from "@jev-game/content";
-import type { OwnedPiece, PlayerSeat } from "./types.js";
+import type { OwnedGem, OwnedPiece, PlayerSeat } from "./types.js";
 import type { RunRules } from "./rules.js";
 
 export interface Loadout {
   heroBuilds: readonly HeroBuild[];
   items: readonly OwnedPiece[];
-  runes: readonly OwnedPiece[];
+  gems: readonly OwnedGem[];
 }
 
-export function piecesOnHero(pieces: readonly OwnedPiece[], heroSlot: number): OwnedPiece[] {
+export function piecesOnHero<T extends OwnedPiece>(pieces: readonly T[], heroSlot: number): T[] {
   return pieces.filter((piece) => piece.heroSlot === heroSlot);
 }
 
-export function stashedPieces(pieces: readonly OwnedPiece[]): OwnedPiece[] {
+export function stashedPieces<T extends OwnedPiece>(pieces: readonly T[]): T[] {
   return pieces.filter((piece) => piece.heroSlot === null);
 }
 
-export function equippedBuild(seat: PlayerSeat, heroSlot: number): HeroBuild | null {
-  const build = seat.heroBuilds[heroSlot];
+export function gemsInSkill(gems: readonly OwnedGem[], heroSlot: number, skill: SkillSlot): OwnedGem[] {
+  return gems.filter((gem) => gem.heroSlot === heroSlot && gem.skill === skill);
+}
+
+export function equippedGems(gems: readonly OwnedGem[], heroSlot: number): EquippedGem[] {
+  const equipped: EquippedGem[] = [];
+
+  for (const gem of piecesOnHero(gems, heroSlot)) {
+    if (gem.skill !== null) {
+      equipped.push({ gemId: gem.pieceId, slot: gem.skill });
+    }
+  }
+
+  return equipped;
+}
+
+export function loadoutBuild(loadout: Loadout, heroSlot: number): HeroBuild | null {
+  const build = loadout.heroBuilds[heroSlot];
 
   if (build === undefined) {
     return null;
@@ -34,16 +52,20 @@ export function equippedBuild(seat: PlayerSeat, heroSlot: number): HeroBuild | n
 
   return withEquipment(
     build,
-    piecesOnHero(seat.items, heroSlot).map((piece) => piece.pieceId),
-    piecesOnHero(seat.runes, heroSlot).map((piece) => piece.pieceId),
+    piecesOnHero(loadout.items, heroSlot).map((piece) => piece.pieceId),
+    equippedGems(loadout.gems, heroSlot),
   );
 }
 
-export function equippedBuilds(seat: PlayerSeat): HeroBuild[] {
+export function equippedBuild(seat: PlayerSeat, heroSlot: number): HeroBuild | null {
+  return loadoutBuild(seat, heroSlot);
+}
+
+export function loadoutBuilds(loadout: Loadout): HeroBuild[] {
   const builds: HeroBuild[] = [];
 
-  for (let slot = 0; slot < seat.heroBuilds.length; slot += 1) {
-    const build = equippedBuild(seat, slot);
+  for (let slot = 0; slot < loadout.heroBuilds.length; slot += 1) {
+    const build = loadoutBuild(loadout, slot);
 
     if (build !== null) {
       builds.push(build);
@@ -51,6 +73,10 @@ export function equippedBuilds(seat: PlayerSeat): HeroBuild[] {
   }
 
   return builds;
+}
+
+export function equippedBuilds(seat: PlayerSeat): HeroBuild[] {
+  return loadoutBuilds(seat);
 }
 
 export function hasFreeItemSlot(seat: Loadout, heroSlot: number, rules: RunRules, ignoringInstanceId: string | null): boolean {
@@ -91,32 +117,58 @@ export function hasStashRoom(seat: Loadout, rules: RunRules, ignoringInstanceId:
   return stashedPieces(seat.items).filter((piece) => piece.instanceId !== ignoringInstanceId).length < rules.stashCapacity;
 }
 
-export function freeRuneSockets(seat: Loadout, heroSlot: number, catalogue: Catalogue, ignoringInstanceId: string | null): number {
-  const build = seat.heroBuilds[heroSlot];
+export function gemSockets(seat: Loadout, heroSlot: number, skill: SkillSlot, catalogue: Catalogue): number {
+  const build = loadoutBuild(seat, heroSlot);
+  const hero = build === null ? undefined : catalogue.heroes[build.heroId];
 
-  if (build === undefined) {
-    return 0;
-  }
-
-  const sockets = compileBuild(build, catalogue).runeSockets;
-  const used = piecesOnHero(seat.runes, heroSlot).filter((piece) => piece.instanceId !== ignoringInstanceId).length;
-
-  return Math.max(0, sockets - used);
+  return build === null || hero === undefined ? 0 : gemSocketsFor(hero, build, catalogue)[skill];
 }
 
-export function runeCanGoOn(seat: Loadout, runeId: string, heroSlot: number, catalogue: Catalogue, ignoringInstanceId: string | null): boolean {
-  const build = seat.heroBuilds[heroSlot];
-  const rune = catalogue.upgrades[runeId];
+export function stashOverflowGems(seat: Loadout, catalogue: Catalogue): OwnedGem[] {
+  const socketed = new Map<string, number>();
 
-  if (build === undefined || rune === undefined || !runeFitsHero(rune, build.heroId, catalogue)) {
+  return seat.gems.map((gem) => {
+    if (gem.heroSlot === null || gem.skill === null) {
+      return gem;
+    }
+
+    const key = `${gem.heroSlot}:${gem.skill}`;
+    const used = socketed.get(key) ?? 0;
+
+    if (used < gemSockets(seat, gem.heroSlot, gem.skill, catalogue)) {
+      socketed.set(key, used + 1);
+
+      return gem;
+    }
+
+    return { ...gem, heroSlot: null, skill: null };
+  });
+}
+
+export function freeGemSockets(seat: Loadout, heroSlot: number, skill: SkillSlot, catalogue: Catalogue, ignoringInstanceId: string | null): number {
+  const used = gemsInSkill(seat.gems, heroSlot, skill).filter((gem) => gem.instanceId !== ignoringInstanceId).length;
+
+  return Math.max(0, gemSockets(seat, heroSlot, skill, catalogue) - used);
+}
+
+export function gemCanGoOn(
+  seat: Loadout,
+  gemId: string,
+  heroSlot: number,
+  skill: SkillSlot,
+  catalogue: Catalogue,
+  ignoringInstanceId: string | null,
+): boolean {
+  const build = seat.heroBuilds[heroSlot];
+  const gem = catalogue.upgrades[gemId];
+
+  if (build === undefined || gem === undefined || !gemFitsSkill(gem, build.heroId, skill, catalogue)) {
     return false;
   }
 
-  const duplicate = piecesOnHero(seat.runes, heroSlot).some(
-    (piece) => piece.pieceId === runeId && piece.instanceId !== ignoringInstanceId,
-  );
+  const duplicate = gemsInSkill(seat.gems, heroSlot, skill).some((owned) => owned.pieceId === gemId && owned.instanceId !== ignoringInstanceId);
 
-  return !duplicate && freeRuneSockets(seat, heroSlot, catalogue, ignoringInstanceId) > 0;
+  return !duplicate && freeGemSockets(seat, heroSlot, skill, catalogue, ignoringInstanceId) > 0;
 }
 
 export function nextFormationCell(formation: readonly BoardCell[], heroId: string): BoardCell | null {

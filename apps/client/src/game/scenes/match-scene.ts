@@ -34,6 +34,7 @@ import { createCountdown, type Countdown } from "../../hud/countdown.js";
 import { button, el } from "../../hud/dom.js";
 import { botSilhouette, heartIcon, humanSilhouette, skipIcon } from "../../hud/icons.js";
 import { renderDraftLoadout, renderLoadout, renderTeamLoadout, type SelectedPiece } from "../../hud/loadout.js";
+import { buildLevel } from "../../hud/levels.js";
 import { createDraftPlate, type DraftPlate } from "../../hud/draft.js";
 import { renderRewardPanel } from "../../hud/rewards.js";
 import { gameCatalogue } from "../catalogues.js";
@@ -581,10 +582,12 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     battleLayer.hidden = false;
     battleHeader.hidden = true;
     const heroIds = view.you.heroBuilds.map((build) => build.heroId);
+    const heroLevels = view.you.heroBuilds.map(buildLevel);
     const key = `reward:${view.phaseEpoch}:${heroIds.join(",")}`;
 
     if (formationView !== null && formationKey === key) {
       formationView.setFormation(view.you.formation);
+      formationView.setLevels(heroLevels);
 
       return;
     }
@@ -596,6 +599,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       grid: boardArena,
       insets: PLACEMENT_HUD_INSETS,
       heroIds,
+      heroLevels,
       formation: view.you.formation,
       onChange: () => {},
     });
@@ -626,6 +630,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       grid: boardArena,
       insets: PLACEMENT_HUD_INSETS,
       heroIds: view.you.heroBuilds.map((build) => build.heroId),
+      heroLevels: view.you.heroBuilds.map(buildLevel),
       formation: view.you.formation,
       onChange: (formation) => activeSession.placeHeroes(formation),
     });
@@ -858,14 +863,14 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     startTimer(view.phaseEpoch, () => {});
 
     if (view.you.ready) {
-      stage.append(el("div", "stage-subtitle reward-waiting", "Waiting for the other players · you can still move items and runes"));
+      stage.append(el("div", "stage-subtitle reward-waiting", "Waiting for the other players · you can still move items and gems"));
 
       return;
     }
 
-    const panel = renderRewardPanel(stage, view, gameCatalogue, (decisionId, offerId) => {
+    const panel = renderRewardPanel(stage, view, gameCatalogue, (decisionId, offerId, skill) => {
       announceChoice(view, decisionId, offerId);
-      activeSession.chooseOffer(decisionId, offerId, null);
+      activeSession.chooseOffer(decisionId, offerId, null, skill);
     });
 
     panel?.append(timerBar());
@@ -889,8 +894,8 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       moveItem(instanceId, heroSlot) {
         activeSession.moveItem(instanceId, heroSlot);
       },
-      socketRune(instanceId, heroSlot) {
-        activeSession.socketRune(instanceId, heroSlot);
+      socketGem(instanceId, heroSlot, skill) {
+        activeSession.socketGem(instanceId, heroSlot, skill);
       },
       discardItem(instanceId) {
         activeSession.discardItem(instanceId);
@@ -1208,6 +1213,10 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     let lastFrameTime = performance.now();
 
     const frame = (now: number): void => {
+      if (watch !== active) {
+        return;
+      }
+
       const step = Math.min(MAX_FRAME_SECONDS, (now - lastFrameTime) / 1000);
       const behind = (session?.roundElapsedSeconds() ?? 0) - active.clock;
       advanceWatch(active, behind > CATCH_UP_SECONDS ? behind : step);

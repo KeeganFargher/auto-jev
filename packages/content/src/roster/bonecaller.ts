@@ -3,6 +3,7 @@ import type { AbilityDefinition, HeroDefinition, UpgradeDefinition } from "@jev-
 export const thrallBlade: AbilityDefinition = {
   id: "thrall-blade",
   name: "Rusted Blade",
+  hitType: "attack",
   cooldownTicks: 42,
   targetPolicy: "nearest-enemy",
   range: 10,
@@ -13,11 +14,16 @@ export const thrallBlade: AbilityDefinition = {
 export const golemSlam: AbilityDefinition = {
   id: "golem-slam",
   name: "Bone Slam",
+  hitType: "attack",
   cooldownTicks: 55,
   targetPolicy: "nearest-enemy",
   range: 12,
-  effects: [{ kind: "damage", amount: 70, maxAmount: 84 }],
-  tags: ["target"],
+  area: { kind: "circle", center: "target", radiusUnits: 12 },
+  effects: [
+    { kind: "damage", amount: 70, maxAmount: 84 },
+    { kind: "taunt", durationTicks: 45 },
+  ],
+  tags: ["area", "target"],
 };
 
 export const thrall: HeroDefinition = {
@@ -30,25 +36,24 @@ export const thrall: HeroDefinition = {
   armor: 0.1,
   moveSpeedUnitsPerSecond: 18,
   basicAttackId: thrallBlade.id,
-  abilityIds: [],
 };
 
 export const boneGolem: HeroDefinition = {
   id: "bone-golem",
-  name: "Bone Golem",
-  title: "A heap of the dead that stood up",
+  name: "Bone Colossus",
+  title: "The whole army, standing up as one",
   school: "might",
   summon: true,
   maxHp: 1400,
   armor: 0.2,
   moveSpeedUnitsPerSecond: 14,
   basicAttackId: golemSlam.id,
-  abilityIds: [],
 };
 
 export const graveBolt: AbilityDefinition = {
   id: "grave-bolt",
   name: "Grave Bolt",
+  hitType: "attack",
   cooldownTicks: 55,
   targetPolicy: "nearest-enemy",
   range: 30,
@@ -56,34 +61,48 @@ export const graveBolt: AbilityDefinition = {
   tags: ["projectile", "target"],
 };
 
-export const raiseDead: AbilityDefinition = {
-  id: "raise-dead",
-  name: "Raise Dead",
-  description: "Raises 2 skeleton thralls beside the Sexton, up to 4 at once. Thralls hit with Might, so they can crush Disoriented enemies.",
-  cooldownTicks: 30,
-  manaCost: 80,
-  targetPolicy: "self",
-  range: 0,
-  effects: [{ kind: "summon", heroId: thrall.id, count: 2, maxActive: 4 }],
-  tags: ["self", "summon"],
+export const lichBolt: AbilityDefinition = {
+  id: "lich-bolt",
+  name: "Lich Bolt",
+  hitType: "attack",
+  cooldownTicks: 55,
+  targetPolicy: "nearest-enemy",
+  range: 30,
+  effects: [{ kind: "damage", amount: 42, maxAmount: 50 }],
+  bounces: { count: 3, rangeUnits: 30 },
+  tags: ["projectile", "target"],
 };
 
 export const corpseExplosion: AbilityDefinition = {
   id: "corpse-explosion",
   name: "Corpse Explosion",
-  description: "Blows up the thrall standing among the most enemies, damaging and Staggering everything within 1.5 cells.",
-  cooldownTicks: 336,
-  targetPolicy: "own-summon",
+  hitType: "spell",
+  description: "Blows up the corpse or thrall with the most enemies around it, dealing 60 plus a quarter of its max HP to every enemy within 1.5 cells and Staggering them.",
+  cooldownTicks: 150,
+  targetPolicy: "busiest-corpse",
   range: 999,
   area: { kind: "circle", center: "target", radiusUnits: 15 },
   minTargets: 1,
-  consumesTarget: true,
+  consumes: { summonId: thrall.id },
   effects: [
-    { kind: "damage", amount: 120 },
+    { kind: "damage", amount: 60, consumedMaxHpFraction: 0.25 },
     { kind: "apply-condition", condition: "staggered" },
   ],
   canCrit: false,
   tags: ["area"],
+};
+
+export const armyOfTheDead: AbilityDefinition = {
+  id: "army-of-the-dead",
+  name: "Army of the Dead",
+  hitType: "spell",
+  description: "Every hero corpse on the board, from either side, rises to fight for the Sexton for 8 s at 40% strength, with 2 thralls beside him. Waits until there is a hero corpse to raise.",
+  cooldownTicks: 30,
+  manaCost: 100,
+  targetPolicy: "self",
+  range: 0,
+  effects: [{ kind: "raise-army", strength: 0.4, lifetimeTicks: 240, thrallHeroId: thrall.id, thralls: 2, thrallScale: 1 }],
+  tags: ["self", "summon"],
 };
 
 export const bonecaller: HeroDefinition = {
@@ -99,108 +118,99 @@ export const bonecaller: HeroDefinition = {
   critChance: 0.05,
   manaPerAttack: 21,
   basicAttackId: graveBolt.id,
-  abilityIds: [raiseDead.id, corpseExplosion.id],
-  passives: [{ kind: "harvest", soulsPerGolem: 4, golemHeroId: boneGolem.id }],
+  abilityId: corpseExplosion.id,
+  ultimateId: armyOfTheDead.id,
+  passives: [{ kind: "harvest", name: "Harvest", soulsPer: 2, heroId: thrall.id, maxActive: 4 }],
 };
 
 export const bonecallerSummons: HeroDefinition[] = [thrall, boneGolem];
 
-export const bonecallerAbilities: AbilityDefinition[] = [thrallBlade, golemSlam, graveBolt, raiseDead, corpseExplosion];
+export const bonecallerAbilities: AbilityDefinition[] = [thrallBlade, golemSlam, graveBolt, lichBolt, corpseExplosion, armyOfTheDead];
 
-const T1 = ["bonecaller-brittle-bones", "bonecaller-soul-well"];
-
-const T2 = ["bonecaller-horde", "bonecaller-golem-heart"];
-
-export const bonecallerTalents: UpgradeDefinition[] = [
+export const bonecallerLevels: UpgradeDefinition[] = [
+  {
+    id: "bonecaller-bigger-booms",
+    name: "Bigger Booms",
+    description: "Corpse Explosion reaches 50% further.",
+    category: "level",
+    heroId: bonecaller.id,
+    level: 2,
+    path: "left",
+    maxStacks: 1,
+    statModifiers: [{ target: { kind: "ability-area", abilityId: corpseExplosion.id }, kind: "percent", value: 0.5 }],
+  },
   {
     id: "bonecaller-brittle-bones",
     name: "Brittle Bones",
-    description: "Each thrall's first hit on an enemy makes it Brittle.",
-    category: "talent",
+    description: "Thralls' hits make enemies Brittle.",
+    category: "level",
     heroId: bonecaller.id,
-    tier: 1,
-    path: "left",
+    level: 2,
+    path: "right",
     maxStacks: 1,
-    excludesUpgradeIds: ["bonecaller-soul-well"],
     statModifiers: [],
     grantsPassives: [
       {
         kind: "empower-summons",
         key: "brittle-bones",
         heroId: thrall.id,
-        passives: [{ kind: "first-hit-per-enemy", key: "brittle-bones", effects: [{ kind: "apply-condition", condition: "brittle" }] }],
+        passives: [{ kind: "every-nth-attack", key: "brittle-bones", n: 1, effects: [{ kind: "apply-condition", condition: "brittle" }] }],
       },
     ],
   },
   {
-    id: "bonecaller-soul-well",
-    name: "Soul Well",
-    description: "Start every fight with 2 Souls.",
-    category: "talent",
+    id: "bonecaller-grave-chain",
+    name: "Grave Chain",
+    description: "When an enemy hit by Corpse Explosion dies within 5 s, its corpse explodes too.",
+    category: "level",
     heroId: bonecaller.id,
-    tier: 1,
-    path: "right",
-    maxStacks: 1,
-    excludesUpgradeIds: ["bonecaller-brittle-bones"],
-    statModifiers: [],
-    grantsPassives: [{ kind: "soul-well", souls: 2 }],
-  },
-  {
-    id: "bonecaller-horde",
-    name: "Horde",
-    description: "Raise Dead raises 3 thralls, up to 6 at once.",
-    category: "talent",
-    heroId: bonecaller.id,
-    tier: 2,
+    level: 3,
     path: "left",
     maxStacks: 1,
-    requiresAnyOfUpgradeIds: T1,
-    excludesUpgradeIds: ["bonecaller-golem-heart"],
-    unlocksRuneSocket: true,
     statModifiers: [],
-    abilityChanges: [{ abilityId: raiseDead.id, setEffects: [{ kind: "summon", heroId: thrall.id, count: 3, maxActive: 6 }] }],
+    grantsPassives: [{ kind: "grave-chain", delayTicks: 9, markTicks: 150 }],
   },
   {
-    id: "bonecaller-golem-heart",
-    name: "Golem Heart",
-    description: "A Golem needs only 3 Souls and arrives with a shield worth half its HP.",
-    category: "talent",
+    id: "bonecaller-bone-legion",
+    name: "Bone Legion",
+    description: "Every Soul raises a thrall at once.",
+    category: "level",
     heroId: bonecaller.id,
-    tier: 2,
+    level: 3,
     path: "right",
     maxStacks: 1,
-    requiresAnyOfUpgradeIds: T1,
-    excludesUpgradeIds: ["bonecaller-horde"],
-    unlocksRuneSocket: true,
     statModifiers: [],
-    grantsPassives: [{ kind: "golem-heart", soulsPerGolem: 3, shieldFraction: 0.5 }],
+    grantsPassives: [{ kind: "harvest", name: "Harvest", soulsPer: 1, heroId: thrall.id, maxActive: 4 }],
   },
   {
-    id: "bonecaller-army-of-the-dead",
-    name: "Army of the Dead",
-    description: "When the Sexton falls, 4 thralls claw their way out where he fell.",
-    category: "talent",
+    id: "bonecaller-lich-form",
+    name: "Lich Form",
+    description: "Army of the Dead also makes the Sexton a Lich for 8 s. His bolts jump to 3 more enemies, and every kill raises a thrall.",
+    category: "level",
     heroId: bonecaller.id,
-    tier: 3,
+    level: 4,
     path: "left",
     maxStacks: 1,
-    requiresAnyOfUpgradeIds: T2,
-    excludesUpgradeIds: ["bonecaller-bone-colossus"],
     statModifiers: [],
-    grantsPassives: [{ kind: "summon-on-death", heroId: thrall.id, count: 4 }],
+    abilityChanges: [{ abilityId: armyOfTheDead.id, setForm: { key: "lich", durationTicks: 240, basicAttackId: lichBolt.id, raisesOnKill: thrall.id } }],
   },
   {
     id: "bonecaller-bone-colossus",
     name: "Bone Colossus",
-    description: "Golems are 50% bigger and carry the Sexton's items.",
-    category: "talent",
+    description: "Army of the Dead raises one Bone Colossus for 12 s instead. It has the army's total HP, 50% more damage for each body in it and the Sexton's items, and its slams hit and taunt every enemy within 1.2 cells.",
+    category: "level",
     heroId: bonecaller.id,
-    tier: 3,
+    level: 4,
     path: "right",
     maxStacks: 1,
-    requiresAnyOfUpgradeIds: T2,
-    excludesUpgradeIds: ["bonecaller-army-of-the-dead"],
     statModifiers: [],
-    grantsPassives: [{ kind: "bone-colossus", hpScale: 1.5, inheritsItems: true }],
+    abilityChanges: [
+      {
+        abilityId: armyOfTheDead.id,
+        setEffects: [
+          { kind: "raise-army", strength: 0.4, lifetimeTicks: 360, thrallHeroId: thrall.id, thralls: 2, thrallScale: 1, merge: { heroId: boneGolem.id, damagePerBody: 0.5 } },
+        ],
+      },
+    ],
   },
 ];

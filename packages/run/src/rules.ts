@@ -1,6 +1,6 @@
 import type { Rarity } from "@jev-game/game";
 
-export type Milestone = "none" | "rune" | "talents" | "recruit";
+export type Milestone = "none" | "gem" | "level" | "recruit";
 
 export interface RunRules {
   startingHealth: number;
@@ -14,7 +14,8 @@ export interface RunRules {
   itemOfferCount: number;
   loserBonusOffers: number;
   recruitOfferCount: number;
-  runeOfferCount: number;
+  gemOfferCount: number;
+  gemCardFromRound: number;
   surpriseChance: number;
   surpriseFromRound: number;
   commonUntilRound: number;
@@ -34,12 +35,13 @@ export const DEFAULT_RUN_RULES: RunRules = {
   itemOfferCount: 3,
   loserBonusOffers: 1,
   recruitOfferCount: 3,
-  runeOfferCount: 3,
+  gemOfferCount: 3,
+  gemCardFromRound: 4,
   surpriseChance: 0.05,
   surpriseFromRound: 3,
   commonUntilRound: 3,
   rareUntilRound: 6,
-  milestones: ["rune", "talents", "recruit", "rune", "talents", "recruit", "talents", "rune"],
+  milestones: ["gem", "level", "recruit", "gem", "level", "recruit", "level", "gem"],
 };
 
 export function milestoneAfterRound(rules: RunRules, round: number): Milestone {
@@ -51,19 +53,19 @@ export function milestoneAfterRound(rules: RunRules, round: number): Milestone {
     return rules.milestones[round - 1] ?? "none";
   }
 
-  return round % 2 === 0 ? "rune" : "none";
+  return round % 2 === 0 ? "gem" : "none";
 }
 
-export function talentTierAfterRound(rules: RunRules, round: number): number {
-  let tier = 0;
+export function heroLevelAfterRound(rules: RunRules, round: number): number {
+  let level = 1;
 
   for (let passed = 1; passed <= round; passed += 1) {
-    if (milestoneAfterRound(rules, passed) === "talents") {
-      tier += 1;
+    if (milestoneAfterRound(rules, passed) === "level") {
+      level += 1;
     }
   }
 
-  return tier;
+  return level;
 }
 
 export function itemRarityForRound(rules: RunRules, round: number): Rarity {
@@ -82,7 +84,7 @@ export interface TrackEntry {
   round: number;
   itemRarity: Rarity;
   milestone: Milestone;
-  talentTier: number;
+  level: number;
 }
 
 export function roundTrack(rules: RunRules): TrackEntry[] {
@@ -95,7 +97,7 @@ export function roundTrack(rules: RunRules): TrackEntry[] {
       round,
       itemRarity: itemRarityForRound(rules, round),
       milestone,
-      talentTier: milestone === "talents" ? talentTierAfterRound(rules, round) : 0,
+      level: milestone === "level" ? heroLevelAfterRound(rules, round) : 0,
     });
   }
 

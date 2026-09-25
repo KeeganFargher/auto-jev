@@ -1,8 +1,9 @@
-import type { BattleEvent, BattleRecording, BattleSnapshot, HeroDefinitionId, UpgradeDefinitionId } from "@jev-game/game";
+import type { BattleEvent, BattleRecording, BattleSnapshot, HeroDefinitionId } from "@jev-game/game";
+import type { LabPicksByHero } from "@jev-game/content";
+
+export type { LabPicksByHero };
 
 export type LabScenarioKind = "duel" | "three-vs-three" | "custom";
-
-export type TeamAUpgradeIdsByHero = ReadonlyMap<HeroDefinitionId, readonly UpgradeDefinitionId[]>;
 
 export interface LabTeams {
   a: readonly HeroDefinitionId[];
@@ -28,7 +29,7 @@ export interface BattleLabSession {
   pause(): void;
   stepOnce(): void;
   setSpeed(multiplier: number): void;
-  reset(seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero, teams?: LabTeams): void;
+  reset(seed: number, scenario?: LabScenarioKind, teamAPicksByHero?: LabPicksByHero, teams?: LabTeams): void;
   advanceRealTime(deltaSeconds: number): void;
   dispose(): void;
 }

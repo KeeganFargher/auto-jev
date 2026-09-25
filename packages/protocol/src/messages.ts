@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { PlayerView } from "@jev-game/run";
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 9;
 
 export const MATCH_ROOM_NAME = "match";
 
@@ -22,14 +22,16 @@ const boardCell = z.object({
 
 const heroSlot = z.number().int().min(0).max(15).nullable();
 
+const skill = z.enum(["ability", "ultimate"]).nullable();
+
 export const commandIntent = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("select-heroes"), offerIds: z.array(identifier).max(16) }),
   z.object({ kind: z.literal("commit-draft"), offerIds: z.array(identifier).max(16) }),
   z.object({ kind: z.literal("confirm-ready") }),
   z.object({ kind: z.literal("place-heroes"), formation: z.array(boardCell).max(16) }),
-  z.object({ kind: z.literal("choose-offer"), decisionId: identifier, offerId: identifier, heroSlot }),
+  z.object({ kind: z.literal("choose-offer"), decisionId: identifier, offerId: identifier, heroSlot, skill }),
   z.object({ kind: z.literal("move-item"), instanceId: identifier, heroSlot }),
-  z.object({ kind: z.literal("socket-rune"), instanceId: identifier, heroSlot }),
+  z.object({ kind: z.literal("socket-gem"), instanceId: identifier, heroSlot, skill }),
   z.object({ kind: z.literal("discard-item"), instanceId: identifier }),
 ]);
 
@@ -86,7 +88,7 @@ export type CommandRejectionReason =
   | "unknown-piece"
   | "no-room"
   | "team-full"
-  | "rune-does-not-fit";
+  | "gem-does-not-fit";
 
 export interface AckMessage {
   commandId: string;

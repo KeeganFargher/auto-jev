@@ -385,6 +385,25 @@
           }
         ]
       },
+      "cast-rocket": {
+        "prompt": "A small rocket launched from an iron tube, a hollow pop and a short sputtering whoosh as it flies off, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.8,
+        "cap": 0.7,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "O411xIwGiupS44RYeMoF",
+        "takes": [
+          {
+            "take": 1,
+            "session": "WH9FVsk04Beve2FI4xND"
+          },
+          {
+            "take": 2,
+            "session": "z1Oi2PFBcZHQABlycsnk"
+          }
+        ]
+      },
       "hit-rivet": {
         "prompt": "A metal rivet punching into an armoured body with a heavy clank and thud, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 0.6,
@@ -401,6 +420,25 @@
           {
             "take": 2,
             "session": "e14M1SmS3MQrenjAmCti"
+          }
+        ]
+      },
+      "hit-rocket": {
+        "prompt": "A small rocket bursting against an armoured fighter, a sharp crack with grit and metal splinters spraying across stone, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.7,
+        "cap": 0.6,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "NH5uRxGNFazLP6PKFvXw",
+        "takes": [
+          {
+            "take": 1,
+            "session": "hAz402aKBmGVplZym8vr"
+          },
+          {
+            "take": 2,
+            "session": "3r4ICPpJItZWpHI7wUbj"
           }
         ]
       },
@@ -442,41 +480,174 @@
           }
         ]
       },
-      "consecrate": {
-        "prompt": "A great war hammer slammed into a stone floor with a deep booming impact and a low rising hum, big and deep, echoing through a vast stone arena, no voice",
+      "shield-toss": {
+        "prompt": "A thick iron shield spinning through the air like a discus, a deep warbling metallic hum, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.45,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "GnAC7rYWME2JnaCRHOwP",
+        "takes": [
+          {
+            "take": 1,
+            "session": "j6Ou7rK7Vk8p5xovdpBr"
+          },
+          {
+            "take": 2,
+            "session": "hQTDUptS13X5dP2btrGn"
+          }
+        ]
+      },
+      "shield-ricochet": {
+        "prompt": "A thrown iron shield smashing into an armoured body and glancing off, a hard crunching thud then a short scraping metal whang, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.3,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "Xk6OznEkQzXwKRTCVqjH",
+        "takes": [
+          {
+            "take": 1,
+            "session": "Cw8xKjsizaZKAdLmJWHS"
+          },
+          {
+            "take": 2,
+            "session": "k7ukyVX2BtSoWQnBBWyl"
+          }
+        ]
+      },
+      "last-stand": {
+        "prompt": "A braced warrior's iron shield bursting outward with a pent-up shockwave, a huge metallic whump and a rolling hum of vibrating iron, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 1.5,
         "cap": null,
         "stereo": false,
         "chosen": 1,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "EyMmJJDvBLxnNLIw39t3",
+        "node": "nBbDLzQvV5i6yUGgxLLl",
         "takes": [
           {
             "take": 1,
-            "session": "Yw3iSPb7gDUFLh7IHQUO"
+            "session": "6q2yOvNGYqRaMUeCdJbK"
           },
           {
             "take": 2,
-            "session": "Bk7a8gWXPvzzpNZRAiVM"
+            "session": "Dgwdrsjb0cwGDunef32v"
           }
         ]
       },
-      "mend": {
-        "prompt": "A soft warm rush of rising air with a gentle low resonant hum, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 1.2,
-        "cap": null,
+      "judgment-throw": {
+        "prompt": "A heavy stone war hammer hurled end over end, a deep rhythmic whooshing spin with a low warm hum trailing behind it, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.8,
+        "cap": 0.5,
         "stereo": false,
-        "chosen": 2,
+        "chosen": 1,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "72QCS4YB0uVj0ib9ODBp",
+        "node": "NIYefUkBjztQ5YhmQopL",
         "takes": [
           {
             "take": 1,
-            "session": "2mMwn0ZEgCNycuBrECEn"
+            "session": "zPbVQBCg064d9EwOEPrD"
           },
           {
             "take": 2,
-            "session": "mNUbLvYsSgbtWl6sd7CF"
+            "session": "cbaWa2aU8tkryY6f2DGB"
+          }
+        ]
+      },
+      "judgment-hit": {
+        "prompt": "A thrown stone war hammer cracking against a steel breastplate, a sudden heavy thud and a brief deep metallic ring, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.4,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "BsJGU3N3FiuYnPHqNtdF",
+        "takes": [
+          {
+            "take": 1,
+            "session": "GtDa23kSc7zHjyUzmI0k"
+          },
+          {
+            "take": 2,
+            "session": "MizAm0waOGHGkawNnPlW"
+          }
+        ]
+      },
+      "judgment-heal": {
+        "prompt": "A warm gust of wind brushing past an armoured warrior, a soft breathy rush with a low mellow hum, gentle and soothing, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.6,
+        "cap": 0.5,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "gsEW4h3HgQpkKZUVywsZ",
+        "takes": [
+          {
+            "take": 1,
+            "session": "8EsZnJRr8GJ4TwUUA30C"
+          },
+          {
+            "take": 2,
+            "session": "lnYSJpg7pwzNk3INSuip"
+          }
+        ]
+      },
+      "resurrection": {
+        "prompt": "A huge bronze bell tolling once, deep and slow, with a vast warm swell of rushing wind rising beneath it, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 2.0,
+        "cap": null,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "W9TfwQ6pG3T553hSTYRQ",
+        "takes": [
+          {
+            "take": 1,
+            "session": "1ehsugBEPFXX22nze3R6"
+          },
+          {
+            "take": 2,
+            "session": "AsYvB5Nw28AnKVX8MKCO"
+          }
+        ]
+      },
+      "holy-pillar": {
+        "prompt": "A column of roaring wind bursting straight up from a stone floor, a deep rising whoosh swelling into a warm powerful hum, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
+        "cap": 1.3,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "dOxpSoylZY66Vwx2MGCk",
+        "takes": [
+          {
+            "take": 1,
+            "session": "r3kTRSrpOIQCC8HjQwTm"
+          },
+          {
+            "take": 2,
+            "session": "daSuX43rR4HumxTHuAmG"
+          }
+        ]
+      },
+      "blessed-burst": {
+        "prompt": "A sudden blast of scorching air tearing outward from an armoured warrior, a hard cracking snap and a roaring gust that scatters sand and pebbles across stone, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.6,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "GvBa2KVDvuxmlyxkLgp7",
+        "takes": [
+          {
+            "take": 1,
+            "session": "LjsqUHaFHsjtfOzYFEjg"
+          },
+          {
+            "take": 2,
+            "session": "DS45hcCYT05NUgf05Pe1"
           }
         ]
       },
@@ -500,63 +671,105 @@
         ]
       },
       "leap": {
-        "prompt": "A heavy warrior leaping and crashing down onto stone with a deep thud and rumble, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 1.2,
+        "prompt": "A heavy armoured warrior springing high into the air, one short deep rising whoosh with rattling chainmail, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.4,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "uLeCq4zHvqwqLGkqv38U",
+        "takes": [
+          {
+            "take": 1,
+            "session": "2cEbhXYprw4U0Mfr0P4w"
+          },
+          {
+            "take": 2,
+            "session": "VbrYON2NeNsXE66HyVLn"
+          }
+        ]
+      },
+      "leap-slam": {
+        "prompt": "A massive ground slam as a brute lands axes-first on flagstones, a deep booming impact with stone cracking and pebbles scattering, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
         "cap": null,
         "stereo": false,
         "chosen": 1,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "Vi6Zlr2slymzw8ZCNCKw",
+        "node": "Koil18pIU9bMcjNSPDoP",
         "takes": [
           {
             "take": 1,
-            "session": "p4M5Tl2bpES5xAhozUal"
+            "session": "qLrP7COyUnq2QE710Jfk"
           },
           {
             "take": 2,
-            "session": "fpskCLt22Oq701j13my1"
+            "session": "kdmfOvqbh7o0iEhSPvhS"
           }
         ]
       },
-      "shadowstep": {
-        "prompt": "A sudden dark whoosh as someone vanishes and reappears, then a sharp blade strike, big and deep, echoing through a vast stone arena, no voice",
+      "meteor-streak": {
+        "prompt": "A flaming rock streaking down from the sky, a fast rising rushing whoosh that grows louder, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.3,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "Ygda0hXMI9W6TfpvbHSD",
+        "takes": [
+          {
+            "take": 1,
+            "session": "z5I72oGWjzRg8b6KtpmX"
+          },
+          {
+            "take": 2,
+            "session": "ZGHOCHtdCBQrT8i3wpP0"
+          }
+        ]
+      },
+      "meteor-strike": {
+        "prompt": "A flaming rock slamming into a stone floor, a heavy crunching thud and a burst of fire, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 1.0,
-        "cap": null,
+        "cap": 0.6,
         "stereo": false,
-        "chosen": 1,
+        "chosen": 2,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "st5yDgJyu5s6tnc1ZICK",
+        "node": "qV5zXwI66m72SmEWB43k",
         "takes": [
           {
             "take": 1,
-            "session": "HXfcF2uptFOPsfI37fxe"
+            "session": "mfhF5sxgX4ZFa5pgA4oB"
           },
           {
             "take": 2,
-            "session": "ZHX3xXjqn2GjhihG1wNJ"
+            "session": "yJvCoUjcuqGeqM5QQGpu"
           }
         ]
       },
-      "meteor-fall": {
-        "prompt": "A huge flaming rock falling from the sky with a rising rushing roar, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 0.9,
+      "supernova-fall": {
+        "prompt": "A huge burning meteor falling toward the ground, a low rush of wind and fire that swells louder and louder as it gets closer, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.2,
         "cap": 0.85,
         "stereo": false,
         "chosen": 1,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "GBjmVRN8Sa57hv9gAkWt",
+        "node": "KVJSeKJtgHxv3euxjniR",
         "takes": [
           {
             "take": 1,
-            "session": "eqNk6hUW3LJY2rQ4vemv"
+            "session": "9XxRXhk0RavQKfZbROgA"
           },
           {
             "take": 2,
-            "session": "1Rcv9Qs9uX8xP9gXqvTO"
+            "session": "XKTa2iGFErqw8BIWy7pD"
           }
-        ]
+        ],
+        "fadeIn": {
+          "seconds": 0.7,
+          "curve": "cub"
+        }
       },
-      "meteor-impact": {
+      "supernova-impact": {
         "prompt": "A massive flaming boulder smashing into a stone floor with a huge explosion and rumble, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 2.0,
         "cap": null,
@@ -575,7 +788,7 @@
           }
         ]
       },
-      "flame-ward": {
+      "inferno": {
         "prompt": "A ring of fire bursting outward with a loud whoomp and roar, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 1.2,
         "cap": null,
@@ -594,22 +807,235 @@
           }
         ]
       },
-      "glacial-lance": {
-        "prompt": "A long spear of ice launched with a cold rushing whoosh and cracking ice, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 1.2,
+      "fireball-throw": {
+        "prompt": "A heavy fireball flung through the air, a thick swelling roar of fire that rushes past, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.8,
+        "cap": 0.5,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "2y7169WW6TxToDy2XAWj",
+        "takes": [
+          {
+            "take": 1,
+            "session": "X94dSjn9SEx1GbziahNU"
+          },
+          {
+            "take": 2,
+            "session": "5f3s88hbiDCw6XfcMesu"
+          }
+        ]
+      },
+      "fireball-blast": {
+        "prompt": "A fireball exploding against a group of armoured fighters, a deep booming burst of flame and a crackling spray of embers, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.75,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "mQMRTK4RNo2lZYBbhrrK",
+        "takes": [
+          {
+            "take": 1,
+            "session": "oFV70Ypmae7w5xiqxnzj"
+          },
+          {
+            "take": 2,
+            "session": "o1ZKZJDtivQ3qFYuJ9aq"
+          }
+        ]
+      },
+      "living-bomb": {
+        "prompt": "A pent-up ball of fire detonating all at once, a sharp cracking bang and a deep booming blast wave of flame, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
+        "cap": 1.3,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "dgo8vjsbR0t8JFURyRsQ",
+        "takes": [
+          {
+            "take": 1,
+            "session": "fv11RiGyxRLOh3hwezsE"
+          },
+          {
+            "take": 2,
+            "session": "4XHdWyD7nAfGbm5hU8Tg"
+          }
+        ]
+      },
+      "inferno-burst": {
+        "prompt": "A small fire bomb bursting, a tight punchy thump of flame with a quick hiss of embers, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": null,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "qJCqhKp4kWHKjb6BwOrd",
+        "takes": [
+          {
+            "take": 1,
+            "session": "QUTywI8IOfdTOElUYRee"
+          },
+          {
+            "take": 2,
+            "session": "56iNBCGv2P499m3GpJrA"
+          }
+        ]
+      },
+      "phoenix": {
+        "prompt": "Dying embers reigniting into a towering column of fire, a long rising roar of flame that swells to a blazing peak, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
+        "cap": null,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "ezbafo9aToQs3QraisNE",
+        "takes": [
+          {
+            "take": 1,
+            "session": "bPwiLTvOKe2sd65rCmiu"
+          },
+          {
+            "take": 2,
+            "session": "mZqIPwntwhpivReVOL2C"
+          }
+        ]
+      },
+      "frozen-orb": {
+        "prompt": "A heavy ball of ice hurled forward, a deep cold whoosh that trails off into a low swirling howl of freezing wind, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
         "cap": null,
         "stereo": false,
         "chosen": 1,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "d7LimCJy1tuyFCHTy9YK",
+        "node": "f9M21puUGp1oDOVA3fIX",
         "takes": [
           {
             "take": 1,
-            "session": "aMFJzFDsiCneC8UkDRJp"
+            "session": "Lv5HrIuaXngC80sXxG8y"
           },
           {
             "take": 2,
-            "session": "IW5s0Ur3ZuLO8tfIUMEO"
+            "session": "iA41rnoR2L4fF8dyFuYB"
+          }
+        ]
+      },
+      "ice-shard": {
+        "prompt": "A thin splinter of ice striking a stone floor, a quick dry crunch, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.3,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "9Ubstr4rbcL42rAIzgjV",
+        "takes": [
+          {
+            "take": 1,
+            "session": "eTfy5VkygO8QGHWWvgOy"
+          },
+          {
+            "take": 2,
+            "session": "YEkMf1xqcoKdP12QeJ05"
+          }
+        ]
+      },
+      "glacial-prison": {
+        "prompt": "Ice erupting from the ground and freezing a crowd solid, a deep groaning roar of thick ice with heavy cracking, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 2.0,
+        "cap": null,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "gfFUcuAPEfyOmoPESRZf",
+        "takes": [
+          {
+            "take": 1,
+            "session": "yMPMj2kcmVAhoE3qEueD"
+          },
+          {
+            "take": 2,
+            "session": "ai6IizYNpZwBSImy0D9Z"
+          }
+        ]
+      },
+      "hailstorm": {
+        "prompt": "A sudden hailstorm, hailstones pelting down hard on stone and armour under a howling cold wind, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 4.0,
+        "cap": null,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "TgwVs4nBfh9mFVnHmlS4",
+        "takes": [
+          {
+            "take": 1,
+            "session": "OOQ1RAxZo9t9PLlu39zn"
+          },
+          {
+            "take": 2,
+            "session": "amjMH9wHvcIYndFUUU7G"
+          }
+        ],
+        "fadeIn": {
+          "seconds": 0.4,
+          "curve": "cub"
+        }
+      },
+      "deep-freeze": {
+        "prompt": "A body seized by frost in an instant, a low grinding creak of ice closing tight, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.6,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "H0CSjSVRfMEoBgCPI0Jb",
+        "takes": [
+          {
+            "take": 1,
+            "session": "QaTB5kx5dMi74KY1LbaE"
+          },
+          {
+            "take": 2,
+            "session": "o8nO4AiexF1ykatxP7Jw"
+          }
+        ]
+      },
+      "ice-mirror": {
+        "prompt": "A dying body flash-frozen into a solid statue of ice, a rushing wave of frost and a deep groaning creak of thick ice, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
+        "cap": null,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "ZHNEjeFhS7cVzswcjFdZ",
+        "takes": [
+          {
+            "take": 1,
+            "session": "EKnJWSxQwqvV3BFRYTIp"
+          },
+          {
+            "take": 2,
+            "session": "EUiwwlDyBhlYHyTaCtQf"
+          }
+        ]
+      },
+      "ice-break": {
+        "prompt": "A frozen statue of ice breaking open, a deep snapping crunch and a spray of ice chunks scattering across a stone floor, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.7,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "QEM4wg6AU0IsG8mpFUwX",
+        "takes": [
+          {
+            "take": 1,
+            "session": "smF0Xxox9g3LQuAqNEEi"
+          },
+          {
+            "take": 2,
+            "session": "9IYYV3Dc5SWPjTUxNrZ2"
           }
         ]
       },
@@ -651,7 +1077,83 @@
           }
         ]
       },
-      "plague-cloud": {
+      "weaver": {
+        "prompt": "A heavy wooden loom beater slamming shut with a sharp clack, then taut threads creaking as they pull tight, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.8,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "9wMDtYtHguuoW8JcdhNy",
+        "takes": [
+          {
+            "take": 1,
+            "session": "zpteEeaoeFGcKtsFw7oF"
+          },
+          {
+            "take": 2,
+            "session": "GwKRdEvbjiFWsucRh8FN"
+          }
+        ]
+      },
+      "omen-echo": {
+        "prompt": "A single harsh raven caw over a quick burst of black wings flapping, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.8,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "IEJo9ZCbmwvMmHsy1NHH",
+        "takes": [
+          {
+            "take": 1,
+            "session": "Qs0piYrmFxCrFsdQ0RSh"
+          },
+          {
+            "take": 2,
+            "session": "8N2npckMMMe6xA3vf9fe"
+          }
+        ]
+      },
+      "death-knell": {
+        "prompt": "A rusty iron bell struck once by a heavy clapper, a hoarse clang with a rough rattling decay, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
+        "cap": 1.2,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "CpgLoS3F8dRTUIPZh7DG",
+        "takes": [
+          {
+            "take": 1,
+            "session": "y2kcJUnk680ibMhU1e8m"
+          },
+          {
+            "take": 2,
+            "session": "0ZhiibGlSg5GetG5CPTw"
+          }
+        ]
+      },
+      "puppeteer": {
+        "prompt": "A wooden marionette jerked upright, its limbs clattering and knocking together while old cords creak taut, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.9,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "6RqpmI3Urtn8XLIKBbJq",
+        "takes": [
+          {
+            "take": 1,
+            "session": "glEsxc1llojMw0QhGt3X"
+          },
+          {
+            "take": 2,
+            "session": "gLyOPgXQAgcLe6BDJSmy"
+          }
+        ]
+      },
+      "plague-bloom": {
         "prompt": "A thick cloud of toxic gas bursting out with a long bubbling hiss, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 1.5,
         "cap": null,
@@ -670,26 +1172,45 @@
           }
         ]
       },
-      "caustic-spit": {
-        "prompt": "A thick glob of acid spat out, then splattering and sizzling, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 1.0,
+      "pandemic": {
+        "prompt": "A wave of plague sweeping across a battlefield, a deep rushing surge of sickly wind thick with swarming flies and bubbling rot, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 2.5,
         "cap": null,
         "stereo": false,
-        "chosen": 2,
+        "chosen": 1,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "2bHvCwtBPuhm4IkACv7l",
+        "node": "bMPhUq2sjaKVDYjX1u2N",
         "takes": [
           {
             "take": 1,
-            "session": "LudjDyNHNsoxBy0pVZAK"
+            "session": "4wGIpBIIlii7MzMXun0S"
           },
           {
             "take": 2,
-            "session": "kT0UsSwHPy7Blj7p7MIy"
+            "session": "5m0bkF52AuH3CsWGMgWw"
           }
         ]
       },
-      "raise-dead": {
+      "plague-burst": {
+        "prompt": "A bloated blister of rot bursting open, a thick wet crunch and a gush of liquid slapping onto stone, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": 0.6,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "no33juBctTuDBA0aAdmy",
+        "takes": [
+          {
+            "take": 1,
+            "session": "yZ3271wFqMwfvxKohk3d"
+          },
+          {
+            "take": 2,
+            "session": "OMW05hIJFhPZc56417rp"
+          }
+        ]
+      },
+      "grave-rise": {
         "prompt": "Skeletons clawing up out of the ground, bones rattling and dirt crumbling, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 1.5,
         "cap": null,
@@ -705,6 +1226,63 @@
           {
             "take": 2,
             "session": "3aiNmm49p2JoAMPDCTQz"
+          }
+        ]
+      },
+      "army-of-the-dead": {
+        "prompt": "A heavy rusted iron crypt gate groaning open on its hinges and slamming against a stone wall, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 2.0,
+        "cap": null,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "ToweYqNI9oIj0J2Z3QNL",
+        "takes": [
+          {
+            "take": 1,
+            "session": "vF0X5bfrUn8ngbsigpCg"
+          },
+          {
+            "take": 2,
+            "session": "ZomC5UjiV2OhSWKsUMYP"
+          }
+        ]
+      },
+      "cast-lichbolt": {
+        "prompt": "A skull wreathed in cold fire hurled through the air, a hollow whoosh with its teeth chattering, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.8,
+        "cap": 0.8,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "SYXgH8AuTwrWyLfXvaZk",
+        "takes": [
+          {
+            "take": 1,
+            "session": "4rFl5swbaSShxzYLgI6D"
+          },
+          {
+            "take": 2,
+            "session": "prrGTQqd5Rz8gIAeUdom"
+          }
+        ]
+      },
+      "thrall-rise": {
+        "prompt": "Loose bones skittering across a stone floor and snapping together into a small skeleton, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.0,
+        "cap": null,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "kn1HW94iM2ytzJpcp6el",
+        "takes": [
+          {
+            "take": 1,
+            "session": "sh9V4wTDIAKyfELGF5Fh"
+          },
+          {
+            "take": 2,
+            "session": "FfSqjLNccIhWXUaIOfYT"
           }
         ]
       },
@@ -746,79 +1324,103 @@
           }
         ]
       },
-      "flashbang": {
-        "prompt": "A flashbang grenade exploding with a sharp deafening bang, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 1.2,
+      "mech-suit": {
+        "prompt": "Heavy iron armour plates slamming shut around a steam-powered war suit, latches clanking, a sharp hiss of steam and a flywheel whirring up to speed, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.5,
         "cap": null,
         "stereo": false,
         "chosen": 1,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "QvpeQcPG5lFBRzoIsk4B",
+        "node": "vp9zBb1ijU5CMHO98I6m",
         "takes": [
           {
             "take": 1,
-            "session": "YrGnG8m1pBN65rJ0yBdj"
+            "session": "qr29pAl4MYw6lrlsDOGS"
           },
           {
             "take": 2,
-            "session": "7DIssUJxtNll1BTM8zd3"
+            "session": "XRhEHRmvvXLVwxcz6FH8"
           }
         ]
       },
-      "smoke": {
-        "prompt": "A smoke bomb bursting with a soft muffled pop and a long hiss, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 1.0,
-        "cap": null,
-        "stereo": false,
-        "chosen": 1,
-        "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "Vuj4ZPg9RUZwnwXSSHAY",
-        "takes": [
-          {
-            "take": 1,
-            "session": "yfNb9zkx2u2QzYhmRrv7"
-          },
-          {
-            "take": 2,
-            "session": "aXZmdopQHDFYgQPOo35a"
-          }
-        ]
-      },
-      "ice-block": {
-        "prompt": "Ice rapidly freezing over a body with cracking and crunching, big and deep, echoing through a vast stone arena, no voice",
-        "durationSeconds": 1.2,
-        "cap": null,
-        "stereo": false,
-        "chosen": 1,
-        "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "XriC5wz8IdA4KVXPOfom",
-        "takes": [
-          {
-            "take": 1,
-            "session": "grVyPKOxuHqTUpn1fXqw"
-          },
-          {
-            "take": 2,
-            "session": "kyTnD6w51JYTpkfn6SDv"
-          }
-        ]
-      },
-      "ward-bell": {
-        "prompt": "One deep bronze bell toll, big and deep, echoing through a vast stone arena",
+      "doomsday": {
+        "prompt": "A giant steam engine's iron boiler splitting open with a sharp crack and a roar of steam, heavy metal plates and chains clattering down across stone, big and deep, echoing through a vast stone arena, no voice",
         "durationSeconds": 2.0,
         "cap": null,
         "stereo": false,
-        "chosen": 1,
+        "chosen": 2,
         "flow": "kJ2AWNk2xsn4UGTVGWj0",
-        "node": "fnyYDfID1fUeYBrpt9oI",
+        "node": "EYcjrsVPcswNZu2euUX6",
         "takes": [
           {
             "take": 1,
-            "session": "r2eHkXlKLI467RKdZBuf"
+            "session": "VdeqxQEkq1YCondzIGDY"
           },
           {
             "take": 2,
-            "session": "OKW1iEURPE4y2yhfH7ax"
+            "session": "KkuxefIVcIKFmMVgTAws"
+          }
+        ]
+      },
+      "voidheart": {
+        "prompt": "A hollow rush of air pulled sharply inward, then a heavy burst of rubble and bone shards spraying across stone, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.2,
+        "cap": null,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "eBSyyqsRRuDprgeMDMRQ",
+        "takes": [
+          {
+            "take": 1,
+            "session": "ZbPk6P8BGntMLCW1vz7c"
+          },
+          {
+            "take": 2,
+            "session": "1CpPuY0fnqQpsZamVhcx"
+          }
+        ],
+        "leadCutSeconds": 0.1,
+        "fadeIn": {
+          "seconds": 0.01,
+          "curve": "cub"
+        }
+      },
+      "ember-trail": {
+        "prompt": "A short burst of flame catching along a line of spilled oil on stone, a low whoosh with crackling, spitting embers, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.8,
+        "cap": null,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "nD8pLnNTNTj7wPbZmNVJ",
+        "takes": [
+          {
+            "take": 1,
+            "session": "QkweitboqxQHDODm7Z0A"
+          },
+          {
+            "take": 2,
+            "session": "BcP5RQ3eC24yKJmgqTnc"
+          }
+        ]
+      },
+      "unstable-core": {
+        "prompt": "Electricity arcing across a cracked iron coil, a harsh crackling sizzle with the hiss of scorched metal, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.8,
+        "cap": 0.5,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "Z1j2lB8m3UeKfpL8uemK",
+        "takes": [
+          {
+            "take": 1,
+            "session": "EOxjcRaYZSIgO33ZnM8a"
+          },
+          {
+            "take": 2,
+            "session": "tQ4YSXXv6mG8sM93Tuz9"
           }
         ]
       },
@@ -895,6 +1497,25 @@
           {
             "take": 2,
             "session": "y2RelyqSGsQMFGuIAC9f"
+          }
+        ]
+      },
+      "self-destruct": {
+        "prompt": "A gunpowder charge bursting inside a small iron crate, a sharp bang, then loose bolts and cogs rattling and rolling across stone, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 1.2,
+        "cap": null,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "81zf6BSYdS0WU9UcYl1w",
+        "takes": [
+          {
+            "take": 1,
+            "session": "BM6G7rXVyCarjKHwUC97"
+          },
+          {
+            "take": 2,
+            "session": "qA1xBr8QrtP6oXwdLcDF"
           }
         ]
       },
@@ -990,6 +1611,25 @@
           {
             "take": 2,
             "session": "sRPmbBqRtww3s75vg9NN"
+          }
+        ]
+      },
+      "stun": {
+        "prompt": "An iron-bound club cracking against a helmeted head, a dull thunk and a short crunch of bone, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.3,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "7TMUzyWJw6NjphkdCmaZ",
+        "takes": [
+          {
+            "take": 1,
+            "session": "3JPctcIWVG0Pg63KujsQ"
+          },
+          {
+            "take": 2,
+            "session": "ZzLy1YBeQ00mHQdjkyfg"
           }
         ]
       },
@@ -1205,6 +1845,44 @@
             "session": "bBxRMM6NtvvHohD4Ptqz"
           }
         ]
+      },
+      "flicker-strike": {
+        "prompt": "A quick shadowy blink whoosh that snaps into one sharp claw swipe, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 0.5,
+        "cap": 0.4,
+        "stereo": false,
+        "chosen": 1,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "cD9h8rkTEb678XiMEIc0",
+        "takes": [
+          {
+            "take": 1,
+            "session": "YACJYjrAIcUm4kClFwmA"
+          },
+          {
+            "take": 2,
+            "session": "AbPyYSxt3TXp6w9ugwFV"
+          }
+        ]
+      },
+      "thousand-cuts": {
+        "prompt": "A rising flurry of eight rapid claw slashes whooshing faster and faster, ending on one heavy cut, big and deep, echoing through a vast stone arena, no voice",
+        "durationSeconds": 2.0,
+        "cap": null,
+        "stereo": false,
+        "chosen": 2,
+        "flow": "kJ2AWNk2xsn4UGTVGWj0",
+        "node": "Az1nvGwnh4cfJR64nxzM",
+        "takes": [
+          {
+            "take": 1,
+            "session": "nxGRl1j2bNUK4d0C5JrG"
+          },
+          {
+            "take": 2,
+            "session": "q7f6hPEAfjCtPQueHzqH"
+          }
+        ]
       }
     }
   },
@@ -1233,8 +1911,8 @@
       },
       "pyromancer": {
         "hero": "Cinder",
-        "name": "Laura",
-        "id": "evlmNgTfQhTg1om8fCgp"
+        "name": "Emma - Adorable and Upbeat",
+        "id": "pPdl9cQBQq4p6mRkZy2Z"
       },
       "frostweaver": {
         "hero": "Rime",
@@ -1437,7 +2115,7 @@
         "voice": "V2bPluzT7MuirpucVAKH",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": null,
+        "node": "RgMXcV6XpXH9IXnltzsp",
         "takes": [
           {
             "take": 1,
@@ -1567,7 +2245,7 @@
         "voice": "X6VIT9ZXy5Nr7EmuLOGz",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": null,
+        "node": "Al1tjqylFGmnObp0V9Kk",
         "takes": [
           {
             "take": 1,
@@ -1632,7 +2310,7 @@
         "voice": "zrqsh6pldVPsh0XysNNZ",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": null,
+        "node": "OckkeSU2IHl0Enpo6Qyk",
         "takes": [
           {
             "take": 1,
@@ -1701,7 +2379,7 @@
         "voice": "sssn4wp3AspuK2kvy3Ym",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": null,
+        "node": "bm1e7jwL19mv9Ddcpbvu",
         "takes": [
           {
             "take": 1,
@@ -1766,7 +2444,7 @@
         "voice": "YGWwh1G8pUwWmJyCCpma",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": null,
+        "node": "gu866XmUkR7PcdQn6uy6",
         "takes": [
           {
             "take": 1,
@@ -1789,70 +2467,66 @@
       },
       "pyromancer-cast-1": {
         "text": "Three, two, one... BOOM!",
-        "voice": "evlmNgTfQhTg1om8fCgp",
+        "voice": "pPdl9cQBQq4p6mRkZy2Z",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": "D8V6Tb5DE8KBJalKEUUz",
+        "node": "u2a96iKEzJ73dIsBd2QE",
         "takes": [
           {
             "take": 1,
-            "session": "SiSuHud35pWUtjUP0OI0"
+            "session": "QMU49mDYZEl0FgYUl3bu"
           }
         ]
       },
       "pyromancer-cast-2": {
         "text": "Stand still, this won't take long!",
-        "voice": "evlmNgTfQhTg1om8fCgp",
+        "voice": "pPdl9cQBQq4p6mRkZy2Z",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": "rmgPpV5NIkstTIqdDSEq",
+        "node": "MSqy07RmItjzhKGMqJqx",
         "takes": [
           {
             "take": 1,
-            "session": "zTA8803k4PQHtiJruiOd"
+            "session": "Ozi5XLWZwhiaXS3GIDZD"
           }
         ]
       },
       "pyromancer-death": {
         "text": "Ugh, so not fair—",
-        "voice": "evlmNgTfQhTg1om8fCgp",
+        "voice": "pPdl9cQBQq4p6mRkZy2Z",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": "n6gYjDgojviemEErVv14",
+        "node": "AgwzlDV6u46j900kGMZO",
         "takes": [
           {
             "take": 1,
-            "session": "6B0fo1XcQtMyQ4N50whv"
+            "session": "b15Yfcj0lqO1bzNLWl5a"
           }
         ]
       },
       "pyromancer-pick": {
         "text": "Ooh, flammable friends! Finally!",
-        "voice": "evlmNgTfQhTg1om8fCgp",
+        "voice": "pPdl9cQBQq4p6mRkZy2Z",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": null,
+        "node": "LnYDxVoB0HUgvArSzkcf",
         "takes": [
           {
             "take": 1,
-            "session": "mpVu22FXL3J47ZpIoJrQ"
-          },
-          {
-            "take": 2,
-            "session": "Q54hlgXVgNwwpVPeqoPe"
+            "session": "YAqUgI7Jft3pBadzg2xv"
           }
         ]
       },
       "pyromancer-win": {
         "text": "Toasty! What's next?",
-        "voice": "evlmNgTfQhTg1om8fCgp",
+        "voice": "pPdl9cQBQq4p6mRkZy2Z",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": "7Ez13nLj1Mllg52Ujosh",
+        "node": "g861wkH2jIi9mnXO9I3f",
         "takes": [
           {
             "take": 1,
-            "session": "Bed1TI4QuNx9JUi89szQ"
+            "session": "K5dyazGyyRKup4mKMtKp"
           }
         ]
       },
@@ -1900,7 +2574,7 @@
         "voice": "3VkFsBHdRPqWKsitgYhJ",
         "chosen": 1,
         "flow": "uQT8FzROA7H43n0CUgy0",
-        "node": null,
+        "node": "Nr3WeUqYhJS1HOoLCUo6",
         "takes": [
           {
             "take": 1,

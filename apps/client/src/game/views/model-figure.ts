@@ -23,6 +23,8 @@ import {
   SINK_SECONDS,
   SINK_UNITS,
   createFigureBase,
+  paintSpectral,
+  type SpectralMemory,
 } from "./figure-base.js";
 import type { FigureAction, FigureTraits, HeroFigure } from "./hero-figures.js";
 import { createCycloneEffect } from "./cyclone-effect.js";
@@ -167,6 +169,10 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
   let channeling = false;
   let celebrating = false;
   let dead = false;
+  let linger = false;
+  let spectral = false;
+  const spectralMemory: SpectralMemory = { colors: new Map() };
+  let sinkTime = 0;
   let current: AnimationAction | null = null;
   let strike: AnimationAction | null = null;
   let attackTime = Number.POSITIVE_INFINITY;
@@ -274,6 +280,7 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
 
       dead = isDead;
       strike = null;
+      sinkTime = 0;
       cyclone?.setActive(channeling && !isDead);
 
       if (isDead) {
@@ -292,9 +299,27 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
       applyTeamColor();
     },
 
+    setLinger(isLingering) {
+      linger = isLingering;
+    },
+
+    setSpectral(isSpectral) {
+      if (isSpectral === spectral) {
+        return;
+      }
+
+      spectral = isSpectral;
+      paintSpectral([...surfaces.flash, ...surfaces.accents.map((accent) => accent.material)], spectralMemory, isSpectral);
+      applyTeamColor();
+    },
+
+    setOverclock() {},
+
     setGlow(amount) {
       bodyGlow = Math.max(0, amount);
     },
+
+    setCharge() {},
 
     setCelebrating(isCelebrating) {
       if (isCelebrating === celebrating) {
@@ -351,7 +376,8 @@ export function createModelFigure(model: LoadedModel, traits: FigureTraits): Her
 
       if (dead) {
         const fallSeconds = actions.get("death")?.getClip().duration ?? 0;
-        const sink = Math.min(1, Math.max(0, deathTime - fallSeconds - DEATH_HOLD_SECONDS) / SINK_SECONDS);
+        sinkTime += !linger && deathTime > fallSeconds + DEATH_HOLD_SECONDS ? deltaSeconds : 0;
+        const sink = Math.min(1, sinkTime / SINK_SECONDS);
         body.position.set(0, -sink * SINK_UNITS, 0);
         base.root.scale.setScalar(Math.max(0.001, 1 - sink));
         root.visible = sink < 1;

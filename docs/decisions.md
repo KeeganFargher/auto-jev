@@ -3051,6 +3051,705 @@ asked for sound effects and voice lines everywhere.
   - 16 voice lines played with no overlap except intended interrupts.
 - **Removed:** `attack-swing.mp3`, `hit-impact.mp3`, `spell-cast.mp3`,
   `heal.mp3` and `missing_assets.md` entries 4, 14, 19, 20 and 23.
+- **Whirlwind was inaudible** (user report, same day).
+  - Its four damage pulses had no hit sound, and its single whoosh was
+    buried: a busy 3v3 fires about 25 other sounds during the 2 s spin.
+  - Each pulse now plays `hit-blade`, and the whoosh uses the 0.8
+    "heavy" mix instead of 0.6.
+  - In the lab, every spin now plays a whoosh plus four chops at 0, 0.5,
+    1.0 and 1.5 s.
+  - Whirlwind is the only damage channel; zone ticks are DoTs and stay
+    silent on purpose.
+- **Cinder recast** at the user's suggestion: Laura became "Emma - Adorable
+  and Upbeat". All five lines were remade and transcript-checked.
+- **Vesper's rebuilt kit** got its own sounds (GAMEPLAY's request in
+  `missing_assets.md` entry 24).
+  - `flicker-strike` is a 0.4 s blink whoosh ending in a claw swipe. It is
+    mapped as the hit sound, because each pounce is a damage event with no
+    cast event of its own. In the lab it played on every pounce, 3 or 6 in
+    a row, 0.2 s apart.
+  - `thousand-cuts` is a 1.5 s rising flurry. It is mapped as the cast
+    sound with no hit sound, so its eight strikes don't stack a second
+    slash on the flurry's own.
+  - The borrowed `shadowstep` and `smoke` sounds lost their last users and
+    were deleted.
+- **Gorrak's rebuilt kit** (GAMEPLAY's request, same day).
+  - Leap Slam's cast and hits all arrive at takeoff, and the client then
+    draws a 0.36 s jump arc. The old `leap` crash played at takeoff, so
+    the slam was heard before he landed.
+  - `leap` is now a 0.4 s takeoff whoosh, mapped as the cast sound. The
+    new `leap-slam` is a 1.5 s ground slam, mapped as the landing sound.
+    `stepLeap` plays it on the frame the arc lands. In the lab, all four
+    leaps played the whoosh at takeoff and the slam 367 ms later.
+  - Leap Slam's damage numbers, sparks and crit layers still show at
+    takeoff.
+  - Whirlwind pulses are attacks now, every 0.3 s. Each pulse plays one
+    `hit-blade`, because the cooldown folds same-tick victims into one
+    chop. In the lab, crit layers never stacked on one pulse.
+  - Blade Vortex pulses are full hits under the `whirlwind` id, so they
+    chop every 0.5 s for 4 s. They were not heard in the lab, because the
+    lab can't pick levels.
+  - Maelstrom's pull is silent (the whirlwind whoosh covers it), and
+    cleave splashes are reactions, which are silent too.
+  - Gorrak's first slam lands 0.4 s into the `battle-start` sting, about
+    14 dB louder than it for 0.2 s. That was left as is.
+- **Anvil's rebuilt kit** (GAMEPLAY's request, same day).
+  - Shield Toss replaced Challenge. `shield-toss` is a 0.45 s warbling hum
+    of a spinning iron shield, mapped as the cast sound. `shield-ricochet`
+    is a 0.3 s crunch with a short scraping whang, mapped as the hit
+    sound, so each ricochet clangs as its leg lands. In the lab, all three
+    tosses played the throw, then clangs 167 and 334 ms later.
+  - Both got their own sounds so a toss doesn't sound like `shield-up` or
+    Gorrak's `whirlwind` spin. The clang was prompted as a crunching thud,
+    so a run of them shouldn't ping like coins. As before, takes were
+    picked by loudness and spectrogram, not by ear.
+  - Vengeance's release is a second hit on the first target in the same
+    leg, so the cooldown folds it into the first clang.
+  - Last Stand keeps `challenge` (a sword beating a shield) as its cast,
+    because the cast is the taunt. The new `last-stand` is a 1.5 s
+    pent-up iron whump with a rolling hum, played as the landing sound
+    when the form ends and the shockwave fires (`impact-landed`). The
+    shockwave's damage is a burst, so it adds no hit sounds.
+  - In the lab, one Last Stand played `challenge` at 0, Shield Bash
+    retaliations at 367 and 1800 ms (a third folded into those), and
+    the shockwave at 2500 ms. The form lasts 75 ticks, and a headless run
+    of the same battle put the shockwave 75 ticks after the cast.
+  - Anvil's level picks were checked headlessly, because the lab can't
+    pick levels.
+    - Every toss hit is an audible attack, including Captain's Return's
+      50% return hits.
+    - Oathbound's ally shields and Captain's Return's self-shield arrive
+      on the cast tick, so `shield-up` plays at the throw.
+    - Reprisal's free tosses play the full toss sounds.
+    - The shockwave came 2.5 s after the cast on both paths.
+  - Anvil throws on tick 1 of every battle (six seeds, in the lab team and
+    in the 3v3 mirror). His first throw and clangs play under the
+    `battle-start` sting, 3 to 7 dB quieter than it. That was left as is.
+  - `SILENT_SHIELD_ABILITIES` only ever held the old Challenge, so it was
+    deleted. Every shield now plays `shield-up`.
+- **Cinder's rebuilt kit** (GAMEPLAY's request, same day). Eight new
+  sounds, two renamed and one deleted, 73 in all.
+  - Fireball throws with `fireball-throw` (a 0.5 s roaring whoosh) and
+    lands with `fireball-blast`. Inferno Bolt keeps the Firebolt cast and
+    lands with the short `inferno-burst`.
+  - Meteor's one whistle became a pair: `meteor-streak` (0.3 s) as it
+    falls and `meteor-strike` (0.6 s crunch and flare) as it lands. Both
+    allow four copies with a 100 ms cooldown, so Armageddon's rain isn't
+    folded into one hit. `meteor-fall` was deleted.
+  - Falling sounds used to start 45% of the way through the fall
+    (`FALL_START_FRACTION`, deleted). They now start `ceil(duration × 30)`
+    ticks before the landing, so the streak or riser ends as the rock
+    hits.
+  - Supernova gets its own pair, keyed by upgrade because the ability is
+    still `meteor`: `supernova-fall` is a 0.85 s rush given a 0.7 s cubic
+    fade-in so it swells into the hit, and `supernova-impact` is the old
+    `meteor-impact` renamed.
+  - Living Bomb's detonation plays `living-bomb` (1.3 s crack and blast)
+    on the `impact-landed` event GAMEPLAY emits for it.
+  - Flame Ward is gone and its burst now opens Inferno, so `flame-ward`
+    was renamed `inferno` and plays when Cinder enters the form.
+  - Phoenix plays `phoenix` (1.5 s roar of embers reigniting) when Cinder
+    revives herself. It's keyed by the upgrade, not the hero, because the
+    Aegis item can revive anyone and stays silent. The revive enters
+    Inferno on the same tick, so that Inferno burst is skipped. No death
+    event comes before a self-revive, so no death sound or line plays.
+  - Headless, across 8 seeds and three builds, every falling sound
+    started exactly 9 (streak) or 26 (riser) ticks before its landing,
+    and the sound counts matched the events. In the lab, Supernova's
+    riser ended 20–30 ms before each blast, Phoenix played without the
+    Inferno burst, an ordinary Inferno still played, Armageddon's
+    streaks and strikes were never folded, and all six bomb detonations
+    played.
+  - No Cinder cast line came up in the lab run. She casts Meteor, her
+    ultimate, about once a fight (7 in 6 headless fights) and cast lines
+    play half the time, so that was chance.
+- **Rime's rebuilt kit** (GAMEPLAY's request, same day). Six new
+  sounds and two deleted, 77 in all.
+  - Frozen Orb casts with `frozen-orb`, a 1.5 s heavy whoosh that trails
+    into a cold howl. Its shards are ordinary Frozen Orb hits and play
+    `ice-shard`, a 0.3 s dry crunch.
+  - GAMEPLAY asked for the shard to be short and light, because it
+    repeats a lot. It is capped at 0.3 s, plays at volume 0.3 (other hits
+    are 0.42), allows three copies and has a 70 ms cooldown, so shards
+    that land together, such as Twin Orbs' pairs, sound once. In the
+    probe below, 341 of 722 shard hits were folded that way.
+  - Glacial Prison plays a 2 s groaning roar of erupting ice. Hailstorm
+    gives it an emitter, and `hailstorm` (a 4 s bed of hail and wind with
+    a 0.4 s fade-in) plays when the emitter starts, through the new
+    `EMITTER_SOUNDS`. Its shards shoot as Frozen Orb, so they play
+    `ice-shard` too.
+  - Deep Freeze plays `deep-freeze` (a 0.6 s grinding creak of ice
+    closing) on its `passive-triggered` event, through the new
+    `PASSIVE_SOUNDS`. The median gap between freezes was 1.5–3.6 s
+    depending on the build. The closest pair came 33 ms apart, and the
+    120 ms cooldown plays those as one.
+  - Ice Mirror plays `ice-mirror` (a 1.5 s rush of frost and groaning
+    ice) on Rime's self-revive, through `REVIVE_SOUNDS` like Phoenix. No
+    death event comes first, so no death sound or line plays.
+  - The old kit's `glacial-lance` and `ice-block` were deleted.
+  - Emitter shots never crit, so shards never add `crit-hit`.
+  - Takes were picked by loudness, spectrogram and how much a laptop
+    speaker loses, not by ear. `ice-shard` is peak-limited and sits
+    about 6 dB under `hit-frost` in the mix. That was left for the user
+    to judge.
+  - Rime was checked headlessly only. Nobody has heard these sounds in
+    a fight yet.
+- **Sounds have a priority.** Routing Rime showed the channel cap
+  cutting spells short.
+  - When a channel's 16 slots were full, any new sound took the oldest
+    one's slot. In the opening volley, a hit could cut Rime's orb cast
+    about 200 ms in, and later hits cut Hailstorm's bed short.
+  - Each sound now has a priority tier: swings and hits 0, abilities 1,
+    big impacts 2, stingers, UI sounds and lines 3. On a full channel, a
+    new sound takes the slot of the oldest sound in the lowest tier at
+    or below its own, and is dropped if everything playing outranks it.
+  - A probe replayed 32 fights through the real `decideVoice`,
+    catalogue and file lengths: 8 seeds, 4 Rime builds, Rime with Anvil
+    and Moira against Gorrak, Vesper and Cinder.
+    - Under the old rule, 43.1 s of ability sound and 9.1 s of
+      big-impact sound were cut, including 17 orb casts and 7
+      hailstorms.
+    - Under the new rule none was. The 60.2 s still cut is all the
+      tails of hits and swings, and no hit, crit or shard was dropped
+      for being outranked.
+- **Nettle's rebuilt kit** (GAMEPLAY's request, same day). Two new
+  sounds, one renamed and one deleted, 78 in all.
+  - Plague Bloom replaced Plague Cloud, so `plague-cloud` was renamed
+    `plague-bloom` and plays when the Bloom is cast. Twin Bloom's two
+    flowers come from one cast and sound once.
+  - Pandemic plays `pandemic`, a 2.5 s deep rushing surge that swells
+    for about 0.3 s and then fades, when it is cast. Nettle's cast line
+    plays with it.
+  - Each Burst plays `plague-burst`, a 0.6 s wet crunch and splatter, on
+    Virulence's `passive-triggered` event. GAMEPLAY added `targetUnitId`
+    to that event, so the pop is panned at the enemy that Bursts, and
+    Deep Freeze now sounds at the frozen enemy instead of at Rime.
+  - Bursts come in clusters, mostly just after a Pandemic: up to 13
+    within 67 ms, and with Black Death the same enemy can Burst twice
+    in one tick. `plague-burst` has a 100 ms cooldown, so a cluster plays
+    one pop. It also varies in pitch by up to 8%, like hits, not the 4%
+    other abilities get.
+  - Caustic Spit left the kit, so `caustic-spit` was deleted.
+  - Takes were picked by loudness, spectrogram and how much a laptop
+    speaker loses, not by ear. Pandemic's take is mostly below 125 Hz
+    and loses 3.6 dB on a laptop (Whirlwind loses 2.9). The Burst's take
+    is mostly 1–8 kHz, so it cuts through the Pandemic rush it usually
+    lands under. Of the four takes it was also the least like Sexton's
+    `corpse-explosion`.
+  - A probe replayed 64 fights (1,123 s) through the real voice policy:
+    8 seeds, 4 builds, Nettle with Anvil and Moira against Gorrak, Vesper
+    and Morrow, or against Sexton, Brassjack and Cinder.
+    - Every one of the 637 Bursts sent exactly one Virulence event,
+      right after its `plague-burst` impact.
+    - 71% of Bursts came within 0.3 s of a Pandemic cast. The cooldown
+      folded them into 175 pops, 2.7 a fight.
+    - Pandemic was cast once a fight, twice in 3 of the 64.
+    - No ability sound or bigger was cut. The 119.5 s that was cut is
+      all hit and swing tails.
+  - Nettle was checked headlessly only. Nobody has heard these sounds in
+    a fight yet.
+- **Ice break** (GAMEPLAY's offer, 2026-09-25). One new sound, 79 in all.
+  - GAMEPLAY gave frozen units an ice block that breaks into chips when
+    the freeze ends or the unit dies. The engine sends no thaw event, so
+    `syncFrozen` in `battle-view.ts` spots it between snapshots. It now
+    also plays `ice-break` there, panned at the unit: a 0.7 s snapping
+    crunch, a second crunch 0.3 s later and chips scattering on stone.
+  - Every thaw plays it, whatever ended the freeze. Snaps stay silent.
+  - It plays at 0.45, under Deep Freeze's 0.5, because the thaw is the
+    aftermath rather than the event. Like `plague-burst`, it has a
+    100 ms cooldown and varies in pitch by up to 8%.
+  - Of the four takes it had the fastest attack (32 ms), so the crack
+    lands with the chips. Its first 0.15 s centres around 2.2–3.6 kHz
+    against `deep-freeze`'s 1.4–2.2 kHz, so the freeze and the thaw don't
+    sound alike.
+  - A probe replayed 64 fights (1,835 s) through the real voice policy:
+    8 seeds, 4 Rime builds, Rime with Anvil and Moira against Gorrak,
+    Vesper and Morrow, or against Sexton, Brassjack and Cinder.
+    - There were 1,141 thaws, 17.8 a fight, all but 9 on Rime's enemies.
+      935 freezes ran out, 97 units died frozen, 100 freezes were
+      replaced by a knock-down or hex, and 9 were Ice Mirror statues.
+    - Glacial Prison thaws its catch together, up to 7 within 100 ms.
+      The cooldown folded the 1,141 into 728 sounds, 11.4 a fight.
+    - 82 thaws landed on the same tick as a combo on that unit. Most
+      were Overloads whose knock-down replaced the freeze, so it does
+      double `combo-overload`, at 0.45 under its 0.85. Only 9 were
+      Shatters.
+    - It was never cut. It took 86 slots from hits, swings, shards and
+      basic-attack casts, all in the lowest tier, and no ability sound
+      or bigger was cut.
+  - Checked headlessly only. Nobody has heard it in a fight yet.
+- **Morrow's rebuilt kit** (GAMEPLAY's slice 4b, 2026-09-25). Six new
+  sounds and two deleted, 83 in all.
+  - Judgment's hammer bounces enemy, ally, enemy, ally, enemy. The throw
+    plays `judgment-throw`, a spinning whoosh with a low hum. Each enemy
+    hit plays `judgment-hit`, a heavy thud with a short metallic ring,
+    and each ally heal plays `judgment-heal`, a soft rush of warm air.
+    Each sounds as its hop lands, 0.16 s after the last, so after the
+    throw one Judgment goes hit, heal, hit, heal, hit. Avatar's attack
+    is a smaller Judgment and uses the same three.
+  - All three play at 0.5, under the 0.6 other abilities get, because
+    one Judgment makes six sounds (eight with Swift Judgment).
+    `judgment-hit` varies in pitch by up to 8%, like hits.
+  - Resurrection plays `resurrection` when cast, with Morrow's cast
+    line: a 2 s bronze bell tolling once over a rising swell of wind.
+    Morrow's shrine carries a bell. Its spectrum is close to
+    `ward-bell`'s, but it sits lower (385 Hz against 524 Hz) and takes
+    239 ms to swell where the ward bell strikes in 76 ms, so the two
+    read as kin, not as a copy.
+  - Each ally it raises plays `holy-pillar` where GAMEPLAY's pillar of
+    light rises: a 1.3 s column of roaring wind that swells into a hum.
+    Avatar's form reuses it. On an Avatar raise the form's pillar plays
+    first, so the cooldown folds the raise's copy, and the one pillar is
+    panned at Morrow instead of the ally. Two copies starting together
+    would only sound louder, so the pan is the only cost.
+  - When a Blessed shield breaks, its burst plays `blessed-burst` at that
+    ally: a 0.6 s hard crack and a gust that scatters sand and pebbles.
+    Like `plague-burst`, it has a 100 ms cooldown and varies in pitch by
+    up to 8%.
+  - Blessed shields are silent (`SILENT_SHIELDS` in `sound-map.ts`, which
+    `audio:check` checks). Overhealing makes them, up to about once a
+    second with Hallowed Path, and `shield-up` would have clanged before
+    the Judgment heal that made one had landed. `playShield` now takes
+    the shield's ability id, which GAMEPLAY's `allyHop` call passes.
+  - Hallowed Path's trail is silent, as GAMEPLAY suggested: its heals are
+    10 HP every half second.
+  - `consecrate` and `mend` were deleted with the abilities they belonged
+    to. `mend` was nearly inaudible anyway: a laptop speaker lost 21.7 dB
+    of it.
+  - Abstract prompts make sub-bass. The first four burst takes, prompted
+    with "a sudden deep thump and a wave of hot air", were almost all
+    sub-bass and lost 12.5–30 dB on a laptop. Prompted with a cracking
+    snap and a gust scattering sand and pebbles, the next four lost
+    0.4–0.6 dB. Name what physically makes the noise.
+  - Two probes replayed 144 fights (2,924 s) through the real voice
+    policy: 8 seeds, with builds mixing Swift Judgment or Hallowed Path,
+    Crusader or Martyr, and Mass Resurrection or Avatar.
+    - With Anvil and Cinder, all 64 Resurrections were cast because
+      Morrow fell under 10% HP with nobody fallen, so the team turned
+      invulnerable and only the bell played. With Cinder and Rime
+      against Rime, Nettle and Moira, or with Gorrak and Brassjack
+      against Vesper, Gorrak and Cinder, 31 of 76 casts raised an ally.
+      A wider sweep (20 team-ups, 6 seeds, no upgrades) raised someone
+      on 25 of 103 casts, so the pillar plays on about a quarter.
+    - Every raise played a pillar at the ally, except the one Avatar
+      raise, whose pillar folded into the form's. Mass Resurrection never
+      raised two allies on one tick.
+    - Blessed Overflow made up to 149 shields in 8 fights with Hallowed
+      Path. Of its 158 bursts, at most two came within 100 ms, and the
+      cooldown folded one.
+    - Judgment's hits mostly started 0.3–0.4 s apart, or 0.16 s apart
+      when no ally was in reach. At most 3 played at once, which is
+      their limit, and none was cut.
+    - None of Morrow's sounds was cut by another sound. Everything cut
+      was the tail of a lowest-tier hit, swing or basic-attack cast.
+    - Morrow's cast line played on 16 of the 76 Resurrections, gated by
+      the line director's gaps and 50% chance.
+  - Checked headlessly only. Nobody has heard these sounds in a fight
+    yet.
+- **Moira's rebuilt kit** (GAMEPLAY's request, 2026-09-25). Four new
+  sounds, 87 in all.
+  - Hex's sound moved from the cast to each `hexed` status, where
+    GAMEPLAY's violet puff appears. The existing `hex`, a puff and a frog
+    croak, is kept. The first enemy's puff sounds at once. Hex Bolt's
+    second target and Weaver's extras sound when their fate bolt lands
+    0.2 s later, and extras that land together fold into one.
+  - Weaver plays `weaver` when Hex spends the 10 Threads: a wooden loom
+    beater clacking shut, then threads creaking tight. It plays at 0.5
+    over the first puff, which starts on the same tick. 92–97% of its
+    energy above 250 Hz sits where it is louder than `hex`. The
+    knot-tightening takes were rejected because their even clicks could
+    pass for the countdown tick.
+  - An Ill Omen echo plays `omen-echo`, a harsh raven caw over a burst
+    of wings, instead of a quieter copy of the combo. It sounds as the
+    fate bolt reaches the other bound enemies, 0.2 s after the combo,
+    and the echoes fold into one caw. From 0.2 s into any of the three
+    combo sounds, 99–100% of its energy stays clear of them. Ill Omen's
+    bonus damage arrives as reaction hits and stays silent.
+  - Death Knell plays `death-knell`, one toll of a rusty iron bell,
+    on its reaction hits. They land on every surviving bound enemy on
+    one tick, so they fold into one toll. The new `REACTION_SOUNDS` in
+    `sound-map.ts` maps the hit's `abilityId`, and `audio:check` checks
+    that it names a passive.
+    - The chosen take strikes at 1425 Hz over a 569 Hz hum and falls
+      20 dB in 0.48 s. Morrow's `resurrection` (523 Hz) and the
+      `ward-bell` (385 Hz) both ring for 2 s, so the knell reads as the
+      short, harsh one of the three. The first prompt's takes gave a
+      single high 1.5 kHz ding or a cracked double tone. The second
+      prompt's strike over a hum sounds more like a toll.
+    - It is peak-limited at −19.6 LUFS, under the −16 target, so it plays
+      at 0.7 instead of 0.6.
+  - Puppeteer plays `puppeteer` on each `puppeted` status: a wooden
+    marionette jerked upright, limbs clattering, old cords creaking.
+    Shared Fate puppets every bound enemy on one tick, which folds into
+    one. The puppet running out and the threads are silent, as GAMEPLAY
+    suggested.
+  - A laptop speaker loses 5.5 dB of `weaver`, about what it loses of
+    `swing-heavy` (6.7 dB), and 0–0.7 dB of the other three.
+  - A probe replayed 96 fights (2,269 s) through the real voice policy:
+    8 seeds and 6 builds. Moira was with Gorrak and Cinder against Rime,
+    Vesper and Anvil, or with Morrow and Rime against Gorrak, Nettle and
+    Brassjack. The builds included Death Knell with Ill Omen, Hex Bolt
+    with Puppeteer, and a hex-lock build with Haste and
+    Cast-on-detonation gems on Hex.
+    - All 332 Hex casts played their first puff. The 430 extra hexes
+      played 241 puffs.
+    - Weaver triggered 148 times, always on a Hex cast's tick, and was
+      never folded or cut.
+    - The engine always sent a combo before its echoes, with the same
+      `causeSequence`. 135 echoes played 52 caws.
+    - 154 Death Knell hits on 62 ticks played 60 tolls. 200 puppets
+      played 66 creaks, one for each Shared Fate cast with Puppeteer.
+    - Only hex-lock pushed Hex past its 3 voices. In 17 of its 185
+      Hexes, a fourth started within the oldest's 1 s and cut it short.
+      Six of those cuts came at 0.3 s, before the croak.
+    - No other sound cut one of Moira's. Hers took 44 slots from
+      lowest-tier hits, swings and casts.
+  - Checked headlessly only. Nobody has heard these sounds in a fight
+    yet.
+- **Sexton's rebuilt kit** (GAMEPLAY's request, 2026-09-25). Three new
+  sounds, and `raise-dead` renamed `grave-rise`: 90 in all.
+  - Army of the Dead plays `army-of-the-dead` on the cast, with Sexton's
+    cast line: a 2 s rusted crypt gate groaning open.
+    - Horns and bells were ruled out: the stingers use horns, and
+      Resurrection, the ward bell and Death Knell use bells.
+    - Coffin lids were tried too, but their takes matched `grave-rise`'s
+      spectrum at 0.94–0.96, and the two start on the same tick. The
+      gate matches it at 0.76.
+    - 68% of its energy sits at 250 Hz–1 kHz, and a laptop loses 1.5 dB.
+      The other gate take kept 68% under 250 Hz and lost 3.4 dB. Neither
+      take has the slam the prompt asked for; each is one long creak.
+  - Each risen copy plays `grave-rise` (`RISE_SOUND`) at its corpse: the
+    old Raise Dead sound of skeletons clawing out of the ground, renamed.
+    Army can raise several on one tick, and the 80 ms cooldown plays one.
+    `playSpawn` never played a pick line, because pick lines play only in
+    the draft.
+  - Risen units never speak. Before this, a risen copy's ultimate played
+    that hero's cast line, and its death played `death` and the hero's
+    death line. `SoundSource` gained `risen` (a unit with a summoner whose
+    hero isn't a summon), and `playCast` and `playDeath` skip the lines
+    for it. A risen copy that dies plays `death-bones` instead.
+  - A unit that times out crumbles: `unit-dismissed` on or after its
+    `expiresAtTick` plays `death-bones` (`CRUMBLE_SOUND`). An Army timing
+    out drops its copies and thralls on one tick, which folds into one
+    crumble. Blown thralls are dismissed on their blast's tick with no
+    death event, and stay silent under the blast.
+  - Harvest plays `thrall-rise` as its soul wisp leaves the corpse: loose
+    bones skittering across stone and snapping together. Its onsets are
+    irregular and bunch toward the end, so it assembles where
+    `death-bones` collapses. A laptop loses none of it. It is
+    peak-limited at −19.5 LUFS but stays at 0.6, because Harvest fires two
+    or three times a fight. The thralls' own `unit-spawned` stays silent,
+    and Army thralls arrive under the Army cast.
+  - Corpse Explosion's sound moved from the cast to its `impact-landed` at
+    the body, which arrives on the cast's tick. Manual casts, Grave Chain's
+    triggered ones and the cast-on-kill gem now sound alike, panned at the
+    body instead of at Sexton.
+  - Lich Bolt plays `cast-lichbolt`: a skull in cold fire hurled with a
+    hollow whoosh, teeth chattering. It plays at 0.36, like Grave Bolt's
+    cast. The chatter runs at about 18 Hz, too fast to pass for the
+    countdown. 44% of its energy sits at 1–4 kHz, and a laptop loses
+    1.0 dB. Each bounce plays `hit-dark` as its bolt lands, 0.22, 0.38,
+    0.54 and 0.7 s after the cast.
+  - Golem Slam's hits land on one tick, and `hit-blunt`'s cooldown folds
+    them into one thump. Its taunts, Grave Mark, `corpse-spent` and the
+    Lich form stay silent. The form arrives with the Army cast, which
+    already sounds.
+  - A probe replayed 105 fights (1,992 s) through the real voice and line
+    policies: 5 seeds and 7 builds, with Sexton, Gorrak and Cinder against
+    three teams. It follows every `battle-view.ts` branch above.
+    - 27 risen ultimates and 9 risen deaths asked for no line. Of 756
+      cast-line and 525 death-line requests, none came from a risen unit.
+    - All 156 Army casts played, each with one rise sound: `grave-rise`
+      for 132 and `golem-rise` for the 24 Colossi. Twice, two copies rose
+      on one tick and folded into one. Sexton's line joined 18 casts.
+    - All 38 Army expiries crumbled, and their 32 thralls folded in. The
+      Colossus timed out 4 times and crumbled.
+    - 229 of 231 blasts played `corpse-explosion`. The other two landed
+      with another blast and folded. 85 blasts also played `crit-heavy`
+      0.16 s later. GAMEPLAY then made `isRangedAbility` skip the
+      `busiest-corpse` target policy, so the hits land at once and
+      `crit-heavy` sounds with the blast.
+    - 90 Golem Slams hit 132 enemies and played 90 thumps. The other 42
+      hits folded.
+    - 238 of 239 Harvests played `thrall-rise`.
+    - All 16 channels filled in every build. 15 of 41 `cast-lichbolt`s
+      were cut 100–633 ms into their 698 ms by later lowest-tier sounds.
+      Grave Bolt's cast is cut the same way (213 times, median 467 ms).
+      Apart from those, Sexton's sounds were cut 8 times.
+  - A laptop audit of every sound found 17 that lose 10 dB or more on a
+    laptop speaker. Grave Bolt's `cast-darkbolt` (24.4 dB) and `hit-dark`
+    (19.9 dB) and the Colossus's `golem-rise` (22.6 dB) are among them.
+    They are left for a separate pass.
+  - Checked headlessly only. Nobody has heard these sounds in a fight
+    yet.
+- **Brassjack's rebuilt kit** (GAMEPLAY's request, 2026-09-25). Five new
+  sounds, and `flashbang` removed with its ability: 94 in all.
+  - Mech Suit plays `mech-suit` on the cast, with Brassjack's cast line:
+    1.5 s of iron plates slamming shut round a steam war suit, latches
+    clanking, a hiss and a flywheel whirring up. Its five clanks come in
+    the first 0.55 s, then the whine rises. It is peak-limited at
+    −19.3 LUFS, so it plays at 0.95, and a laptop loses none of it. The
+    suit's shield (`SILENT_SHIELDS`) and the `mech` form stay silent,
+    since both arrive with the cast.
+  - With Doomsday, the suit ending plays `doomsday`: a 2 s boiler
+    splitting with a crack and a roar of steam, then plates and chains
+    clattering down. It hits at once; the other take swelled in slowly.
+  - Mech Rocket plays `cast-rocket` on the cast, a hollow pop and a short
+    sputtering whoosh that fades by 0.35 s, as the rocket lands. Each hit
+    plays `hit-rocket`, a 0.12 s crack with grit and metal splinters,
+    the take least like Cinder's fire hits. Their band spectra sit 18
+    and 24 dB (RMS) from the turret's rivet cast and hit. Two takes of a
+    rocket bursting "against a steel shield" carried a steady whistle
+    and were dropped.
+  - Self-Destruct plays `self-destruct` 0.3 s after a turret dies or is
+    replaced: a charge bursting in a small iron crate, then bolts and
+    cogs rattling across stone. Four takes that asked for steam and a
+    hiss came out as flat noise with no bang, so the final prompt
+    leaves them out. Its spectrum is close to `death-turret`'s, but its bang comes
+    after that crash has faded, and none of it is masked.
+  - The hits of Doomsday and Self-Destruct are reactions, so they stay
+    silent and never add `crit-heavy`.
+  - Flashbang left the kit, so its sound map and catalogue entries, its
+    runtime file and its raw takes are gone. No voice line mentions it.
+    Overclock stays silent: it builds up over time and has no single
+    moment to mark.
+  - GAMEPLAY changed how a projectile's area hits land.
+    `projectile()` returns its flight time, the first hit stores it in
+    `flightTimes`, and the blast's other hits wait that long instead of
+    a fixed 0.16 s.
+  - A probe replayed 120 fights (2,547 s) through the real voice and line
+    policies: 5 seeds and 8 builds, with Brassjack, Gorrak and Cinder
+    against three teams. It follows every `battle-view.ts` branch above.
+    - 672 rockets hit 1,041 times. Every hit landed in the same frame,
+      0.3 s after its launch, and each rocket played one `hit-rocket`.
+    - All 170 Mech Suits played. The shields and forms asked for no
+      sound. With Walking Fortress the suit lasted up to 16.9 s and
+      fired up to 10 rockets.
+    - All 17 Doomsday blasts played. 18 of their 25 hits were big enough
+      for `crit-heavy` and stayed silent as reactions.
+    - 96 turret blasts landed, each 0.3 s after its turret fell: 87
+      deaths and 9 replacements. 91 played; the other 5 came within
+      80 ms of another blast and folded into it.
+    - All 459 Tesla Coils chain hits took the arc path and landed 94 ms
+      before the turret's bolt reached the first enemy. That is flagged
+      to GAMEPLAY.
+    - 74 of 672 `cast-rocket`s were cut by later lowest-tier sounds, 12
+      of them before the rocket landed. `mech-suit`, `doomsday`,
+      `self-destruct` and `death-turret` were never cut.
+  - All five new sounds lose 1.7 dB or less on a laptop. With
+    `flashbang` gone, 16 sounds still lose 10 dB or more.
+  - Checked headlessly only. Nobody has heard these sounds in a fight
+    yet.
+- **The items overhaul** (GAMEPLAY's request, 2026-09-25). Four new
+  sounds, and `ward-bell` removed with its item: 97 in all.
+  - Voidheart's burst plays `voidheart` at the body, 0.3 s after the
+    kill: a hollow rush of air pulled inward, then rubble and bone
+    shards spraying across stone. The take's first 0.1 s is cut
+    (`leadCutSeconds`), so the burst peaks 60 ms in, while the nova's
+    flash is still up. Uncut, it peaked at 160 ms, after the flash had
+    gone. An implosion that starts before the burst would need an event
+    at the death, which is GAMEPLAY's call. The burst's hits are
+    reactions and stay silent.
+  - Ember Brand's fire zones play `ember-trail`, a low whoosh with
+    crackling, spitting embers. Its 800 ms cooldown, the sound's full
+    length, lets one whoosh play at a time. Without it, Vesper's hops
+    played 14.5 a fight, each cutting off the one before.
+  - Every `stunned` status plays `stun`, an iron-bound club cracking
+    against a helmet, capped at 0.3 s. GAMEPLAY asked for a dull thunk.
+    This take is crisper, and the hit's own sound under it gives the
+    thud. A stun that rides on a hit sounds with that hit
+    (`stunningHitsIn`); any other stun sounds when its status arrives.
+  - Unstable Core's HP cost plays `unstable-core` on the original cast:
+    electricity arcing across a cracked iron coil, capped at 0.5 s. The
+    echo 0.3 s later plays the skill's cast sound again.
+  - Ward Bell's catalogue entry, runtime file and raw takes are gone.
+    Spell Siphon, Infinity Band, Berserker's Collar, The Unbound, Focus
+    Crystal, Iron Plate and Hourglass Shard stay silent, as asked.
+  - Four more stun takes were tried. One matched the spectrum check but
+    was a dud: a 4 ms click at 1.2 kHz on a flat low bed, with a raw
+    momentary maximum of −36.4 LUFS. The −30 LUFS rule still catches
+    these. Four more ember takes failed too. "Straw catching fire" gave
+    single snaps, and the rest lost 5.1–5.4 dB on a laptop, so take 1
+    stays.
+  - A probe replayed 15 fights per setup (5 seeds, 3 enemy teams)
+    through the real voice and line policies, following every
+    `battle-view.ts` branch above.
+    - Gorrak with Skull Basher asked for 8.4 stuns a fight, and 6.3
+      played. The rest were extra Whirlwind targets stunned on the same
+      tick, which folded into one crack. Whirlwind counts as an attack,
+      so 76 of the 126 stuns came from it. Cinder's Skull Basher stuns
+      (3.6 a fight) sounded as the firebolt landed, 0.16 s after the
+      event. Sentinel Ward stunned 8 times in 15 fights, each sounding
+      at once.
+    - Ruthless first stunned only on Fireball. Deferred casts dropped
+      its stun, so Leap Slam, Whirlwind and Flicker Strike never
+      stunned, and GAMEPLAY fixed that the same day. A re-run of 36
+      fights per skill heard every stun with the hit that caused it:
+      0.4 a fight from Leap Slam as it landed, 0.9 from Flicker Strike,
+      1.8 from Fireball (a blast's extra targets fold into one crack)
+      and 2.3 from Frozen Orb, each on its own shot. Ultimates almost
+      never reach a third use, so Whirlwind, Thousand Cuts and Meteor
+      never stunned. Enemies a third use hit but did not stun either
+      died from the hit or were Gorrak, who is unstoppable in Whirlwind
+      and immune to control at full Fury.
+    - Gorrak's leaps dropped 0–3 fire zones each, all on the cast's
+      tick, and each leap played one whoosh. Vesper's Flicker Strike and
+      Thousand Cuts dropped up to 22 zones across 1.4 s. With the
+      cooldown, 4.4 whooshes a fight play instead of 14.5, and none cuts
+      another.
+    - Every Voidheart burst landed 0.3 s after its kill: 1.0 a fight
+      with Gorrak, 1.8 with Cinder. Bursts on the same tick folded into
+      one.
+    - Unstable Core paid 5.2 times a fight for Cinder and for Rime,
+      always on the original cast, with the echo 0.3 s later. Every
+      echo was `triggered`, so none asked for a voice line.
+  - `voidheart`, `stun` and `unstable-core` lose 0.1 dB or less on a
+    laptop. `ember-trail` loses 5 dB, like the other fire sounds
+    (`hit-fire` 5.8, `inferno-burst` 5.4).
+  - Checked headlessly only. Nobody has heard these sounds in a fight
+    yet.
+
+## Hero redesign, slice 1: skills, gems, triggers and Vesper (2026-09-24)
+
+The user merged the redesign proposal (`docs/hero-redesign.md`), asked
+for the heroes not to be mostly human, said the 3D can be mocked until
+it's made in Blender, and asked that combos keep working. This builds
+slice 1 of the proposal.
+
+- **Built in a git worktree, merged at the end.** The HUD, sound and
+  asset sessions were working in the shared tree; an engine rewrite in
+  place would have broken their builds for hours. The merge used a
+  three-way merge per file against the snapshot the worktree started
+  from.
+- **Skills, not a signature.** `HeroDefinition.abilityId` and
+  `ultimateId` replace `abilityIds`, and the "signature" name is gone
+  everywhere (no alias kept). Upgrade tokens are `@ability`, `@ultimate`
+  and `@basic`.
+- **Attacks and spells.** `AbilityDefinition.hitType` decides crits and
+  on-hit. Basic attacks, Shield Bash, Leap and Vesper's skills are
+  attacks; everything else is a spell for now. Whirlwind stays a spell
+  until Gorrak's rebuild, so his balance didn't shift in this slice.
+- **Loop rules as the proposal wrote them.** Triggered casts wait at
+  least 3 ticks, one per hero per tick, and are full casts. The old
+  same-tick `ctx.triggered` queue is gone; HP-threshold reactions (Ice
+  Block, Ward Bell) still resolve in the same tick through
+  `ctx.reactions`.
+- **Gems per skill.** `HeroBuild.gems` holds `{ gemId, slot }`, and
+  `trainedSockets` counts Train per skill. The run's `OwnedGem` has a
+  `skill`, the `socket-gem` command and `choose-offer` carry it, and the
+  protocol is version 4.
+- **Rune art became gem art** under the new ids (Echo's art is now
+  Multicast's, Retaliate's Cast when Damaged's, Tandem's Cast on
+  Detonation's); Twincast's was deleted. Five retired Vesper talent
+  icons were deleted.
+- **Combos checked by measurement.** A probe fought the three lore trios
+  against each other before and after (60 seeds each way): every combo
+  kept its tier. Detonation counts moved in the fights against Vesper's
+  trio, because her new kit changes those fights; Shatter moved the
+  most (2.64 → 1.63 per fight for Anvil, Rime and Vesper). `validateCatalogue` now fails a hero whose declared
+  condition nothing in its kit applies, and the trait scan sees
+  conditions granted to summons and dash finishers.
+- **Seven non-human bodies, mocked.** Rime, Moira, Nettle, Sexton,
+  Brassjack, Vesper and Morrow have new placeholder figures
+  (`hero-figures.ts`); the model contract text allows any skeleton, and
+  the new looks, portraits and icons are `missing_assets.md` entries 8
+  and 24. Floating figures bob instead of stepping.
+- The measurements and the choices the proposal left open are in
+  `docs/hero-redesign.md` §13.
+
+## Creature portraits and slice 1's icons (2026-09-24)
+
+The gameplay session asked, on the user's instruction, for the art
+that slice 1 of the hero redesign needs. Twenty images were made the
+same way as the rest (gpt-image-2.5 through Cloudflare, medium quality),
+plus two retakes: three gems, five items, Vesper's five level picks, and
+new portraits for the seven heroes with non-human bodies. Every item,
+gem, level pick and hero has art again.
+
+- **A creature version of the portrait template.** "Head-and-shoulders
+  bust" doesn't fit a tortoise, a clock or an eye.
+  - The creature template names what stands in for the head (the eye,
+    the clock face) and asks for it in the upper half of the canvas,
+    where the tooltip card's band looks.
+  - It adds "not cute, not a mascot, not a plush toy".
+  - The three riskiest (Brassjack, Morrow, Vesper) went first.
+  - Brassjack's dial has no numerals, which would count as text.
+  - Morrow's shrine is an invented one, with no real-world religious
+    architecture; its roof still has a slight East Asian curve.
+  - Vesper and Sexton are painted in mid-tone plum and slate with a
+    strong rim light, never black on black. Sexton's orange-red wing
+    bands, which are team pieces on his 3D model, are left out.
+- **Two icons were redone.** Cast on Crit's star on a blade read as a
+  cross at small sizes; it's now a starburst on a diagonal dagger.
+  Daedalus Edge's first blade was thin, with a small spark.
+- **Face crops** keep each hero's signature feature: the eye, the dial
+  and bell, the antennae and lantern, the crystal spines.
+- **Nettle's portrait is 44 KB**, so the portrait budget went from
+  40 KB to 48 KB. The busts now total about 300 KB, and the faces about
+  90 KB.
+- **Moira's threads came out raspberry-magenta**, warmer than her
+  violet-magenta role colour. They're darker and pinker than the
+  their-side red (3% of pixels near `#ff6b6b`), and her eye reads
+  clearly at 28 px.
+- The Rime question from the first portraits is moot now that she's a
+  dragon.
+- Entry 24 of `missing_assets.md` is delivered and removed. Its one open
+  question, whether gems should become cut gems, is noted in
+  `docs/icons.md`.
+- Nothing was committed.
+
+## Hero redesign, slice 2: levels, Gorrak, Anvil and Cinder (2026-09-24)
+
+The user asked for more of the redesign after slice 1 ("we dont wanna
+rebuild more?"), so all nine remaining heroes are being rebuilt in the
+proposal's slice order. This entry covers slice 2. It was built directly
+in the shared checkout, with the HUD, sound and art sessions kept
+informed by message.
+
+- **Talents are levels, with no alias.** `UpgradeCategory` is `"level"`.
+  A pick has `level` 2, 3 or 4 and a `path`, and eligibility is generic:
+  one pick per level, taken in order, so `requiresAnyOfUpgradeIds` and
+  `excludesUpgradeIds` are gone. The run's milestone is `"level"`,
+  `PendingDecision.level` replaces `tier`, recruits catch up on arrival,
+  and from round 4 one card in each item pick is a gem. The icon kind
+  is `levels` (the folders moved). The protocol went to 5 for the levels
+  change and 6 for the rest of the slice, then to 7 when the checkout
+  was brought up to the upstream draft-timer change, which was 4 on its
+  own.
+- **Levels are visible.** An I–IV badge sits on the battle plate, the
+  ITEMS panel portrait and the hero card. Figures grow 6% per level, and
+  level IV adds a pulsing aura. Levelling up on the reward board shows a
+  badge pop and swells the figure.
+- **Engine primitives sized for later heroes.**
+  - The stacks passive now has gain rules, decay, a start value and
+    effects at max (cleave, control immunity, an ability reset, a form).
+  - Level picks can patch a passive (`passiveChanges`).
+  - Channels can be unstoppable, drift, pull, and leave a zone when they
+    end.
+  - Zones can follow their source and hit with full attacks.
+  - Forms are timed states with damage reduction, an HP floor,
+    retaliation, a closing burst, a basic-attack swap and draining
+    stacks.
+  - Shield Toss uses ricochets, Meteor Shower uses showers, and
+    Fireball can split and plant bombs. Revive can enter a form.
+- **Retired passives deleted:** interpose, retribution,
+  unbreakable-while-taunting, grudge, bloodlust and Blood Contract, with
+  their engine code and memory fields.
+- **Order bias found and fixed.** Anvil's mirror went 17/83. Forms ended
+  in unit-array order (team A first), so B's closing shockwave counted
+  A's shockwave damage. Timed passes now run in `resolutionPriority`
+  order, simultaneous endings resolve in two phases, and damage stored
+  for Vengeance settles the next tick. Mirrors are 48–53% for all four
+  rebuilt heroes.
+- **First-pass numbers were far too high and were cut by measurement.**
+  One-swap win rates as first built were Anvil 87% and Cinder 93%.
+  Removing kit parts in cloned catalogues showed the cause: Last Stand's
+  retaliation and burst for Anvil, raw area damage for Cinder. The
+  numbers in the kits are the tuned ones, and §14 of the redesign lists
+  them.
+- **Every trigger has a recharge.** Reprisal without one ping-ponged
+  between two Anvils (a ×208 chain). It now recharges in 0.5 s, and the
+  longest chain in 10,000 random fights is ×12.
 
 ## Main menu: your arena and three heroes behind it (2026-09-24)
 
@@ -3292,3 +3991,458 @@ Each layer is its own commit and a working game.
     51 → 51 over 12 rebuilds).
   - Frame rates can't be judged here: software WebGL runs at about
     2 FPS.
+
+## Hero redesign, slice 4a: Rime and Nettle (2026-09-24)
+
+The third slice of the redesign rebuilds Rime and Nettle. It was built
+directly in the shared checkout after it was brought up to the upstream
+lighting, menu and draft-timer work, with the HUD, sound and art sessions
+kept informed by message. Redesign §15 has the kits and numbers.
+
+- **Frozen Orb is a moving emitter.** `state.emitters` holds orbs that
+  travel, shoot every few ticks at the nearest enemy (or every enemy,
+  for Hailstorm) and stop when their caster dies.
+  - Each shot is a real cast of the skill, so the skill's gems apply.
+    Barrage and Pierce aim from the orb.
+  - The snapshot carries the orbs for the client.
+- **Chill replaces the old slow-history Deep Freeze.** Chill is a status
+  with stacks: 5 Freeze the enemy and make it Brittle.
+  - Frozen enemies can't gain it.
+  - Only full-strength hits add it, so gem copies don't multiply Freezes.
+- **Nettle's poison has no cap and Bursts.**
+  - One function changes a pile's stacks and checks the Disorient and
+    Burst thresholds.
+  - Bursts wait one tick and resolve in resolution-priority order.
+  - A Burst shares stacks and never copies them, so a round of Bursts
+    can't grow the enemy team's total. "Each neighbour gets half" grows
+    it in any clump of three.
+- **Bursts had to add damage to be worth anything.** When a Burst spent
+  every stack, it only moved damage earlier, and Virulence measured
+  worthless (75.8% one-swap without it, 75.6% with it). The unspread half
+  now stays on the target.
+- **Withering stays, and scales with stacks.** On uncapped poison, flat
+  Withering was worth 22 points by itself. It made picks that just poison
+  more enemies (Twin Bloom +19.5) beat every other pick. It now reaches
+  its 40% / 30% at 10 stacks.
+- **Merged poison keeps the later expiry and blends damage by stacks.**
+  The old "highest rate wins" rule let one Venom Vial stack lift the
+  whole pile, giving 1,100-damage Bursts.
+- **First-pass numbers were cut by measurement,** as in slice 2. Rime
+  started at 26% and Nettle at 75.6%. The fix came from removing kit
+  parts in cloned catalogues and comparing one-swap win rates.
+- **Deleted with no aliases:**
+  - Ice Block, Glacial Lance, Caustic Spit and Plague Cloud;
+  - the Brittle-burst passive;
+  - the death-spread poison passive;
+  - shield stripping and biggest-shield targeting;
+  - the DoT damage and max-stack stats;
+  - the dot's condition-at-stacks field;
+  - the line Fork;
+  - ten level icons.
+- **Passive events can name a target.** `passive-triggered` has an
+  optional `targetUnitId` (the Bursting or Frozen enemy), asked for by
+  the sound session so it can pan and time those sounds.
+- The protocol is 8.
+
+## Hero redesign, slices 4b and 4c: Morrow, Moira, Sexton and Brassjack (2026-09-25)
+
+The last two slices of the redesign rebuild the remaining four heroes,
+again directly in the shared checkout, with the HUD, sound and art
+sessions kept informed by message. Redesign §16 to §18 have the kits,
+numbers and every tuning choice. All ten heroes are now rebuilt.
+
+- **Ultimates wait for their moment.** Resurrection waits for a fallen
+  ally, and Army of the Dead waits for a hero corpse. Cast on
+  cooldown, both spent their mana on the weak fallback.
+- **Bounces revisit.** In a 3v3, Judgment's four bounces already reached
+  everyone, so extra bounces (Swift Judgment, Chain, Heavy Shield) did
+  nothing. A hop now goes to the nearest target not yet hit, then to
+  the nearest one it didn't just leave.
+- **Forms lost `invulnerable`.** Avatar's invulnerability was worth 6.5
+  to 11.9 points. A 30% damage cut replaces it.
+- **Puppets are a link rule.** A puppeted enemy uses only its basic
+  attack, aimed at its link partner, with hits that carry no conditions
+  or detonations. Its skills wait, and triggered casts still aim at
+  enemies.
+- **Corpses are real state.** A unit is a corpse while it is dead,
+  fell through a real death and isn't used up. Morrow's revives, Corpse
+  Explosion and Army of the Dead all need one, so they compete for the
+  same bodies. `removeUnit` takes a summon off the board without a
+  death, a Soul or a corpse.
+- **Summons can carry their summoner's gems** (`carriesGems`). A gem
+  goes onto the summon's basic attack when it works there, and onto the
+  skill otherwise. Applying it to both made Overcharge worth 15 points.
+  `compileBuild` takes the summoner's arming, so gems like Haste change
+  a turret's compiled cooldowns.
+- **A new shield never lowers an existing one.** A small ally shield
+  used to cut the Mech Suit's shield down to the 30% stacking cap. The
+  change moved no fight without Brassjack in it.
+- **An ultimate's form can stop mana building** (`locksMana`, on the
+  Mech Suit). With mana building inside the mech, two Brassjacks each
+  had a fresh 800 shield up almost all the time, and their mirrors
+  timed out. The mech now costs 110 mana instead of 160.
+- **Summons spawn mirrored for the north team.** The spawn ring flipped
+  only its y offset, so north-side summons landed on the wrong flank.
+  Brassjack's 3v3 mirrors went 24% or 71% by his slot; now they are
+  about even.
+- **Numbers were cut by measurement,** by removing kit parts in cloned
+  catalogues and comparing one-swap win rates:
+  - Puppeteer's full effect now costs 50 more mana (+13.4 without the
+    cost, +3.2 to +4.2 with it);
+  - Death Knell is 10%, not 25%;
+  - turrets have 800 HP instead of 640, on a 7 s deploy;
+  - Twin Deploy recharges in 16 s.
+- **Deleted with no aliases:**
+  - Mend, Consecrate, Last Rites and Martyrdom;
+  - Siphon, Cruel Hex, Mass Hex and the old Ill Omen;
+  - Raise Dead, Soul Well, Horde, Golem Heart and the old Army of the
+    Dead and Bone Colossus;
+  - Flashbang, the flat Overclock and six Brassjack levels;
+  - the `own-summon` target policy and the forms' `invulnerable`.
+- The protocol is 9.
+
+## Chill, Pandemic and Burst in the HUD (2026-09-25)
+
+The HUD side of Rime's and Nettle's rebuilds, done alongside the gameplay
+session's slice.
+
+- **Status icons** (`statusGlyph` in `hud/icons.ts`). These replace the
+  stun glyph both chips fell back to.
+  - Chill: icicles hanging from a bar, a step before Frozen's ice block.
+    The snowflake was already the Brittle condition icon.
+  - Pandemic: a spotted virus.
+  - Both paths are built from shapes that don't overlap, so the evenodd
+    fill leaves no stray holes.
+- **Chip colours.** Chill is `#c4ecff`, a paler ice than Frozen. Pandemic
+  uses `--color-poison` (`#c6e84a`), apart from the poison chip's green.
+  The plate shows Chill's stack count and no count for Pandemic.
+- **Selected-unit card** (`unit-inspector.ts`). "Chill ×3 2.8s" follows
+  Slowed, and "Pandemic 3.8s" follows the DoTs.
+- **Burst callout.** Nettle's Burst damage is a highlight, so it gets the
+  combo callout: "Burst" over the number, in chartreuse. The label rule
+  is now `.float-number[data-label]::before`, shared by combos and
+  Bursts.
+- **Card rows.** `.unit-card-ability-head` dropped
+  `justify-content: space-between`. A passive head has no cost, so its
+  name was pushed to the far right. Names now sit next to their kind
+  label in every row, and costs stay right through `margin-left: auto`.
+- **Verified in the lab** (Rime, Nettle and Anvil vs Gorrak, Vesper and
+  Morrow).
+  - Chips appear with the new glyphs.
+  - Morrow's card listed "Knocked down, Chill ×3 2.8s, Poison ×4" and
+    later "Disoriented, Frozen, Poison ×31, Pandemic 3.8s".
+  - Rime's Deep Freeze row and its hover card render.
+  - Ten Burst callouts appeared in a 19.5 s fight, next to 16 combos and 8
+    crits, with no console errors.
+- **Found, not mine to fix.**
+  - Pandemic with Black Death Bursts each enemy twice on the same tick for
+    the same damage. Bursts that don't spread neither consume the poison
+    nor set `burstLockedUntilTick`. Passed to the gameplay session.
+  - At 1512×760 the Hailstorm cloud hides every unit in the cluster
+    under it.
+
+## Morrow in the HUD: Blessed shields, Avatar and Blessed Overflow (2026-09-25)
+
+The HUD side of Morrow's rebuild.
+
+- **Blessed Overflow on the card.** `cardPassive` in `tips.ts` now
+  includes it.
+  - Summary and rule are built from `capMaxHpFraction`, `durationTicks`,
+    `burstFraction` and `burstRadiusUnits`.
+  - Shield icon, gold tip accent (`passiveAccent`).
+  - Crusader has no row, since its copy lives on the level pick.
+- **Blessed shields read gold.** While `shield.blessed` is set:
+  - the inspector's row becomes "Blessed shield N" with a gold chip;
+  - the card's HP-bar shield segment turns gold;
+  - the plate's shield strip has `.is-blessed` styles ready. The one-line
+    toggle in `battle-view.ts` `syncRecords` is with the gameplay session,
+    which is editing that file.
+- **Avatar in the inspector.** Any active form shows as a gold buff row
+  named from the form's key: "Avatar 5.9s". Status "form" uses the SUN
+  glyph, Morrow's role icon. Inspector chips now carry
+  `data-status={key}` for styling.
+- **`titleCase`** moved from `damage-meter.ts` into `tips.ts` so both can
+  use it.
+- **Revive was already handled.** Plates show and hide from `unit.alive`
+  on every sync, the white trail snaps up to the revived HP, and the
+  inspector and damage meter already flip back on "revived".
+- **Verified in the lab.** Morrow with Hallowed Path, Crusader and Avatar,
+  plus Anvil and Gorrak, against Cinder, Vesper and Rime.
+  - At tick 20 Gorrak read "Chill ×1 · Burn ×1 · Blessed shield 62", with
+    a gold chip and a gold shield segment.
+  - At tick 390 Morrow read "… Invulnerable · Avatar 5.9s".
+  - Her card showed the Blessed Overflow row, and its gold hover card
+    showed the full rule.
+  - No console errors.
+
+## Moira in the HUD: Puppeted and the Weaver meter (2026-09-25)
+
+The HUD side of Moira's rebuild.
+
+- **Puppeted status.** `statusGlyph("puppeted")` is a marionette control
+  bar with three strings ending in beads, drawn from shapes that don't
+  overlap. It replaces the stun glyph fallback.
+  - The plate chip is hot magenta (`#ff6ad9`), a notch louder than
+    Linked's violet.
+  - The inspector adds "Puppeted 2.3s" under Linked while
+    `link.puppetUntilTick !== 0`.
+- **Weaver meter.** `.unit-plate-meter[data-passive="threads"]` fills
+  violet-magenta (`#d46bff`) and turns pale with a glow when full,
+  apart from Fury's pink.
+- **Verified in the lab** with two builds: Long Bond, Hex Bolt and
+  Puppeteer, then Long Bond, Death Knell and Ill Omen.
+  - At tick 350 Anvil read "Knocked down · Slowed 20% · Chill ×2 · Linked
+    · Puppeted 2.3s", and the puppeted chips were on both bound enemies.
+  - The Weaver meter showed at 80% in magenta.
+  - Ill Omen spread Crush to the other bound enemy on the same tick for
+    the same amount (ticks 278 and 301).
+  - No console errors.
+
+## Sexton in the HUD: Grave-marked, Harvest and risen copies (2026-09-25)
+
+The HUD side of Sexton's rebuild, plus two fixes found while checking it.
+
+- **Grave-marked.**
+  - `statusGlyph("grave-marked")` is a headstone with a cross cut out of
+    it, drawn from shapes that don't overlap.
+  - The plate chip is pushed while `unit.graveMark !== null` and uses
+    Sexton's teal (`--color-role-bonecaller`).
+  - The inspector shows "Grave-marked 4.1s".
+- **Harvest on the card.** `cardPassive` is now a grouped switch that
+  includes it.
+  - The summary is "Every 2 deaths raise a thrall", or "Every death"
+    when `soulsPer` is 1.
+  - The rule reads: "Every death on either side is a Soul, except his
+    own summons. Every 2 Souls raise a thrall beside him, up to 4 at
+    once."
+  - The thrall's name comes from its hero definition. The tip uses the
+    headstone icon with a teal accent.
+- **Risen copies show their real level.** `isHeroUnit` in
+  `battle-view.ts` now asks only whether the hero is a summon type. A
+  copy of a real hero gets its level badge, figure growth and level
+  aura; thralls and golems still don't.
+- **Clicks prefer the living.** Corpses now stay lying while Sexton can
+  use them, and a click picked the nearest body even when a living unit
+  was just as close. Dead units now score an extra `PICK_RADIUS_PIXELS`,
+  so they're chosen only when nothing alive is in reach, and they can
+  still be inspected.
+- **The damage meter names copies.** A risen copy's damage already rolls
+  up to Sexton. Its source label is now "Risen Morrow", not "Morrow", so
+  it doesn't read as the real hero's damage. Summon-type heroes keep
+  their plain names.
+- **Verified in the lab.**
+  - "Grave-marked 4.1s" appeared on Vesper after Corpse Explosion with
+    Grave Chain.
+  - Sexton's card read "Harvest · Every 2 deaths raise a thrall", and
+    "Lich 4.7s" showed as a form row.
+  - The risen Morrow copy read "Ally summon · Wall · Melee" with her full
+    kit and a level I badge, and was selected rather than her corpse.
+  - No console errors.
+
+## Brassjack in the HUD: Overclock, turret gems, Mech and forms (2026-09-25)
+
+The HUD side of Brassjack's rebuild.
+
+- **Overclock on the card.**
+  - Summary: "Turrets near another turret spin up +10% fire rate a
+    second, to +100%".
+  - The rule is built from `rangeUnits`, `bonusPerSecond` and `maxBonus`.
+  - COG icon and a brass accent.
+  - The Harvest helper became `summonName(heroId)`, shared by both
+    passives.
+- **Gems say where they act.** Socket and fit lines add "(on turret
+  shots)" when a gem works on the carried shot (`carriedShot` +
+  `gemWorksOnShot`), so Chain reads "Deploy Turret (on turret shots)".
+  Split, Empower and the trigger gems still read "Deploy Turret".
+- **Ability recharge includes level modifiers.** `CardStats` carries
+  `abilityCooldownTicks` from `abilityCooldownDurations`. With Twin
+  Deploy, Deploy Turret now reads "every 15.8 s", not its base 7 s.
+- **Forms carry their key.** Plate chips and inspector rows use
+  `form:<key>` with the owner's glyph and colour: Avatar sun and gold,
+  Lich skull and teal, Mech cog and brass. Walking Fortress
+  (`endsWhenShieldBreaks`) reads "Mech until its shield breaks" instead
+  of a 2-minute countdown.
+- **Summon abilities are named in the meter.** A summon-type unit's
+  non-basic ability is labelled by name, so turret blasts roll up to
+  Brassjack as "Self-Destruct". Risen copies keep "Risen X".
+- **Not done.**
+  - A "+40%" Overclock chip on turret plates (optional, since the figure
+    already spins up and glows).
+  - A reticle on the mech's commanded target.
+  - Listing a turret's carried gems in the inspector.
+- **Verified in the lab** with Twin Deploy, Self-Destruct, Walking
+  Fortress and a Chain gem.
+  - "Mech until its shield breaks" appeared, with a brass mech chip.
+  - The Overclock row, and "every 15.8 s" on Deploy Turret.
+  - The Chain tooltip's "Socketed · Brassjack · Deploy Turret (on turret
+    shots)".
+  - No console errors.
+
+## Items overhaul (2026-09-25)
+
+The item list now matches redesign §7, and every item §7 doesn't list is
+deleted. Built in the shared checkout like the hero slices; redesign §19
+has the numbers and the full list of choices.
+
+- **Attack and spell damage are separate stats.** `attack-damage`
+  scales only hits from attacks; `spell-damage` scales every other hit,
+  damage-over-time ticks included. The old `damage` stat still scales
+  both. Whetstone moved to attack damage, and Focus Crystal is the spell
+  side.
+- **Lifesteal comes from attacks only,** unless the hero holds
+  Spellblade Hilt, which already turns spells into attacks.
+- **Every-Nth-attack items count strikes.** An attack counts once per
+  cast and tick, so cleave, chain or fork hits don't advance the count
+  and Barrage copies don't either. Each Flicker hop counts as one
+  strike. A proc lands on every hit of the strike.
+- **Mana is gained in one place** (`gainMana`), which applies a form's
+  mana lock and Withering. Spell Siphon goes through it.
+- **Detonations have a body and a source.** Voidheart shares the queue
+  Self-Destruct uses, with the killer as the source, and needs the body
+  to still be dead when it fires.
+- **Items can add gem sockets** (`extraGemSockets`, only The Unbound
+  today). Sockets are read from the equipped build everywhere, and the
+  run sends gems past a skill's socket count back to the stash when the
+  item moves or is discarded. The run package has its first tests
+  (`pnpm --filter @jev-game/run test`).
+- **Unstable Core repeats only the hero's own ability and ultimate
+  casts,** so it can't multiply trigger gems or turret shots, and its
+  HP cost can't kill.
+- **Deleted with no aliases:** Ward Bell and its shield, Soul Lantern,
+  Thunder Maul, Hourglass, the `hp-threshold`,
+  `refill-after-first-ultimate`, `soul-lantern`, `on-kill-mana` and
+  `on-kill-heal` passives, the `starting-mana` stat and the `setSchool`
+  ability change. The damage meter's "Kill heal" label went with
+  `on-kill-heal`.
+- **Ruthless's stun travels with deferred casts,** once per enemy per
+  use. Dashes, channels, impacts, showers, bombs and emitters carried
+  its damage but dropped its stun.
+- **Revives aren't heals.** Aegis and Resurrection set HP directly, so
+  a Berserker's Collar holder still comes back (59 revives in 60 test
+  fights, none at 0 HP).
+- The protocol stays v9.
+- **Left for Slice 3:** Swift Boots, Skull Basher, Ember Brand and
+  Infinity Band miss the +3 dead-pick bar. Skull Basher's stun is short
+  because cooldowns keep running while a unit is stunned.
+
+## Voidheart callout (2026-09-25)
+
+- **Every Voidheart burst hit gets the combo callout:** "Voidheart" over
+  the damage, in the nova's magenta (`#e45cff`), whatever the size of the
+  hit. `landHit` keys on the item ability's id, and nothing else deals
+  damage under it.
+- **Why it clears the highlights-only bar.** It fires 0.4–1.6 times a
+  fight and often lands the kill that ends it. In the lab, a 320 burst
+  finished Rime (1,750 HP) under the 20% big-hit bar, so the death came
+  with no number.
+- **Ember Brand's Burn ticks stay hidden,** like every other DoT tick.
+- **Verified in the lab** (Gorrak with Voidheart and Ember Brand, Anvil
+  and Morrow vs Vesper, Rime and Moira). The burst at tick 491 showed
+  "Voidheart 320" in magenta, with no console errors.
+
+## Level-pick and item icons for the redesign and the items overhaul (2026-09-25)
+
+The gameplay session sent, on the user's instruction, the icons that
+slices 2 to 4c of the hero redesign and the items overhaul need.
+Fifty-nine images were made the usual way (gpt-image-2.5 through
+Cloudflare, medium quality), plus six retakes: 42 level picks for
+Gorrak, Anvil, Cinder, Rime, Nettle, Morrow, Moira, Sexton and
+Brassjack, 15 items, and redos of Heavy Shield and Ill Omen. Every item
+and level pick has art again (43 and 60). The eight new gems wait on
+the tablet-or-cut-gem decision.
+
+- **Each hero's six picks were compared side by side at 32 px,** which
+  caught three problems that needed retakes.
+  - Maelstrom and Wide Swings were both a red ring around crossed axes.
+    Maelstrom is now a funnel vortex.
+  - Doomsday and Self-Destruct were both orange blasts. Doomsday is now
+    Brassjack's own dial at midnight, cracked, in a ring of fire.
+  - Black Death's plum petals sank into the navy disc. They're ash grey
+    and mauve now.
+- **Two level-pick template variants for people.** Four prompts swap
+  "no characters" for "the figure(s) seen whole, no close-up(s) of
+  faces": Gorrak's leap, Living Bomb, Permafrost and Mass Resurrection.
+  `docs/icons.md` has both variants.
+- **New items were checked against their nearest neighbours.**
+  - Unstable Core is a caged capsule, not an orb, so it doesn't look
+    like Worldbreaker.
+  - Focus Crystal is one tall crystal in a claw mount, not a cluster
+    like Mana Stone.
+  - Spell Siphon's mana is Mana Stone's pale aquamarine, not blue.
+- **Team colours.** No icon is dominated by either one, which is the
+  documented test.
+  - Anvil's shields name a "weathered grey steel face", and all six
+    have 0% of pixels near `#4ea1ff`.
+  - Gorrak's reds have 2–11% of pixels near `#ff6b6b`.
+  - Frost is held to its own rule: pale icy white and aqua, never
+    blue. "Pale icy white and aqua" still gave a pale blue, up to 26%
+    of pixels near `#4ea1ff`. Shatterpoint has 18%, Rime's portrait 1%
+    and Frost Brand 0%.
+  - The three bluest were retaken with Frost Brand's words ("pale
+    ice-white and light cyan", "pale icy colours only, no deep or
+    saturated blue"). Slow Orb went from 25% to 9% and Twin Orbs from
+    21% to 15%.
+  - Ice Mirror stayed at 25%, down from 26%. It's paler to the eye, but
+    its shadows are still light blue. A further retake could try packed
+    snow in place of clear ice.
+  - Permafrost (12%) and Hailstorm (7%) kept their first takes.
+- **Old art reused under new ids:** Holy Ground as Hallowed Path, Horde
+  as Bone Legion, Fortress as Walking Fortress, and Hourglass as
+  Hourglass Shard. Icons and prompts for picks and items that no longer
+  exist are gone. The Hourglass Shard redo was skipped, because the
+  whole hourglass already reads as a cooldown.
+- **Size.** The 59 new WebPs total 663 KB, 11 KB each on average. The
+  whole icon set is 1.58 MB.
+- **`missing_assets.md`.** Entries 26 to 29 and 31 are delivered and
+  removed. Entry 25 keeps the eight gems, and entry 30 keeps Brassjack's
+  two 3D wishes.
+- Nothing was committed.
+
+## Moira built in three.js, and her abilities reworked (2026-09-25)
+
+- **Model.** Moira is built in code, not from a GLB
+  (`apps/client/src/models/moira/`). She is a wound-thread ball around
+  one slit-pupil eye, with curling tendrils, and uses
+  `createMoiraFigure` in `hero-figures.ts`. Kits are cached per detail
+  level. The board model is about 32k triangles. Her GLB request in
+  `missing_assets.md` is removed.
+- **Abilities.**
+  - Spite Bolt is a magenta yarn needle with a tapered tail, a release
+    burst and a heavier `fate` hit.
+  - Hex opens an evil eye, cinches a helix and pops the target into a
+    poppet (`hex-critters.ts`). The pop is a magenta ink puff with a
+    ground shock, not a white flash.
+  - Shared Fate throws threads and drops a web that is capped at 26
+    units. A thin shock ring shows the true area.
+  - Bound enemies wear braided tethers and knots. Puppets hang from
+    wooden crosses.
+  - Shared damage, Ill Omen and Death Knell travel as beads and tolls
+    along the threads. Death Knell also rings a bronze bell.
+- **Readability rule.** Every effect gets a solid saturated or dark
+  core under its additive glow. Additive alone washes to white on the
+  cream and frost boards.
+- **Spell bench.** `#sculpt/spells` (`spell-bench.ts`) fires each Moira
+  effect on the real board against four dummies. It needs no simulation
+  and runs at about 7 ms a frame, against about 117 ms in the battle lab
+  in the browser pane.
+- **Battle view reset.** A snap (reset, replay or a tick jump) now
+  disposes in-flight spell visuals and projectiles. Before, any hero's
+  cast kept playing for up to 1.5 s after a reset.
+- **Follow-up.** On team A, Moira faces away from the camera, so her eye
+  never shows in battle.
+- Nothing was committed.
+
+## Delayed hit visuals stay near the 0.16 s projectile (2026-09-25)
+
+- **Rule.** A hit's visual lands within about 0.2 s of its damage.
+  `syncRecords` applies each snapshot at the damage tick: the plate's HP
+  fill, plate hiding and `figure.setDead`. `landHit` waits for the
+  visual. With Moira's first timings (0.36–0.46 s), the bar dropped and,
+  on a kill, the target fell before the bolt arrived.
+- **Moira's hits now land in 0.22 s,** Shared Fate in 0.28 s after a
+  Spite Bolt cast, which sits close enough to the default projectile.
+- **For long, showy flights later,** hold plate HP and plate hiding until
+  the hit lands, and hold `setDead` in the figure, rather than
+  stretching the delay.
+- The white trail's 0.4 s hold isn't the limit: a later hit still finds
+  the white chunk as it starts to drain.

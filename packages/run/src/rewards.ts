@@ -1,30 +1,35 @@
 import {
+  SKILL_SLOTS,
   applyUpgrade,
   createHeroBuild,
   createRng,
-  eligibleTalents,
-  findSignatureAbilityId,
+  eligibleLevelPicks,
+  gemFitsHero,
   nextFloat,
   nextInt,
-  runeFitsHero,
+  pickedLevels,
+  skillIdFor,
+  withTrainedSocket,
   type Catalogue,
   type HeroBuild,
+  type PickLevel,
   type Rarity,
   type RngState,
+  type SkillSlot,
   type UpgradeDefinition,
+  PICK_LEVELS,
 } from "@jev-game/game";
-import type { PlayerId } from "./ids.js";
-import type { OwnedPiece, PendingDecision, PlayerSeat, RewardOffer } from "./types.js";
+import type { OwnedGem, OwnedPiece, PendingDecision, PlayerSeat, RewardOffer } from "./types.js";
 import {
   itemRarityForRound,
   milestoneAfterRound,
   rarityAbove,
-  talentTierAfterRound,
+  heroLevelAfterRound,
   type RunRules,
 } from "./rules.js";
 import { deriveOfferSeed } from "./seed.js";
 import { playableHeroIds } from "./offers.js";
-import { hasStashRoom, itemCanGoOn, nextFormationCell, runeCanGoOn } from "./inventory.js";
+import { gemCanGoOn, hasStashRoom, itemCanGoOn, nextFormationCell } from "./inventory.js";
 
 export type RewardRejection = "unknown-offer" | "ineligible-upgrade" | "team-full";
 
@@ -51,22 +56,32 @@ function offerId(decisionId: string, index: number): string {
   return `${decisionId}-${index}`;
 }
 
+function fittingGems(catalogue: Catalogue, seat: PlayerSeat): UpgradeDefinition[] {
+  return upgradesOf(
+    catalogue,
+    (upgrade) => upgrade.category === "gem" && seat.heroBuilds.some((build) => gemFitsHero(upgrade, build.heroId, catalogue)),
+  );
+}
+
 function itemDecision(
   catalogue: Catalogue,
   rules: RunRules,
   round: number,
-  playerId: PlayerId,
+  seat: PlayerSeat,
   runSeed: number,
   isLoser: boolean,
 ): PendingDecision | null {
+  const playerId = seat.playerId;
   const rng = createRng(deriveOfferSeed(runSeed, round, playerId, "item"));
   const count = rules.itemOfferCount + (isLoser ? rules.loserBonusOffers : 0);
   const band = itemRarityForRound(rules, round);
   const decisionId = `${playerId}-r${round}-item`;
   const offers: RewardOffer[] = [];
   const taken = new Set<string>();
+  const gemCard = round >= rules.gemCardFromRound ? sample(fittingGems(catalogue, seat), 1, createRng(deriveOfferSeed(runSeed, round, playerId, "item-gem")))[0] : undefined;
+  const itemCount = gemCard === undefined ? count : count - 1;
 
-  for (let index = 0; index < count; index += 1) {
+  for (let index = 0; index < itemCount; index += 1) {
     const surprise = round >= rules.surpriseFromRound && band !== "legendary" && nextFloat(rng) < rules.surpriseChance;
     const rarity: Rarity = surprise ? rarityAbove(band) : band;
     let pool = upgradesOf(catalogue, (upgrade) => upgrade.category === "item" && upgrade.rarity === rarity && !taken.has(upgrade.id));
@@ -85,40 +100,37 @@ function itemDecision(
     offers.push({ offerId: offerId(decisionId, index), kind: "item", pieceId: item.id, heroId: null, heroSlot: null, rarity: item.rarity ?? rarity });
   }
 
-  return offers.length === 0 ? null : { decisionId, kind: "item", heroSlot: null, tier: null, offers };
+  if (gemCard !== undefined) {
+    offers.push({ offerId: offerId(decisionId, offers.length), kind: "gem", pieceId: gemCard.id, heroId: null, heroSlot: null, rarity: null });
+  }
+
+  return offers.length === 0 ? null : { decisionId, kind: "item", heroSlot: null, level: null, offers };
 }
 
-function runeDecision(catalogue: Catalogue, rules: RunRules, round: number, seat: PlayerSeat, runSeed: number): PendingDecision | null {
-  const rng = createRng(deriveOfferSeed(runSeed, round, seat.playerId, "rune"));
+function gemDecision(catalogue: Catalogue, rules: RunRules, round: number, seat: PlayerSeat, runSeed: number): PendingDecision | null {
+  const rng = createRng(deriveOfferSeed(runSeed, round, seat.playerId, "gem"));
 
-  const pool = upgradesOf(
-    catalogue,
-    (upgrade) => upgrade.category === "rune" && seat.heroBuilds.some((build) => runeFitsHero(upgrade, build.heroId, catalogue)),
-  );
+  const pool = fittingGems(catalogue, seat);
 
-  const decisionId = `${seat.playerId}-r${round}-rune`;
+  const decisionId = `${seat.playerId}-r${round}-gem`;
 
-  const offers = sample(pool, rules.runeOfferCount, rng).map((rune, index): RewardOffer => ({
+  const offers = sample(pool, rules.gemOfferCount, rng).map((gem, index): RewardOffer => ({
     offerId: offerId(decisionId, index),
-    kind: "rune",
-    pieceId: rune.id,
+    kind: "gem",
+    pieceId: gem.id,
     heroId: null,
     heroSlot: null,
     rarity: null,
   }));
 
-  return offers.length === 0 ? null : { decisionId, kind: "rune", heroSlot: null, tier: null, offers };
+  return offers.length === 0 ? null : { decisionId, kind: "gem", heroSlot: null, level: null, offers };
 }
 
-function talentTier(upgrade: UpgradeDefinition): number {
-  return upgrade.tier ?? 0;
-}
-
-export function nextTalentDecision(
+export function nextLevelDecision(
   catalogue: Catalogue,
   seat: PlayerSeat,
   heroSlot: number,
-  maxTier: number,
+  reachedLevel: number,
   round: number,
 ): PendingDecision | null {
   const build = seat.heroBuilds[heroSlot];
@@ -127,46 +139,46 @@ export function nextTalentDecision(
     return null;
   }
 
-  const ownedTiers = new Set<number>();
+  const picked = pickedLevels(build, catalogue);
 
-  for (const selection of build.upgrades) {
-    const upgrade = catalogue.upgrades[selection.upgradeId];
-
-    if (upgrade?.category === "talent") {
-      ownedTiers.add(talentTier(upgrade));
-    }
-  }
-
-  for (let tier = 1; tier <= maxTier; tier += 1) {
-    if (ownedTiers.has(tier)) {
-      continue;
-    }
-
-    const eligible = eligibleTalents(build, catalogue, tier).sort((a, b) => (a.path ?? "").localeCompare(b.path ?? "") || a.id.localeCompare(b.id));
-
-    if (eligible.length === 0) {
+  for (const level of PICK_LEVELS) {
+    if (level > reachedLevel) {
       return null;
     }
 
-    const decisionId = `${seat.playerId}-r${round}-talent-${heroSlot}-t${tier}`;
+    if (picked.has(level)) {
+      continue;
+    }
 
-    return {
-      decisionId,
-      kind: "talent",
-      heroSlot,
-      tier,
-      offers: eligible.map((talent, index) => ({
-        offerId: offerId(decisionId, index),
-        kind: "talent",
-        pieceId: talent.id,
-        heroId: build.heroId,
-        heroSlot,
-        rarity: null,
-      })),
-    };
+    return levelDecision(catalogue, seat, build, heroSlot, level, round);
   }
 
   return null;
+}
+
+function levelDecision(catalogue: Catalogue, seat: PlayerSeat, build: HeroBuild, heroSlot: number, level: PickLevel, round: number): PendingDecision | null {
+  const eligible = eligibleLevelPicks(build, catalogue, level).sort((a, b) => (a.path ?? "").localeCompare(b.path ?? "") || a.id.localeCompare(b.id));
+
+  if (eligible.length === 0) {
+    return null;
+  }
+
+  const decisionId = `${seat.playerId}-r${round}-level-${heroSlot}-l${level}`;
+
+  return {
+    decisionId,
+    kind: "level",
+    heroSlot,
+    level,
+    offers: eligible.map((pick, index) => ({
+      offerId: offerId(decisionId, index),
+      kind: "level",
+      pieceId: pick.id,
+      heroId: build.heroId,
+      heroSlot,
+      rarity: null,
+    })),
+  };
 }
 
 function recruitDecision(catalogue: Catalogue, rules: RunRules, round: number, seat: PlayerSeat, runSeed: number): PendingDecision | null {
@@ -186,12 +198,12 @@ function recruitDecision(catalogue: Catalogue, rules: RunRules, round: number, s
   seat.heroBuilds.forEach((build, heroSlot) => {
     const hero = catalogue.heroes[build.heroId];
 
-    if (hero !== undefined && findSignatureAbilityId(hero, catalogue) !== null) {
+    if (hero !== undefined && SKILL_SLOTS.some((slot) => skillIdFor(hero, slot) !== null)) {
       offers.push({ offerId: offerId(decisionId, offers.length), kind: "train", pieceId: null, heroId: build.heroId, heroSlot, rarity: null });
     }
   });
 
-  return offers.length === 0 ? null : { decisionId, kind: "recruit", heroSlot: null, tier: null, offers };
+  return offers.length === 0 ? null : { decisionId, kind: "recruit", heroSlot: null, level: null, offers };
 }
 
 export function generateRewardDecisions(
@@ -203,7 +215,7 @@ export function generateRewardDecisions(
   isLoser: boolean,
 ): PendingDecision[] {
   const decisions: PendingDecision[] = [];
-  const item = itemDecision(catalogue, rules, round, seat.playerId, runSeed, isLoser);
+  const item = itemDecision(catalogue, rules, round, seat, runSeed, isLoser);
 
   if (item !== null) {
     decisions.push(item);
@@ -212,24 +224,24 @@ export function generateRewardDecisions(
   const milestone = milestoneAfterRound(rules, round);
 
   switch (milestone) {
-    case "rune": {
-      const rune = runeDecision(catalogue, rules, round, seat, runSeed);
+    case "gem": {
+      const gem = gemDecision(catalogue, rules, round, seat, runSeed);
 
-      if (rune !== null) {
-        decisions.push(rune);
+      if (gem !== null) {
+        decisions.push(gem);
       }
 
       break;
     }
 
-    case "talents": {
-      const maxTier = talentTierAfterRound(rules, round);
+    case "level": {
+      const reached = heroLevelAfterRound(rules, round);
 
       for (let heroSlot = 0; heroSlot < seat.heroBuilds.length; heroSlot += 1) {
-        const talent = nextTalentDecision(catalogue, seat, heroSlot, maxTier, round);
+        const levelUp = nextLevelDecision(catalogue, seat, heroSlot, reached, round);
 
-        if (talent !== null) {
-          decisions.push(talent);
+        if (levelUp !== null) {
+          decisions.push(levelUp);
         }
       }
 
@@ -289,6 +301,30 @@ function newPiece(seat: PlayerSeat, pieceId: string, heroSlot: number | null): O
   return { instanceId: `${seat.playerId}-p${seat.nextInstanceId}`, pieceId, heroSlot };
 }
 
+function newGem(seat: PlayerSeat, pieceId: string, heroSlot: number | null, skill: SkillSlot | null): OwnedGem {
+  return { ...newPiece(seat, pieceId, heroSlot), skill: heroSlot === null ? null : skill };
+}
+
+export function defaultTrainSkill(build: HeroBuild, catalogue: Catalogue): SkillSlot | null {
+  const hero = catalogue.heroes[build.heroId];
+
+  if (hero === undefined) {
+    return null;
+  }
+
+  return skillIdFor(hero, "ultimate") !== null ? "ultimate" : skillIdFor(hero, "ability") !== null ? "ability" : null;
+}
+
+function trainableSkill(build: HeroBuild, catalogue: Catalogue, requested: SkillSlot | null): SkillSlot | null {
+  const hero = catalogue.heroes[build.heroId];
+
+  if (hero !== undefined && requested !== null && skillIdFor(hero, requested) !== null) {
+    return requested;
+  }
+
+  return defaultTrainSkill(build, catalogue);
+}
+
 export function applyRewardOffer(
   catalogue: Catalogue,
   rules: RunRules,
@@ -296,6 +332,7 @@ export function applyRewardOffer(
   seat: PlayerSeat,
   offer: RewardOffer,
   requestedSlot: number | null,
+  requestedSkill: SkillSlot | null,
 ): RewardApplication {
   switch (offer.kind) {
     case "item": {
@@ -312,39 +349,44 @@ export function applyRewardOffer(
       };
     }
 
-    case "rune": {
+    case "gem": {
       if (offer.pieceId === null) {
         return refused("unknown-offer");
       }
 
-      const slot = requestedSlot !== null && runeCanGoOn(seat, offer.pieceId, requestedSlot, catalogue, null) ? requestedSlot : null;
+      const fits =
+        requestedSlot !== null && requestedSkill !== null && gemCanGoOn(seat, offer.pieceId, requestedSlot, requestedSkill, catalogue, null);
 
       return {
         accepted: true,
-        seat: { ...seat, runes: [...seat.runes, newPiece(seat, offer.pieceId, slot)], nextInstanceId: seat.nextInstanceId + 1 },
+        seat: {
+          ...seat,
+          gems: [...seat.gems, newGem(seat, offer.pieceId, fits ? requestedSlot : null, fits ? requestedSkill : null)],
+          nextInstanceId: seat.nextInstanceId + 1,
+        },
         followUps: [],
       };
     }
 
-    case "talent": {
+    case "level": {
       const build = offer.heroSlot === null ? undefined : seat.heroBuilds[offer.heroSlot];
-      const talent = offer.pieceId === null ? undefined : catalogue.upgrades[offer.pieceId];
+      const pick = offer.pieceId === null ? undefined : catalogue.upgrades[offer.pieceId];
 
-      if (build === undefined || talent === undefined || offer.heroSlot === null) {
+      if (build === undefined || pick === undefined || offer.heroSlot === null) {
         return refused("unknown-offer");
       }
 
       let updated: HeroBuild;
 
       try {
-        updated = applyUpgrade(build, talent.id, catalogue);
+        updated = applyUpgrade(build, pick.id, catalogue);
       } catch {
         return refused("ineligible-upgrade");
       }
 
       const heroSlot = offer.heroSlot;
       const nextSeat = { ...seat, heroBuilds: seat.heroBuilds.map((existing, slot) => (slot === heroSlot ? updated : existing)) };
-      const followUp = nextTalentDecision(catalogue, nextSeat, heroSlot, talentTierAfterRound(rules, round), round);
+      const followUp = nextLevelDecision(catalogue, nextSeat, heroSlot, heroLevelAfterRound(rules, round), round);
 
       return { accepted: true, seat: nextSeat, followUps: followUp === null ? [] : [followUp] };
     }
@@ -367,7 +409,7 @@ export function applyRewardOffer(
 
       const build = createHeroBuild(`${seat.playerId}-${heroSlot}`, offer.heroId, [], catalogue);
       const nextSeat = { ...seat, heroBuilds: [...seat.heroBuilds, build], formation: [...seat.formation, cell] };
-      const followUp = nextTalentDecision(catalogue, nextSeat, heroSlot, talentTierAfterRound(rules, round), round);
+      const followUp = nextLevelDecision(catalogue, nextSeat, heroSlot, heroLevelAfterRound(rules, round), round);
 
       return { accepted: true, seat: nextSeat, followUps: followUp === null ? [] : [followUp] };
     }
@@ -380,7 +422,13 @@ export function applyRewardOffer(
         return refused("unknown-offer");
       }
 
-      const trained = { ...build, extraRuneSockets: (build.extraRuneSockets ?? 0) + 1 };
+      const skill = trainableSkill(build, catalogue, requestedSkill);
+
+      if (skill === null) {
+        return refused("unknown-offer");
+      }
+
+      const trained = withTrainedSocket(build, skill);
 
       return {
         accepted: true,

@@ -1,11 +1,17 @@
 import type { UnitId } from "../ids.js";
 import type { AbilityDefinitionId } from "../ids.js";
-import type { ConditionKind, ControlKind, DotKind, EffectDefinition } from "../definitions.js";
-import type { UnitState } from "./state.js";
+import type { ConditionKind, ControlKind, DotKind, EffectDefinition, PandemicSpread, PullDefinition } from "../definitions.js";
+import type { CastStun, UnitState } from "./state.js";
+
+export interface BlessedShield {
+  sourceUnitId: UnitId;
+  peak: number;
+}
 
 export interface ShieldStatus {
   amount: number;
   expiresAtTick: number;
+  blessed: BlessedShield | null;
 }
 
 export interface SlowStatus {
@@ -16,6 +22,12 @@ export interface SlowStatus {
 export interface ConditionStatus {
   condition: ConditionKind;
   sourceUnitId: UnitId;
+  expiresAtTick: number;
+}
+
+export interface ChillStatus {
+  sourceUnitId: UnitId;
+  stacks: number;
   expiresAtTick: number;
 }
 
@@ -30,6 +42,13 @@ export interface LinkStatus {
   sourceUnitId: UnitId;
   fraction: number;
   expiresAtTick: number;
+  puppetUntilTick: number;
+}
+
+export interface GraveMarkStatus {
+  sourceUnitId: UnitId;
+  abilityId: AbilityDefinitionId;
+  expiresAtTick: number;
 }
 
 export interface ChannelStatus {
@@ -40,6 +59,10 @@ export interface ChannelStatus {
   periodTicks: number;
   radiusUnits: number;
   effects: EffectDefinition[];
+  stun: CastStun | null;
+  unstoppable: boolean;
+  drifts: boolean;
+  pull: PullDefinition | null;
 }
 
 export interface TauntStatus {
@@ -51,13 +74,35 @@ export interface DotStatus {
   dot: DotKind;
   sourceUnitId: UnitId;
   stacks: number;
-  maxStacks: number;
+  maxStacks: number | null;
   damagePerStackPerSecond: number;
+  durationTicks: number;
   expiresAtTick: number;
   nextTickAt: number;
 }
 
-export type ExpiringStatus = "shield" | "slow" | "condition" | "control" | "taunt" | "invulnerable" | "untargetable" | "link" | "channel";
+export interface PandemicStatus {
+  sourceUnitId: UnitId;
+  expiresAtTick: number;
+  tickRateMultiplier: number;
+  spread: PandemicSpread | null;
+  burstAtStacks: number | null;
+}
+
+export type ExpiringStatus =
+  | "shield"
+  | "slow"
+  | "condition"
+  | "control"
+  | "taunt"
+  | "invulnerable"
+  | "untargetable"
+  | "link"
+  | "puppet"
+  | "channel"
+  | "chill"
+  | "pandemic"
+  | "grave-mark";
 
 export function expireShield(unit: UnitState, tick: number): boolean {
   if (unit.shield === null || unit.shield.expiresAtTick > tick) {
@@ -107,6 +152,11 @@ export function expireTimedStatuses(unit: UnitState, tick: number): ExpiringStat
     expired.push("untargetable");
   }
 
+  if (unit.link !== null && unit.link.puppetUntilTick !== 0 && unit.link.puppetUntilTick <= tick) {
+    unit.link.puppetUntilTick = 0;
+    expired.push("puppet");
+  }
+
   if (unit.link !== null && unit.link.expiresAtTick <= tick) {
     unit.link = null;
     expired.push("link");
@@ -117,6 +167,21 @@ export function expireTimedStatuses(unit: UnitState, tick: number): ExpiringStat
     expired.push("channel");
   }
 
+  if (unit.chill !== null && unit.chill.expiresAtTick <= tick) {
+    unit.chill = null;
+    expired.push("chill");
+  }
+
+  if (unit.pandemic !== null && unit.pandemic.expiresAtTick <= tick) {
+    unit.pandemic = null;
+    expired.push("pandemic");
+  }
+
+  if (unit.graveMark !== null && unit.graveMark.expiresAtTick <= tick) {
+    unit.graveMark = null;
+    expired.push("grave-mark");
+  }
+
   return expired;
 }
 
@@ -125,7 +190,7 @@ export function isControlled(unit: UnitState): boolean {
 }
 
 export function isUnstoppable(unit: UnitState): boolean {
-  return unit.channel !== null;
+  return unit.channel !== null && unit.channel.unstoppable;
 }
 
 export function isSummon(unit: UnitState): boolean {

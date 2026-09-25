@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { availableParallelism } from "node:os";
-import type { Catalogue } from "@jev-game/game";
+import type { Catalogue, EquippedGem } from "@jev-game/game";
 import { playableHeroIds } from "@jev-game/run";
 import {
   heroRows,
@@ -117,9 +117,10 @@ Options:
   --allow-stale        run even when a package's dist is older than its src
   --out <dir>          report root (default reports/survey)
 
-Teams are written as hero ids joined by commas. Upgrades and talents go in
-square brackets, items in braces and runes in angle brackets:
-  bulwark[bulwark-spiked-plate]{aegis},frostweaver<rune-echo>,duskblade`;
+Teams are written as hero ids joined by commas. Level picks go in
+square brackets, items in braces and gems in angle brackets as gem@ability or
+gem@ultimate:
+  bulwark[bulwark-spiked-rim]{aegis},frostweaver<gem-multicast@ultimate>,duskblade`;
 
 function parseInteger(flag: string, text: string | undefined): number {
   const value = Number(text);
@@ -265,6 +266,16 @@ function splitList(text: string | undefined): string[] {
   return text === undefined || text === "" ? [] : text.split("+");
 }
 
+function parseGem(text: string): EquippedGem {
+  const [gemId, slot] = text.split("@");
+
+  if (gemId === undefined || (slot !== "ability" && slot !== "ultimate")) {
+    throw new Error(`can't read gem "${text}": write it as gem@ability or gem@ultimate`);
+  }
+
+  return { gemId, slot };
+}
+
 function parseTeam(text: string): HeroPick[] {
   return text.split(",").map((part) => {
     const match = /^([^[\]{}<>]+)(?:\[([^\]]*)\])?(?:\{([^}]*)\})?(?:<([^>]*)>)?$/.exec(part.trim());
@@ -273,7 +284,7 @@ function parseTeam(text: string): HeroPick[] {
       throw new Error(`can't read team member "${part}"`);
     }
 
-    return { heroId: match[1]!, upgradeIds: splitList(match[2]), itemIds: splitList(match[3]), runeIds: splitList(match[4]) };
+    return { heroId: match[1]!, upgradeIds: splitList(match[2]), itemIds: splitList(match[3]), gems: splitList(match[4]).map(parseGem) };
   });
 }
 

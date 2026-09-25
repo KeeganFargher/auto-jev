@@ -1,5 +1,5 @@
 import type { HeroDefinitionId } from "../ids.js";
-import type { Catalogue, ComboKind, ConditionKind, School, EffectDefinition } from "../definitions.js";
+import type { Catalogue, ComboKind, ConditionKind, EffectDefinition, PassiveDefinition, School } from "../definitions.js";
 import type { HeroBuild } from "./state.js";
 import { compileBuild, type CompiledUnitStats } from "./compile-build.js";
 import { COMBO_FOR_CONDITION, CONDITION_KINDS, DETONATED_BY, SCHOOLS } from "../battle/conditions.js";
@@ -39,26 +39,58 @@ function collectConditions(effects: readonly EffectDefinition[], into: Set<Condi
       into.add(effect.condition);
     }
 
-    if (effect.kind === "dot" && effect.conditionAtStacks !== undefined) {
-      into.add(effect.conditionAtStacks.condition);
+    if (effect.kind === "resurrect") {
+      into.add("staggered");
+    }
+
+    if (effect.kind === "summon") {
+      collectPassiveConditions(effect.passives ?? [], into);
     }
   }
 }
 
-export function appliedConditions(compiled: CompiledUnitStats): Set<ConditionKind> {
+function collectPassiveConditions(passives: readonly PassiveDefinition[], into: Set<ConditionKind>): void {
+  for (const passive of passives) {
+    if (passive.kind === "deep-freeze" || passive.kind === "virulence") {
+      into.add(passive.condition);
+    }
+
+    if (passive.kind === "every-nth-attack" || passive.kind === "first-hit-per-enemy") {
+      collectConditions(passive.effects, into);
+    }
+
+    if (passive.kind === "empower-summons") {
+      collectPassiveConditions(passive.passives ?? [], into);
+    }
+  }
+}
+
+function collectSummonedConditions(effects: readonly EffectDefinition[], catalogue: Catalogue, into: Set<ConditionKind>): void {
+  for (const effect of effects) {
+    const summoned = effect.kind === "summon" ? catalogue.heroes[effect.heroId] : undefined;
+
+    if (summoned !== undefined) {
+      collectPassiveConditions(summoned.passives ?? [], into);
+      collectConditions(catalogue.abilities[summoned.basicAttackId]?.effects ?? [], into);
+    }
+  }
+}
+
+export function appliedConditions(compiled: CompiledUnitStats, catalogue: Catalogue): Set<ConditionKind> {
   const applied = new Set<ConditionKind>();
 
   for (const ability of Object.values(compiled.abilities)) {
+    collectSummonedConditions(ability.effects, catalogue, applied);
     collectConditions(ability.effects, applied);
     collectConditions(ability.secondary?.effects ?? [], applied);
     collectConditions(ability.zone?.effects ?? [], applied);
+    collectConditions(ability.channel?.effects ?? [], applied);
+    collectConditions(ability.dash?.finalEffects ?? [], applied);
+    collectConditions(ability.channel?.endZone?.effects ?? [], applied);
+    collectConditions(ability.form?.endBurst?.effects ?? [], applied);
   }
 
-  for (const passive of compiled.passives) {
-    if (passive.kind === "every-nth-basic-attack" || passive.kind === "first-hit-per-enemy") {
-      collectConditions(passive.effects, applied);
-    }
-  }
+  collectPassiveConditions(compiled.passives, applied);
 
   return applied;
 }
@@ -106,7 +138,7 @@ export function compileTeamTraits(compiledUnits: readonly CompiledUnitStats[], c
     let selfCombo = false;
 
     compiledUnits.forEach((compiled, unitIndex) => {
-      const applies = appliedConditions(compiled).has(condition);
+      const applies = appliedConditions(compiled, catalogue).has(condition);
       const detonates = detonatingSchools(compiled, catalogue).has(DETONATED_BY[condition]);
 
       if (applies) {

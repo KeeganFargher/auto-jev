@@ -1,16 +1,28 @@
 import {
   ATTUNEMENT_THRESHOLD,
-  compileBuild,
+  SKILL_SLOTS,
   computeTeamTraits,
-  withEquipment,
+  gemSocketsFor,
   type AttunementTrait,
   type Catalogue,
   type ComboKind,
   type ComboTrait,
   type HeroBuild,
+  type SkillSlot,
   type TeamTraits,
 } from "@jev-game/game";
-import { hasStashRoom, itemCanGoOn, piecesOnHero, runeCanGoOn, stashedPieces, type OwnedPiece, type OwnSeat, type RunRules } from "@jev-game/run";
+import {
+  gemCanGoOn,
+  gemsInSkill,
+  hasStashRoom,
+  itemCanGoOn,
+  loadoutBuilds as runLoadoutBuilds,
+  piecesOnHero,
+  stashedPieces,
+  type OwnedPiece,
+  type OwnSeat,
+  type RunRules,
+} from "@jev-game/run";
 import { button, el } from "./dom.js";
 import { conditionIcon, schoolIcon } from "./icons.js";
 import { heroFaceArt, pieceSocketArt } from "./icon-art.js";
@@ -22,12 +34,13 @@ import {
   comboTip,
   emptySocketTip,
   pieceTip,
+  levelsTip,
   schoolName,
-  talentsTip,
   type PieceKind,
   type PiecePlace,
 } from "./tips.js";
 import { heroTip } from "./hero-card.js";
+import { buildLevel, levelBadge } from "./levels.js";
 import { upgradeDefinition } from "../game/catalogues.js";
 
 export interface SelectedPiece {
@@ -40,7 +53,7 @@ export interface LoadoutActions {
   interactive: boolean;
   select(piece: SelectedPiece | null): void;
   moveItem(instanceId: string, heroSlot: number | null): void;
-  socketRune(instanceId: string, heroSlot: number | null): void;
+  socketGem(instanceId: string, heroSlot: number | null, skill: SkillSlot | null): void;
   discardItem(instanceId: string): void;
 }
 
@@ -53,9 +66,9 @@ interface HeroView {
   slot: number;
   build: HeroBuild;
   items: PieceView[];
-  runes: PieceView[];
+  gems: Record<SkillSlot, PieceView[]>;
   itemSlots: number;
-  runeSockets: number;
+  gemSockets: Record<SkillSlot, number>;
 }
 
 interface OwnLoadout {
@@ -65,16 +78,14 @@ interface OwnLoadout {
   actions: LoadoutActions;
 }
 
-const MAX_TALENTS = 3;
+export function loadoutBuilds(you: Pick<OwnSeat, "heroBuilds" | "items" | "gems">): HeroBuild[] {
+  return runLoadoutBuilds(you);
+}
 
-export function loadoutBuilds(you: Pick<OwnSeat, "heroBuilds" | "items" | "runes">): HeroBuild[] {
-  return you.heroBuilds.map((build, slot) =>
-    withEquipment(
-      build,
-      piecesOnHero(you.items, slot).map((piece) => piece.pieceId),
-      piecesOnHero(you.runes, slot).map((piece) => piece.pieceId),
-    ),
-  );
+function socketsOf(build: HeroBuild, catalogue: Catalogue): Record<SkillSlot, number> {
+  const hero = catalogue.heroes[build.heroId];
+
+  return hero === undefined ? { ability: 0, ultimate: 0 } : gemSocketsFor(hero, build, catalogue);
 }
 
 export function teamTraits(builds: readonly HeroBuild[], catalogue: Catalogue): TeamTraits {
@@ -178,15 +189,29 @@ function itemsHelp(itemSlots: number, interactive: boolean): HTMLElement {
   const sections = [
     tipSection(
       null,
-      tipText(`Up to ${itemSlots} items per hero, and 1 rune per socket. Runes upgrade the hero's signature.`),
+      tipText(`Up to ${itemSlots} items per hero. Each skill has a gem socket: the first diamonds are the ability's, the last the ultimate's. Train adds one more.`),
     ),
   ];
 
   if (interactive) {
-    sections.push(tipHint("Click an item or rune, then click a hero to move it there."));
+    sections.push(tipHint("Click an item or gem, then click a glowing slot to move it there."));
   }
 
-  return tipCard({ icon: null, accent: null, title: "Items", subtitle: "Round sockets hold items, diamonds hold runes", tag: null, sections });
+  return tipCard({ icon: null, accent: null, title: "Items", subtitle: "Round sockets hold items, diamonds hold gems", tag: null, sections });
+}
+
+function acceptsGem(own: OwnLoadout, selected: SelectedPiece, slot: number, skill: SkillSlot): boolean {
+  const piece = own.you.gems.find((candidate) => candidate.instanceId === selected.instanceId);
+
+  return (
+    piece !== undefined &&
+    (piece.heroSlot !== slot || piece.skill !== skill) &&
+    gemCanGoOn(own.you, piece.pieceId, slot, skill, own.catalogue, piece.instanceId)
+  );
+}
+
+function acceptingSkill(own: OwnLoadout, selected: SelectedPiece, slot: number): SkillSlot | null {
+  return SKILL_SLOTS.find((skill) => acceptsGem(own, selected, slot, skill)) ?? null;
 }
 
 function acceptsPiece(own: OwnLoadout, selected: SelectedPiece, slot: number): boolean {
@@ -198,12 +223,10 @@ function acceptsPiece(own: OwnLoadout, selected: SelectedPiece, slot: number): b
     return piece !== undefined && piece.heroSlot !== slot && itemCanGoOn(you, piece.pieceId, slot, rules, catalogue, piece.instanceId);
   }
 
-  const piece = you.runes.find((candidate) => candidate.instanceId === selected.instanceId);
-
-  return piece !== undefined && piece.heroSlot !== slot && runeCanGoOn(you, piece.pieceId, slot, catalogue, piece.instanceId);
+  return acceptingSkill(own, selected, slot) !== null;
 }
 
-function placeSelected(own: OwnLoadout, slot: number): void {
+function placeSelected(own: OwnLoadout, slot: number, skill: SkillSlot | null): void {
   const target = own.actions.selected;
 
   if (target === null) {
@@ -213,7 +236,11 @@ function placeSelected(own: OwnLoadout, slot: number): void {
   if (target.kind === "item") {
     own.actions.moveItem(target.instanceId, slot);
   } else {
-    own.actions.socketRune(target.instanceId, slot);
+    const chosen = skill ?? acceptingSkill(own, target, slot);
+
+    if (chosen !== null) {
+      own.actions.socketGem(target.instanceId, slot, chosen);
+    }
   }
 
   own.actions.select(null);
@@ -247,61 +274,81 @@ function pieceNode(piece: PieceView, kind: PieceKind, place: PiecePlace, teamHer
   return node;
 }
 
-function emptySocket(kind: PieceKind, hero: HeroView, own: OwnLoadout | null, accepts: boolean, index: number): HTMLElement {
+function emptySocket(kind: PieceKind, hero: HeroView, own: OwnLoadout | null, accepts: boolean, skill: SkillSlot | null, index: number): HTMLElement {
   const target = own !== null && accepts && own.actions.selected?.kind === kind;
-  const node = target && own !== null ? button(`piece-chip is-${kind} is-empty is-target`, () => placeSelected(own, hero.slot)) : el("span", `piece-chip is-${kind} is-empty`);
-  node.setAttribute("aria-label", kind === "item" ? "Empty item slot" : "Empty rune socket");
+
+  const node =
+    target && own !== null
+      ? button(`piece-chip is-${kind} is-empty is-target`, () => placeSelected(own, hero.slot, skill))
+      : el("span", `piece-chip is-${kind} is-empty`);
+
+  node.setAttribute("aria-label", kind === "item" ? "Empty item slot" : "Empty gem socket");
 
   attachTip(node, {
-    key: `empty:${hero.slot}:${kind}:${index}`,
+    key: `empty:${hero.slot}:${kind}:${skill ?? "item"}:${index}`,
     side: "left",
     live: false,
-    render: () => emptySocketTip(kind, hero.build.heroId, own !== null && own.actions.interactive),
+    render: () => emptySocketTip(kind, hero.build.heroId, skill, own !== null && own.actions.interactive),
   });
 
   return node;
+}
+
+function gemGroup(hero: HeroView, skill: SkillSlot, teamHeroIds: readonly string[], own: OwnLoadout | null, tipPrefix: string): HTMLElement | null {
+  const sockets = hero.gemSockets[skill];
+
+  if (sockets === 0) {
+    return null;
+  }
+
+  const selected = own?.actions.selected ?? null;
+  const accepts = own !== null && own.actions.interactive && selected?.kind === "gem" && acceptsGem(own, selected, hero.slot, skill);
+  const place: PiecePlace = { kind: "hero", heroId: hero.build.heroId, skill };
+  const pieces = hero.gems[skill];
+
+  const group = el(
+    "span",
+    "loadout-skill",
+    ...pieces.map((piece, index) =>
+      pieceNode(piece, "gem", place, teamHeroIds, own, piece.instanceId === null ? `${tipPrefix}:gem:${skill}:${index}` : `${tipPrefix}:${piece.instanceId}`),
+    ),
+    ...Array.from({ length: Math.max(0, sockets - pieces.length) }, (_unused, index) => emptySocket("gem", hero, own, accepts, skill, index)),
+  );
+
+  group.dataset.skill = skill;
+
+  return group;
 }
 
 function heroRow(hero: HeroView, teamHeroIds: readonly string[], own: OwnLoadout | null): HTMLElement {
   const { build, slot } = hero;
   const selected = own?.actions.selected ?? null;
   const accepts = own !== null && own.actions.interactive && selected !== null && acceptsPiece(own, selected, slot);
-  const place: PiecePlace = { kind: "hero", heroId: build.heroId };
+  const place: PiecePlace = { kind: "hero", heroId: build.heroId, skill: null };
   const tipPrefix = own === null ? `team:${slot}` : "piece";
 
   const items = el(
     "div",
     "loadout-items",
     ...hero.items.map((piece, index) => pieceNode(piece, "item", place, teamHeroIds, own, piece.instanceId === null ? `${tipPrefix}:item:${index}` : `${tipPrefix}:${piece.instanceId}`)),
-    ...Array.from({ length: Math.max(0, hero.itemSlots - hero.items.length) }, (_unused, index) => emptySocket("item", hero, own, accepts, index)),
+    ...Array.from({ length: Math.max(0, hero.itemSlots - hero.items.length) }, (_unused, index) => emptySocket("item", hero, own, accepts, null, index)),
   );
 
-  let talentCount = 0;
+  const level = levelBadge(buildLevel(build), "loadout-level");
+  attachTip(level, { key: `levels:${own === null ? "team" : "own"}:${slot}`, side: "left", live: false, render: () => levelsTip(build) });
 
-  for (const selection of build.upgrades) {
-    if (upgradeDefinition(selection.upgradeId)?.category === "talent") {
-      talentCount += 1;
-    }
-  }
+  const gems = el("div", "loadout-gems", ...SKILL_SLOTS.map((skill) => gemGroup(hero, skill, teamHeroIds, own, tipPrefix)));
 
-  const talents = badgePips(Math.min(MAX_TALENTS, talentCount), MAX_TALENTS, "is-talents");
-  attachTip(talents, { key: `talents:${own === null ? "team" : "own"}:${slot}`, side: "left", live: false, render: () => talentsTip(build, MAX_TALENTS) });
+  const portrait = el("span", "loadout-portrait", heroFaceArt(build.heroId), el("span", "loadout-slot", String(slot + 1)), level);
 
-  const runes = el(
-    "div",
-    "loadout-runes",
-    ...hero.runes.map((piece, index) => pieceNode(piece, "rune", place, teamHeroIds, own, piece.instanceId === null ? `${tipPrefix}:rune:${index}` : `${tipPrefix}:${piece.instanceId}`)),
-    ...Array.from({ length: Math.max(0, hero.runeSockets - hero.runes.length) }, (_unused, index) => emptySocket("rune", hero, own, accepts, index)),
-    talents,
-  );
+  const heroNode =
+    accepts && own !== null ? button("loadout-hero is-target", () => placeSelected(own, slot, null), portrait) : el("div", "loadout-hero", portrait);
 
-  const portrait = el("span", "loadout-portrait", heroFaceArt(build.heroId), el("span", "loadout-slot", String(slot + 1)));
-  const heroNode = accepts && own !== null ? button("loadout-hero is-target", () => placeSelected(own, slot), portrait) : el("div", "loadout-hero", portrait);
   const heroHint = accepts ? "Click to place it here" : null;
   heroNode.tabIndex = 0;
   attachTip(heroNode, { key: `hero:${own === null ? "team" : "own"}:${slot}`, side: "left", live: false, render: () => heroTip(build, slot, heroHint) });
 
-  const row = el("div", "loadout-row", heroNode, el("div", "loadout-gear", items, runes));
+  const row = el("div", "loadout-row", heroNode, el("div", "loadout-gear", items, gems));
   row.dataset.role = build.heroId;
   row.classList.toggle("is-target", accepts);
   row.classList.toggle("is-blocked", own !== null && own.actions.interactive && selected !== null && !accepts);
@@ -322,9 +369,9 @@ function stashControls(own: OwnLoadout): HTMLElement | null {
   const pieceOnHero =
     selected.kind === "item"
       ? you.items.some((piece) => piece.instanceId === selected.instanceId && piece.heroSlot !== null)
-      : you.runes.some((piece) => piece.instanceId === selected.instanceId && piece.heroSlot !== null);
+      : you.gems.some((piece) => piece.instanceId === selected.instanceId && piece.heroSlot !== null);
 
-  const stashTakesIt = selected.kind === "rune" || hasStashRoom(you, rules, selected.instanceId);
+  const stashTakesIt = selected.kind === "gem" || hasStashRoom(you, rules, selected.instanceId);
 
   if (pieceOnHero && stashTakesIt) {
     controls.push(
@@ -332,7 +379,7 @@ function stashControls(own: OwnLoadout): HTMLElement | null {
         if (selected.kind === "item") {
           actions.moveItem(selected.instanceId, null);
         } else {
-          actions.socketRune(selected.instanceId, null);
+          actions.socketGem(selected.instanceId, null, null);
         }
 
         actions.select(null);
@@ -355,10 +402,10 @@ function stashControls(own: OwnLoadout): HTMLElement | null {
 function stashBlock(own: OwnLoadout, teamHeroIds: readonly string[]): HTMLElement | null {
   const { you, rules } = own;
   const items = stashedPieces(you.items);
-  const runes = stashedPieces(you.runes);
+  const gems = stashedPieces(you.gems);
   const controls = stashControls(own);
 
-  if (items.length === 0 && runes.length === 0 && controls === null) {
+  if (items.length === 0 && gems.length === 0 && controls === null) {
     return null;
   }
 
@@ -379,7 +426,7 @@ function stashBlock(own: OwnLoadout, teamHeroIds: readonly string[]): HTMLElemen
         subtitle: `${items.length} of ${rules.stashCapacity} item spaces used`,
         tag: null,
         sections: [
-          tipSection(null, tipText("Pieces you own but haven't equipped. They do nothing until you move them onto a hero. Runes don't take stash space.")),
+          tipSection(null, tipText("Pieces you own but haven't equipped. They do nothing until you move them onto a hero. Gems don't take stash space.")),
         ],
       }),
   });
@@ -390,7 +437,7 @@ function stashBlock(own: OwnLoadout, teamHeroIds: readonly string[]): HTMLElemen
     "div",
     "stash-pieces",
     ...items.map((piece: OwnedPiece) => pieceNode(piece, "item", stash, teamHeroIds, own, `piece:${piece.instanceId}`)),
-    ...runes.map((piece: OwnedPiece) => pieceNode(piece, "rune", stash, teamHeroIds, own, `piece:${piece.instanceId}`)),
+    ...gems.map((piece: OwnedPiece) => pieceNode(piece, "gem", stash, teamHeroIds, own, `piece:${piece.instanceId}`)),
   );
 
   const block = el("div", "stash-block", label, pieces, controls);
@@ -423,9 +470,9 @@ export function renderLoadout(
       slot,
       build: builds[slot] ?? build,
       items: piecesOnHero(you.items, slot),
-      runes: piecesOnHero(you.runes, slot),
+      gems: { ability: gemsInSkill(you.gems, slot, "ability"), ultimate: gemsInSkill(you.gems, slot, "ultimate") },
       itemSlots: rules.itemSlots,
-      runeSockets: compileBuild(build, catalogue).runeSockets,
+      gemSockets: socketsOf(builds[slot] ?? build, catalogue),
     }),
   );
 
@@ -438,9 +485,12 @@ export function renderTeamLoadout(root: HTMLElement, builds: readonly HeroBuild[
       slot,
       build,
       items: (build.itemIds ?? []).map((pieceId) => ({ pieceId, instanceId: null })),
-      runes: (build.runeIds ?? []).map((pieceId) => ({ pieceId, instanceId: null })),
+      gems: {
+        ability: (build.gems ?? []).flatMap((gem) => (gem.slot === "ability" ? [{ pieceId: gem.gemId, instanceId: null }] : [])),
+        ultimate: (build.gems ?? []).flatMap((gem) => (gem.slot === "ultimate" ? [{ pieceId: gem.gemId, instanceId: null }] : [])),
+      },
       itemSlots,
-      runeSockets: compileBuild(build, catalogue).runeSockets,
+      gemSockets: socketsOf(build, catalogue),
     }),
   );
 

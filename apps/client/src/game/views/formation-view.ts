@@ -1,10 +1,11 @@
 import { Mesh, MeshBasicMaterial, PlaneGeometry, Vector3 } from "three";
 import { boardCellCenter, ownCellAt, ownCellToBoardCell, sideRows, type BoardCell, type BoardGrid } from "@jev-game/game";
 import type { BoardStage, ViewportInsets } from "./board-stage.js";
-import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
+import { createHeroFigure, levelFigureScale, type HeroFigure } from "./hero-figures.js";
 
 export interface FormationView {
   setFormation(formation: readonly BoardCell[]): void;
+  setLevels(levels: readonly number[]): void;
   setLocked(locked: boolean): void;
   dispose(): void;
 }
@@ -13,6 +14,7 @@ export interface FormationViewOptions {
   grid: BoardGrid;
   insets: ViewportInsets;
   heroIds: readonly string[];
+  heroLevels: readonly number[];
   formation: readonly BoardCell[];
   onChange: (formation: BoardCell[]) => void;
 }
@@ -33,9 +35,15 @@ const CELL_INSET = 0.9;
 
 const FACING_ENEMY = Math.PI;
 
+const LEVEL_UP_SECONDS = 0.7;
+
+const LEVEL_UP_SWELL = 0.35;
+
 interface PlacedHero {
   figure: HeroFigure;
   position: Vector3;
+  level: number;
+  levelUp: number;
 }
 
 function sameCell(first: BoardCell, second: BoardCell): boolean {
@@ -84,7 +92,7 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
     stage.scene.add(figure.root);
     const cell = formation[slot];
 
-    return { figure, position: cell === undefined ? new Vector3() : cellCenter(cell) };
+    return { figure, position: cell === undefined ? new Vector3() : cellCenter(cell), level: options.heroLevels[slot] ?? 1, levelUp: 0 };
   });
 
   function pickSlot(clientX: number, clientY: number): number | null {
@@ -212,6 +220,8 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
       const lift = dragging ? LIFT_UNITS : 0;
       const height = hero.figure.root.position.y + (lift - hero.figure.root.position.y) * blend;
       hero.figure.root.position.set(hero.position.x, height, hero.position.z);
+      hero.levelUp = Math.max(0, hero.levelUp - deltaSeconds / LEVEL_UP_SECONDS);
+      hero.figure.root.scale.setScalar(levelFigureScale(hero.level) * (1 + LEVEL_UP_SWELL * Math.sin(hero.levelUp * Math.PI)));
       hero.figure.setMoving(dragging);
       hero.figure.update(deltaSeconds);
     });
@@ -236,6 +246,18 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
       }
 
       formation = next.map((cell) => ({ ...cell }));
+    },
+
+    setLevels(levels) {
+      heroes.forEach((hero, slot) => {
+        const level = levels[slot] ?? hero.level;
+
+        if (level > hero.level) {
+          hero.levelUp = 1;
+        }
+
+        hero.level = level;
+      });
     },
 
     setLocked(isLocked) {

@@ -11,41 +11,89 @@ import {
   LineSegments,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   OctahedronGeometry,
   RingGeometry,
   SphereGeometry,
   Vector3,
   type Object3D,
 } from "three";
-import { CONDITION_DURATION_TICKS, type BattleEvent, type BattleSnapshot, type BoardGrid, type ComboKind, type ConditionKind, type DamageDealtEvent, type UnitState } from "@jev-game/game";
-import { abilityDefinition, heroDefinition } from "../catalogues.js";
+import {
+  CONDITION_DURATION_TICKS,
+  heroLevel,
+  isCorpse,
+  isRevivable,
+  MAX_HERO_LEVEL,
+  overclockBonus,
+  overclockOf,
+  PLAGUE_BURST,
+  TICK_RATE,
+  type BattleEvent,
+  type BattleSnapshot,
+  type BoardGrid,
+  type ComboKind,
+  type ConditionKind,
+  type DamageDealtEvent,
+  type PassiveDefinition,
+  type UnitState,
+} from "@jev-game/game";
+import { boneGolem, duskStrike, flickerStrike, hex as hexSpell, pandemic as pandemicSpell, sharedFate, thousandCuts, voidheartBlast } from "@jev-game/content";
+import { abilityDefinition, gameCatalogue, heroDefinition } from "../catalogues.js";
 import {
   castVisual,
+  emitterShotOrigin,
+  emitterVisual,
+  formVisual,
+  iceChunkGeometry,
   impactVisual,
   landingVisual,
+  leapArc,
+  passiveVisual,
   projectileVisual,
+  releaseDelay,
+  risenVisual,
+  spawnVisual,
+  waveArrivalSeconds,
   zoneVisual,
+  type EmitterMotion,
   type SpellVisual,
   type TickedVisual,
 } from "./spell-visuals.js";
 import { conditionIcon, statusIcon } from "../../hud/icons.js";
 import { comboName } from "../../hud/tips.js";
+import { levelBadge, romanLevel } from "../../hud/levels.js";
 import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
 import { CHEST_FRACTION } from "./figure-base.js";
+import { createFateThreads, type Tie } from "./fate-threads.js";
+import { deathKnell, HEX_POP_SECONDS, KNELL_HEIGHT, KNELL_TOLL_SECONDS } from "./fate-visuals.js";
+import { createHexCritters, type HexedUnit } from "./hex-critters.js";
+import { clawRake, duskPuff, duskStreak } from "./dusk-visuals.js";
 import { createHealthTrail, type HealthTrail } from "./health-trail.js";
-import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
+import { createHeroFigure, levelFigureScale, type HeroFigure } from "./hero-figures.js";
 import { emitHit, emitRelease, hitKind, hitTint, trailStyle } from "./hit-effects.js";
 import { createTrail, type ParticleStyle } from "./particles.js";
 import {
   createFallingTracker,
   playCast,
   playCombo,
+  playCrumble,
   playDeath,
+  playEmitter,
+  playForm,
   playHeal,
   playHit,
   playLanding,
+  playOmenEcho,
+  playPassive,
+  playPayment,
+  playPuppet,
+  playRevive,
+  playRise,
   playShield,
   playSpawn,
+  playStun,
+  playThaw,
+  playZone,
   type SoundSource,
 } from "../fx/battle-sounds.js";
 
@@ -76,6 +124,34 @@ const HEAL_COLOR = "#4ade80";
 const SHIELD_COLOR = "#60a5fa";
 
 const FROST_COLOR = "#67e8f9";
+
+const AURA_COLOR = "#ffcf6b";
+
+const FORM_COLOR = "#ffd98a";
+
+const INFERNO_COLOR = "#ff7a2a";
+
+const FORM_BURST_RADIUS = 12;
+
+const PLAGUE_COLOR = "#a3e635";
+
+const ICE_BLOCK_COLOR = "#cdf3ff";
+
+const ICE_BLOCK_GLOW = "#2f9fd0";
+
+const SHOT_MEMORY_TICKS = 60;
+
+const BURST_TARGET_UNITS = 2;
+
+const GLOB_LAUNCH_HEIGHT = 4.5;
+
+const TAINT_RADIUS = 7;
+
+const TAINT_SPORE_COUNT = 10;
+
+const ICE_SHATTER_COUNT = 18;
+
+const FREEZE_MIST_COUNT = 12;
 
 const POSITION_SMOOTHING = 18;
 
@@ -108,6 +184,8 @@ const HEAL_MOTE_HEIGHT = 1.5;
 const COMBO_SPARK_COUNT = 18;
 
 const SPAWN_MOTE_COUNT = 16;
+
+const SPAWN_RADIUS = 8;
 
 const DEATH_DUST_COUNT = 10;
 
@@ -173,7 +251,47 @@ const IMPACT_COLOR = "#ff8a4c";
 
 const SPIN_RADIANS_PER_SECOND = 16;
 
-const HEXED_SCALE = 0.55;
+const HEX_PUFF_RADIUS = 6;
+
+const WEAVER_FLARE_RADIUS = 9;
+
+const HARVEST = "harvest";
+
+const HARVEST_FLARE_RADIUS = 6;
+
+const RISEN_RADIUS = 7;
+
+const OMEN_ECHO = "ill-omen";
+
+const DEATH_KNELL = "death-knell";
+
+const KNELL_RADIUS = 14;
+
+const DUSK_DASHES = new Set<string>([flickerStrike.id, thousandCuts.id]);
+
+const DUSK_REAPPEAR_SECONDS = 0.3;
+
+const DUSK_STRIKE_RAKE = 0.75;
+
+const SHADE_RAKE = 0.45;
+
+const AVATAR_SCALE = 1.45;
+
+const MECH_SCALE = 1.3;
+
+const COLOSSUS_SCALE = 1.6;
+
+const GROW_SMOOTHING = 5;
+
+const BLESSED_COLOR = "#ffd98a";
+
+const SANCTIFY_COLOR = "#ffe39a";
+
+const SANCTIFY_RADIUS = 7;
+
+const SANCTIFY_MOTE_COUNT = 12;
+
+const AURA_PULSE_SECONDS = 1.6;
 
 const SPAWN_COLOR = "#9fe0d0";
 
@@ -191,6 +309,57 @@ const IMPACT_DUST: ParticleStyle = {
   cone: 1.35,
   spread: 1.5,
   life: [0.5, 1],
+};
+
+const ICE_SHATTER: ParticleStyle = {
+  blend: "solid",
+  from: new Color("#f2fdff"),
+  to: new Color("#7fd3f0"),
+  brightness: 1,
+  opacity: 1,
+  size: [1.6, 0.5],
+  life: [0.35, 0.7],
+  speed: [8, 18],
+  cone: 1.2,
+  spread: 1.6,
+  gravity: 30,
+  drag: 2.5,
+  stretch: 0.03,
+  softness: 0.2,
+};
+
+const FREEZE_MIST: ParticleStyle = {
+  blend: "glow",
+  from: new Color("#f2fdff"),
+  to: new Color(FROST_COLOR),
+  brightness: 1,
+  opacity: 0.8,
+  size: [2.2, 0.6],
+  life: [0.4, 0.7],
+  speed: [2, 6],
+  cone: Math.PI,
+  spread: 2.4,
+  gravity: 2,
+  drag: 2,
+  stretch: 0,
+  softness: 0.6,
+};
+
+const TAINT_SPORES: ParticleStyle = {
+  blend: "glow",
+  from: new Color("#ecfccb"),
+  to: new Color(PLAGUE_COLOR),
+  brightness: 0.9,
+  opacity: 0.85,
+  size: [1.4, 0.4],
+  life: [0.6, 1],
+  speed: [2, 6],
+  cone: 0.9,
+  spread: 1.5,
+  gravity: -3,
+  drag: 1.5,
+  stretch: 0,
+  softness: 0.5,
 };
 
 function comboSparks(color: string): ParticleStyle {
@@ -214,14 +383,11 @@ function comboSparks(color: string): ParticleStyle {
 
 function zoneColor(abilityId: string): string {
   switch (abilityId) {
-    case "plague-cloud":
+    case "plague-bloom":
       return "#8fd14f";
 
-    case "consecrate":
+    case "hallowed-path":
       return "#f2d27a";
-
-    case "glacial-lance":
-      return "#9fe8ff";
 
     default:
       return IMPACT_COLOR;
@@ -239,6 +405,11 @@ const COMBO_BURST_SECONDS = 0.55;
 const BIG_HIT_FRACTION = 0.2;
 
 const BIG_HEAL_FRACTION = 0.15;
+
+interface Vanish {
+  token: number;
+  from: Vector3;
+}
 
 interface GroundMarker {
   mesh: Mesh<RingGeometry, MeshBasicMaterial>;
@@ -259,11 +430,49 @@ interface UnitRecord {
   plateMana: HTMLElement | null;
   plateCondition: HTMLElement;
   plateStatus: HTMLElement;
+  plateStacks: HTMLElement | null;
+  plateChain: HTMLElement;
   conditionKey: string;
   statusKey: string;
+  stacksKey: string;
+  chainEndsAtTick: number;
   bubble: Mesh<SphereGeometry, MeshBasicMaterial>;
   frost: Mesh<RingGeometry, MeshBasicMaterial>;
   conditionRing: Mesh<RingGeometry, MeshBasicMaterial>;
+  level: number;
+  plateLevel: HTMLElement | null;
+  aura: Mesh<RingGeometry, MeshBasicMaterial>;
+  plateMeter: HTMLElement | null;
+  leap: LeapFlight | null;
+  formRing: Mesh<RingGeometry, MeshBasicMaterial>;
+  ice: Mesh<BufferGeometry, MeshStandardMaterial>;
+  plague: Mesh<RingGeometry, MeshBasicMaterial>;
+  frozen: boolean;
+  grow: number;
+}
+
+interface ShotOrigin {
+  from: Vector3;
+  abilityId: string;
+  tick: number;
+}
+
+interface BurstCenter {
+  center: Vector3;
+  tick: number;
+}
+
+type CastEvent = Extract<BattleEvent, { kind: "cast" }>;
+
+type StatusAppliedEvent = Extract<BattleEvent, { kind: "status-applied" }>;
+
+interface LeapFlight {
+  abilityId: string;
+  from: Vector3;
+  to: Vector3;
+  age: number;
+  seconds: number;
+  height: number;
 }
 
 interface TransientEffect {
@@ -311,6 +520,108 @@ function hpFraction(unit: UnitState): number {
   return Math.max(0, unit.hp / Math.max(1, unit.maxHp));
 }
 
+function forgetBefore<T extends { tick: number }>(entries: Map<number, T>, tick: number): void {
+  for (const [key, entry] of entries) {
+    if (entry.tick < tick) {
+      entries.delete(key);
+    }
+  }
+}
+
+function hitKey(causeSequence: number, targetUnitId: string): string {
+  return `${causeSequence}:${targetUnitId}`;
+}
+
+const CHAIN_HOLD_TICKS = Math.round(TICK_RATE * 1.5);
+
+const CHAIN_FLOURISH_LINK = 5;
+
+const PIP_LIMIT = 8;
+
+function storePassive(unit: UnitState): Extract<PassiveDefinition, { kind: "damage-store" }> | null {
+  for (const passive of unit.passives) {
+    if (passive.kind === "damage-store") {
+      return passive;
+    }
+  }
+
+  return null;
+}
+
+function meterFraction(unit: UnitState): number | null {
+  const store = storePassive(unit);
+
+  if (store !== null) {
+    return Math.min(1, (unit.memory.stored[store.key] ?? 0) / Math.max(1, unit.maxHp * store.capMaxHpFraction));
+  }
+
+  const stacks = stackPassive(unit);
+
+  return stacks === null || stacks.max <= PIP_LIMIT ? null : Math.min(1, (unit.memory.stacks[stacks.key] ?? 0) / stacks.max);
+}
+
+function stackCharge(unit: UnitState): number {
+  const stacks = stackPassive(unit);
+
+  return stacks === null ? 0 : Math.min(1, (unit.memory.stacks[stacks.key] ?? 0) / stacks.max);
+}
+
+function stackPassive(unit: UnitState): Extract<PassiveDefinition, { kind: "stacks" }> | null {
+  for (const passive of unit.passives) {
+    if (passive.kind === "stacks") {
+      return passive;
+    }
+  }
+
+  return null;
+}
+
+function isHeroUnit(unit: UnitState): boolean {
+  return heroDefinition(unit.heroId)?.summon !== true;
+}
+
+function unitLevel(unit: UnitState): number {
+  return isHeroUnit(unit) ? heroLevel(unit.build, gameCatalogue) : 1;
+}
+
+function figureHeight(record: UnitRecord): number {
+  return record.figure.height * levelFigureScale(record.level) * record.grow;
+}
+
+function isRisen(unit: UnitState): boolean {
+  return unit.summonerUnitId !== null && heroDefinition(unit.heroId)?.summon !== true;
+}
+
+function raisesCorpses(unit: UnitState): boolean {
+  return unit.alive && Object.values(unit.abilities).some((ability) => ability.targetPolicy === "busiest-corpse" || ability.effects.some((effect) => effect.kind === "raise-army"));
+}
+
+function revivesCorpses(unit: UnitState): boolean {
+  return unit.alive && Object.values(unit.abilities).some((ability) => ability.effects.some((effect) => effect.kind === "resurrect"));
+}
+
+function growTarget(unit: UnitState): number {
+  if (!unit.alive) {
+    return 1;
+  }
+
+  if (unit.heroId === boneGolem.id) {
+    return COLOSSUS_SCALE;
+  }
+
+  if (unit.form?.definition.key === "mech") {
+    return MECH_SCALE;
+  }
+
+  return unit.form?.definition.key === "avatar" ? AVATAR_SCALE : 1;
+}
+
+function overclockLevel(units: readonly UnitState[], unit: UnitState): number {
+  const overclock = unit.alive ? overclockOf(units, unit) : null;
+
+  return overclock === null ? 0 : overclockBonus(units, unit) / overclock.maxBonus;
+}
+
 function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean): HTMLElement {
   const plate = document.createElement("div");
   plate.className = `unit-plate ${isFriendly ? "is-friendly" : "is-enemy"}`;
@@ -331,6 +642,14 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
 
   bar.append(trail, hp, shield);
 
+  const barRow = document.createElement("div");
+  barRow.className = "unit-plate-bar-row";
+  barRow.append(bar);
+
+  if (isHeroUnit(unit)) {
+    barRow.append(levelBadge(unitLevel(unit), "unit-plate-level"));
+  }
+
   const condition = document.createElement("div");
   condition.className = "unit-plate-condition";
   condition.hidden = true;
@@ -338,7 +657,11 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
   const status = document.createElement("div");
   status.className = "unit-plate-status";
 
-  plate.append(condition, status, bar);
+  const chain = document.createElement("div");
+  chain.className = "unit-plate-chain";
+  chain.hidden = true;
+
+  plate.append(chain, condition, status, barRow);
 
   if (unit.maxMana > 0) {
     const mana = document.createElement("div");
@@ -347,6 +670,31 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
     fill.className = "unit-plate-mana-fill";
     mana.append(fill);
     plate.append(mana);
+  }
+
+  const passive = stackPassive(unit);
+  const store = storePassive(unit);
+
+  if (store !== null || (passive !== null && passive.max > PIP_LIMIT)) {
+    const meter = document.createElement("div");
+    meter.className = "unit-plate-meter";
+    meter.dataset.passive = store?.key ?? passive?.key ?? "";
+    const fill = document.createElement("div");
+    fill.className = "unit-plate-meter-fill";
+    meter.append(fill);
+    plate.append(meter);
+  } else if (passive !== null) {
+    const stacks = document.createElement("div");
+    stacks.className = "unit-plate-stacks";
+    stacks.dataset.passive = passive.key;
+
+    for (let index = 0; index < passive.max; index += 1) {
+      const pip = document.createElement("span");
+      pip.className = "unit-plate-stack";
+      stacks.append(pip);
+    }
+
+    plate.append(stacks);
   }
 
   if (showUnitId) {
@@ -363,13 +711,34 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   const records = new Map<string, UnitRecord>();
   const effects: TransientEffect[] = [];
   const chainTargets = new Map<number, string>();
+  const bounceCounts = new Map<number, number>();
+  const flightTimes = new Map<number, number>();
 
   const falling = createFallingTracker();
   const spellVisuals = new Set<SpellVisual>();
   const stateVisuals = new Map<string, TickedVisual | null>();
+  const emitterMotions = new Map<string, EmitterMotion>();
+  const emitterAbilities = new Map<number, string>();
+  const shotOrigins = new Map<number, ShotOrigin>();
+  const burstCenters = new Map<number, BurstCenter>();
+  const pendingTrails = new Set<number>();
+  const hexOrigins = new Map<number, string>();
+  const omenOrigins = new Map<number, string>();
+  const struckUnits = new Map<number, string>();
+  const boundTo = new Map<string, number>();
+  const knellSources = new Map<number, string>();
+  const tolledAt = new Map<string, number>();
+  const vanished = new Map<string, Vanish>();
+  const shadeCasts = new Set<number>();
+  let vanishToken = 0;
+  const fateThreads = createFateThreads(stage.particles);
+  const hexCritters = createHexCritters(stage.particles);
 
+  const iceGeometry = iceChunkGeometry();
   const bubbleGeometry = new SphereGeometry(6.4, 20, 14);
   const frostGeometry = new RingGeometry(4.9, 5.8, 32);
+  const auraGeometry = new RingGeometry(3.6, 6.4, 40);
+  let auraClock = 0;
   const sparkGeometry = new OctahedronGeometry(1, 0);
   const boltGeometry = new OctahedronGeometry(0.7, 0);
   const selectionGeometry = new RingGeometry(5.2, 6.1, 40);
@@ -399,16 +768,18 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     new LineDashedMaterial({ color: "#ffffff", dashSize: 1.2, gapSize: 1, transparent: true, opacity: 0.35 }),
   );
 
-  stage.scene.add(selectionRing, rangeRing, targetLines);
+  stage.scene.add(selectionRing, rangeRing, targetLines, fateThreads.root, hexCritters.root);
 
   let snapshot: BattleSnapshot | null = null;
   const groundMarkers = new Map<string, GroundMarker>();
   let selectedUnitId: string | null = null;
   let rangeRingRadius = -1;
   let lastTick = -1;
+  let selfRevivals = new Map<string, number>();
+  let stunningHits = new Map<string, number>();
 
   function chestOf(record: UnitRecord): Vector3 {
-    return record.position.clone().setY(record.figure.height * CHEST_FRACTION);
+    return record.position.clone().setY(figureHeight(record) * CHEST_FRACTION);
   }
 
   function addEffect(effect: TransientEffect): void {
@@ -457,10 +828,17 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
   }
 
-  function areaRadius(abilityId: string): number {
-    const area = abilityDefinition(abilityId)?.area;
+  function areaRadius(record: UnitRecord, abilityId: string): number {
+    const area = (record.state.abilities[abilityId] ?? abilityDefinition(abilityId))?.area;
 
     return area?.kind === "circle" ? area.radiusUnits : 0;
+  }
+
+  function castCenter(record: UnitRecord, event: CastEvent): Vector3 {
+    const area = record.state.abilities[event.abilityId]?.area;
+    const target = records.get(event.targetUnitId);
+
+    return area?.kind === "circle" && area.center === "target" && target !== undefined ? target.destination.clone() : record.position.clone();
   }
 
   function disposeEffectObjects(effect: TransientEffect): void {
@@ -482,7 +860,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   }
 
   function floatNumber(record: UnitRecord, text: string, kind: string): HTMLElement | null {
-    const point = stage.toScreen(record.position.clone().setY(record.figure.height + PLATE_GAP_UNITS));
+    const point = stage.toScreen(record.position.clone().setY(figureHeight(record) + PLATE_GAP_UNITS));
 
     if (point === null) {
       return null;
@@ -511,7 +889,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     emitHit(stage.particles, hitKind(event.abilityId), chestOf(record), heading.normalize(), heavy);
   }
 
-  function landHit(event: DamageDealtEvent): void {
+  function landHit(event: DamageDealtEvent, stuns: boolean): void {
     const record = records.get(event.targetUnitId);
 
     if (record === undefined) {
@@ -521,10 +899,28 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     const total = event.amount + event.shieldAbsorbed;
     const big = total >= record.state.maxHp * BIG_HIT_FRACTION;
 
+    if (event.abilityId === PLAGUE_BURST) {
+      if (total > 0) {
+        record.figure.trigger("hit");
+        sprayHit(event, record, true);
+        const callout = floatNumber(record, String(total), "burst");
+
+        if (callout !== null) {
+          callout.dataset.label = "Burst";
+        }
+      }
+
+      return;
+    }
+
     if (event.dot === undefined) {
       record.figure.trigger("hit");
       sprayHit(event, record, big || event.crit === true);
       playHit(event, big, panOf(record));
+    }
+
+    if (event.dot === undefined && stuns) {
+      playStun(panOf(record));
     }
 
     if (event.combo !== undefined) {
@@ -542,7 +938,13 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       return;
     }
 
-    if (event.crit === true) {
+    if (event.abilityId === voidheartBlast.id) {
+      const callout = floatNumber(record, String(total), "voidheart");
+
+      if (callout !== null) {
+        callout.dataset.label = voidheartBlast.name;
+      }
+    } else if (event.crit === true) {
       floatNumber(record, String(total), big ? "crit is-huge" : "crit");
     } else if (big && record.state.summonerUnitId === null) {
       floatNumber(record, String(total), "big");
@@ -610,31 +1012,47 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     });
   }
 
-  function projectile(sourceId: string, targetId: string, abilityId: string, onDone: () => void): void {
+  function delayed(seconds: number, onDone: () => void): void {
+    addEffect({ objects: [], age: 0, duration: Math.max(0.001, seconds), onDone, step() {} });
+  }
+
+  function projectile(sourceId: string, targetId: string, abilityId: string, onDone: () => void, delaySeconds = 0, origin: Vector3 | null = null): number {
     const source = records.get(sourceId);
     const target = records.get(targetId);
 
     if (source === undefined || target === undefined) {
       onDone();
 
-      return;
+      return 0;
     }
 
-    const from = source.figure.castOrigin(new Vector3());
+    const from = origin ?? source.figure.castOrigin(new Vector3());
     const visual = projectileVisual(stage.particles, abilityId, from);
 
     if (visual !== null) {
+      const flightSeconds = visual.seconds ?? PROJECTILE_SECONDS;
+      const duration = delaySeconds + flightSeconds;
+      let launch: Vector3 | null = delaySeconds === 0 ? from : null;
+
       addEffect({
         objects: visual.objects,
         age: 0,
-        duration: PROJECTILE_SECONDS,
+        duration,
         onDone,
         step(progress) {
-          visual.place(from, chestOf(target), progress);
+          const flight = Math.min(1, Math.max(0, (progress * duration - delaySeconds) / flightSeconds));
+          const flying = progress * duration >= delaySeconds;
+
+          for (const object of visual.objects) {
+            object.visible = flying;
+          }
+
+          launch ??= flying ? (origin ?? chestOf(source)) : null;
+          visual.place(launch ?? origin ?? chestOf(source), chestOf(target), flight);
         },
       });
 
-      return;
+      return duration;
     }
 
     const kind = hitKind(abilityId);
@@ -659,6 +1077,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         trail.follow(mesh.position);
       },
     });
+
+    return PROJECTILE_SECONDS;
   }
 
   function arc(fromId: string, toId: string, abilityId: string, onDone: () => void): void {
@@ -728,7 +1148,44 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   }
 
   function sourceOf(record: UnitRecord): SoundSource {
-    return { heroId: record.state.heroId, friendly: record.state.teamId === options.friendlyTeamId };
+    return { heroId: record.state.heroId, friendly: record.state.teamId === options.friendlyTeamId, risen: isRisen(record.state) };
+  }
+
+  function upgradesOf(unitId: string): string[] {
+    return records.get(unitId)?.state.build.upgrades.map((upgrade) => upgrade.upgradeId) ?? [];
+  }
+
+  function selfRevivalsIn(events: readonly BattleEvent[]): Map<string, number> {
+    const found = new Map<string, number>();
+
+    for (const event of events) {
+      if (event.kind === "revived" && event.sourceUnitId === event.unitId) {
+        found.set(event.unitId, event.tick);
+      }
+    }
+
+    return found;
+  }
+
+  function stunningHitsIn(events: readonly BattleEvent[]): Map<string, number> {
+    const stuns = new Set<string>();
+    const carriers = new Map<string, number>();
+
+    for (const event of events) {
+      if (event.kind === "status-applied" && event.status === "stunned") {
+        stuns.add(hitKey(event.causeSequence, event.targetUnitId));
+      }
+    }
+
+    for (const event of events) {
+      const key = event.kind === "damage-dealt" && event.dot === undefined ? hitKey(event.causeSequence, event.targetUnitId) : null;
+
+      if (key !== null && stuns.has(key) && !carriers.has(key)) {
+        carriers.set(key, event.sequence);
+      }
+    }
+
+    return carriers;
   }
 
   function isRangedAbility(abilityId: string): boolean {
@@ -736,7 +1193,168 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     const grid = snapshot === null ? null : snapshotGrid(snapshot);
     const cell = grid === null ? 10 : grid.width / grid.columns;
 
-    return ability !== undefined && ability.range > cell * RANGED_ATTACK_CELLS;
+    return (
+      ability !== undefined &&
+      ability.dash === undefined &&
+      ability.blinkBehindTarget !== true &&
+      ability.targetPolicy !== "busiest-corpse" &&
+      ability.range > cell * RANGED_ATTACK_CELLS
+    );
+  }
+
+  function flyShot(event: DamageDealtEvent, shot: ShotOrigin, land: () => void): void {
+    const target = records.get(event.targetUnitId);
+    const from = target === undefined ? shot.from : emitterShotOrigin(shot.abilityId, shot.from, target.destination);
+    projectile(event.sourceUnitId, event.targetUnitId, event.abilityId, land, 0, from);
+  }
+
+  function spreadGlob(event: StatusAppliedEvent): void {
+    const burst = burstCenters.get(event.causeSequence);
+    const target = records.get(event.targetUnitId);
+
+    if (burst === undefined || target === undefined) {
+      return;
+    }
+
+    if (Math.hypot(target.destination.x - burst.center.x, target.destination.z - burst.center.z) < BURST_TARGET_UNITS) {
+      return;
+    }
+
+    projectile(event.sourceUnitId, event.targetUnitId, PLAGUE_BURST, () => {}, 0, burst.center.clone().setY(GLOB_LAUNCH_HEIGHT));
+  }
+
+  function taint(event: StatusAppliedEvent): void {
+    const target = records.get(event.targetUnitId);
+    const source = records.get(event.sourceUnitId);
+
+    if (target === undefined || source === undefined) {
+      return;
+    }
+
+    const distance = Math.hypot(target.position.x - source.position.x, target.position.z - source.position.z);
+
+    delayed(waveArrivalSeconds(distance, areaRadius(source, pandemicSpell.id)), () => {
+      impactFlash(target.position.x, target.position.z, TAINT_RADIUS, PLAGUE_COLOR);
+      stage.particles.emit(TAINT_SPORES, chestOf(target), UP, TAINT_SPORE_COUNT);
+    });
+  }
+
+  function allyHop(causeSequence: number, targetUnitId: string, abilityId: string, land: () => void): void {
+    const previousTarget = abilityDefinition(abilityId)?.bounces === undefined ? undefined : chainTargets.get(causeSequence);
+
+    if (previousTarget === undefined) {
+      land();
+
+      return;
+    }
+
+    const bounce = bounceCounts.get(causeSequence) ?? 0;
+    chainTargets.set(causeSequence, targetUnitId);
+    bounceCounts.set(causeSequence, bounce + 1);
+    projectile(previousTarget, targetUnitId, abilityId, land, PROJECTILE_SECONDS * (bounce + 1));
+  }
+
+  function hexed(event: StatusAppliedEvent): void {
+    const first = hexOrigins.get(event.causeSequence);
+
+    const land = (): void => {
+      const record = records.get(event.targetUnitId);
+      const visual = record === undefined ? null : landingVisual(stage.particles, hexSpell.id, record.position.clone(), HEX_PUFF_RADIUS);
+
+      if (visual !== null) {
+        showSpell(visual);
+      }
+
+      if (record !== undefined) {
+        playLanding(hexSpell.id, upgradesOf(event.sourceUnitId), panOf(record));
+      }
+
+      hexCritters.transform(event.targetUnitId, HEX_POP_SECONDS);
+    };
+
+    if (first === undefined || first === event.targetUnitId) {
+      hexOrigins.set(event.causeSequence, event.targetUnitId);
+      land();
+
+      return;
+    }
+
+    projectile(first, event.targetUnitId, hexSpell.id, land);
+  }
+
+  function stepThreads(deltaSeconds: number): void {
+    const ties: Tie[] = [];
+
+    for (const record of records.values()) {
+      const link = record.state.link;
+
+      if (record.state.alive && link !== null) {
+        boundTo.set(record.unitId, link.linkId);
+        ties.push({ linkId: link.linkId, unitId: record.unitId, chest: chestOf(record), crown: record.position.clone().setY(figureHeight(record)), puppet: link.puppetUntilTick !== 0 });
+      }
+    }
+
+    fateThreads.update(ties, deltaSeconds);
+  }
+
+  function stepCritters(deltaSeconds: number): void {
+    const hexed: HexedUnit[] = [];
+
+    for (const record of records.values()) {
+      if (record.state.alive && record.state.control?.control === "hexed") {
+        const teamColor = record.state.teamId === options.friendlyTeamId ? FRIENDLY_COLOR : ENEMY_COLOR;
+        hexed.push({ unitId: record.unitId, position: record.position, yaw: record.yaw, teamColor });
+      }
+    }
+
+    hexCritters.update(hexed, deltaSeconds);
+  }
+
+  function sanctify(unitId: string): void {
+    const record = records.get(unitId);
+
+    if (record !== undefined) {
+      impactFlash(record.position.x, record.position.z, SANCTIFY_RADIUS, SANCTIFY_COLOR);
+      stage.particles.emit(HEAL_MOTES, chestOf(record), UP, SANCTIFY_MOTE_COUNT);
+    }
+  }
+
+  function isTrail(unitId: string, abilityId: string): boolean {
+    return Object.values(records.get(unitId)?.state.abilities ?? {}).some((ability) => ability.bounces?.trail === abilityId);
+  }
+
+  function trailDelaysIn(events: readonly BattleEvent[]): Map<number, number> {
+    const delays = new Map<number, number>();
+    const hops = new Map<number, string[]>();
+    const landings = new Map<string, number>();
+
+    for (const event of events) {
+      if ((event.kind === "damage-dealt" || event.kind === "healing-done") && abilityDefinition(event.abilityId)?.bounces !== undefined) {
+        const path = hops.get(event.causeSequence) ?? [];
+
+        if (path[path.length - 1] !== event.targetUnitId) {
+          path.push(event.targetUnitId);
+        }
+
+        hops.set(event.causeSequence, path);
+        landings.set(event.sourceUnitId, PROJECTILE_SECONDS * path.length);
+      }
+
+      const landing = event.kind === "zone-created" && isTrail(event.sourceUnitId, event.abilityId) ? landings.get(event.sourceUnitId) : undefined;
+
+      if (event.kind === "zone-created" && landing !== undefined) {
+        delays.set(event.zoneId, landing);
+      }
+    }
+
+    return delays;
+  }
+
+  function holdTrails(events: readonly BattleEvent[]): void {
+    for (const [zoneId, seconds] of trailDelaysIn(events)) {
+      pendingTrails.add(zoneId);
+      delayed(seconds, () => pendingTrails.delete(zoneId));
+    }
   }
 
   function handleEvent(event: BattleEvent): void {
@@ -750,11 +1368,21 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       record.figure.trigger(event.isBasicAttack ? "attack" : "cast");
       playCast(event, sourceOf(record), panOf(record));
 
+      if (event.repeat === "clone") {
+        shadeCasts.add(event.sequence);
+      } else if (DUSK_DASHES.has(event.abilityId)) {
+        vanish(record);
+      }
+
+      if (event.chainLink !== undefined && event.chainLink >= 2) {
+        showChain(record, event.chainLink, event.tick);
+      }
+
       if (isRangedAbility(event.abilityId)) {
         emitRelease(stage.particles, hitKind(event.abilityId), record.figure.castOrigin(new Vector3()));
       }
 
-      const flourish = castVisual(stage.particles, event.abilityId, record.position, areaRadius(event.abilityId));
+      const flourish = castVisual(stage.particles, event.abilityId, castCenter(record, event), areaRadius(record, event.abilityId), record.figure.castOrigin(new Vector3()));
 
       if (flourish !== null) {
         showSpell(flourish);
@@ -764,26 +1392,71 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
 
     if (event.kind === "combo-detonated") {
-      comboBurst(event.targetUnitId, event.combo);
       const target = records.get(event.targetUnitId);
-      playCombo(event.combo, target === undefined ? undefined : panOf(target));
+
+      const pop = (): void => {
+        comboBurst(event.targetUnitId, event.combo);
+        const pan = target === undefined ? undefined : panOf(target);
+
+        if (event.echo === true) {
+          playOmenEcho(pan);
+        } else {
+          playCombo(event.combo, pan);
+        }
+      };
+
+      const origin = event.echo === true ? omenOrigins.get(event.causeSequence) : undefined;
+
+      if (origin === undefined) {
+        omenOrigins.set(event.causeSequence, event.targetUnitId);
+        pop();
+      } else {
+        projectile(origin, event.targetUnitId, OMEN_ECHO, pop);
+      }
 
       return;
     }
 
     if (event.kind === "unit-spawned") {
       const center = stage.toScene(event.position, 0);
-      impactFlash(center.x, center.z, 8, SPAWN_COLOR);
-      stage.particles.emit(SPAWN_MOTES, center.clone().setY(1), UP, SPAWN_MOTE_COUNT);
-      playSpawn(event.heroId, panAt(center));
+
+      if (event.corpseUnitId === undefined) {
+        const drop = spawnVisual(stage.particles, event.heroId, center, SPAWN_RADIUS);
+
+        if (drop === null) {
+          impactFlash(center.x, center.z, SPAWN_RADIUS, SPAWN_COLOR);
+          stage.particles.emit(SPAWN_MOTES, center.clone().setY(1), UP, SPAWN_MOTE_COUNT);
+        } else {
+          showSpell(drop);
+        }
+
+        playSpawn(event.heroId, panAt(center));
+      } else {
+        showSpell(risenVisual(stage.particles, center, RISEN_RADIUS));
+        playRise(panAt(center));
+      }
+
+      return;
+    }
+
+    if (event.kind === "unit-dismissed") {
+      const record = records.get(event.unitId);
+
+      if (record !== undefined && record.state.expiresAtTick > 0 && event.tick >= record.state.expiresAtTick) {
+        playCrumble(panOf(record));
+      }
 
       return;
     }
 
     if (event.kind === "impact-landed") {
       const center = stage.toScene(event.center, 0);
-      playLanding(event.abilityId, panAt(center));
+      playLanding(event.abilityId, upgradesOf(event.sourceUnitId), panAt(center));
       const landing = landingVisual(stage.particles, event.abilityId, center, event.radiusUnits);
+
+      if (event.abilityId === PLAGUE_BURST) {
+        burstCenters.set(event.sequence, { center, tick: event.tick });
+      }
 
       if (landing === null) {
         impactFlash(center.x, center.z, event.radiusUnits, IMPACT_COLOR);
@@ -796,7 +1469,33 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
 
     if (event.kind === "damage-dealt") {
-      const land = (): void => landHit(event);
+      const stuns = stunningHits.get(hitKey(event.causeSequence, event.targetUnitId)) === event.sequence;
+      const land = (): void => landHit(event, stuns);
+      const leap = leapArc(event.abilityId);
+
+      if (event.abilityId === sharedFate.id && event.reaction === true) {
+        shareAlongThread(event, land);
+
+        return;
+      }
+
+      if (event.abilityId === DEATH_KNELL) {
+        tollKnell(event, land);
+
+        return;
+      }
+
+      if ((DUSK_DASHES.has(event.abilityId) || event.abilityId === duskStrike.id) && event.reaction !== true && event.dot === undefined) {
+        duskHit(event);
+      }
+
+      struckUnits.set(event.causeSequence, event.targetUnitId);
+
+      if (leap !== null && event.reaction !== true) {
+        delayed(leap.seconds, land);
+
+        return;
+      }
 
       if (event.dot !== undefined || event.reaction === true || !isRangedAbility(event.abilityId)) {
         land();
@@ -804,13 +1503,49 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         return;
       }
 
+      const shot = shotOrigins.get(event.causeSequence);
+
+      if (shot !== undefined) {
+        flyShot(event, shot, land);
+
+        return;
+      }
+
       const previousTarget = chainTargets.get(event.causeSequence);
       chainTargets.set(event.causeSequence, event.targetUnitId);
 
+      const blast = abilityDefinition(event.abilityId)?.area;
+
       if (previousTarget === undefined) {
-        projectile(event.sourceUnitId, event.targetUnitId, event.abilityId, land);
+        bounceCounts.set(event.causeSequence, 0);
+        const target = records.get(event.targetUnitId);
+
+        const landing = (): void => {
+          land();
+
+          if (blast?.kind === "circle" && target !== undefined) {
+            const visual = landingVisual(stage.particles, event.abilityId, target.position.clone(), blast.radiusUnits);
+
+            if (visual !== null) {
+              showSpell(visual);
+            }
+          }
+        };
+
+        flightTimes.set(event.causeSequence, projectile(event.sourceUnitId, event.targetUnitId, event.abilityId, landing, releaseDelay(event.abilityId)));
+      } else if (blast !== undefined && abilityDefinition(event.abilityId)?.bounces === undefined) {
+        delayed(flightTimes.get(event.causeSequence) ?? PROJECTILE_SECONDS, land);
+      } else if (abilityDefinition(event.abilityId)?.bounces !== undefined) {
+        const bounce = bounceCounts.get(event.causeSequence) ?? 0;
+
+        if (previousTarget === event.targetUnitId) {
+          delayed(PROJECTILE_SECONDS * (bounce + 1), land);
+        } else {
+          bounceCounts.set(event.causeSequence, bounce + 1);
+          projectile(previousTarget, event.targetUnitId, event.abilityId, land, PROJECTILE_SECONDS * (bounce + 1));
+        }
       } else {
-        arc(previousTarget, event.targetUnitId, event.abilityId, land);
+        delayed(flightTimes.get(event.causeSequence) ?? PROJECTILE_SECONDS, () => arc(previousTarget, event.targetUnitId, event.abilityId, land));
       }
 
       return;
@@ -820,8 +1555,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       const record = records.get(event.targetUnitId);
 
       if (record !== undefined) {
-        healBurst(record, event.amount);
-        playHeal(event.abilityId, panOf(record));
+        allyHop(event.causeSequence, event.targetUnitId, event.abilityId, () => {
+          healBurst(record, event.amount);
+          playHeal(event.abilityId, panOf(record));
+        });
       }
 
       return;
@@ -831,7 +1568,146 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       const record = records.get(event.targetUnitId);
 
       if (record !== undefined) {
-        playShield(event.abilityId, panOf(record));
+        allyHop(event.causeSequence, event.targetUnitId, event.abilityId, () => playShield(event.abilityId, panOf(record)));
+      }
+
+      return;
+    }
+
+    if (event.kind === "status-applied") {
+      if (event.status === "poison") {
+        spreadGlob(event);
+
+        return;
+      }
+
+      if (event.status === "invulnerable") {
+        sanctify(event.targetUnitId);
+
+        return;
+      }
+
+      if (event.status === "pandemic") {
+        taint(event);
+
+        return;
+      }
+
+      if (event.status === "hexed") {
+        hexed(event);
+
+        return;
+      }
+
+      if (event.status === "puppeted") {
+        const record = records.get(event.targetUnitId);
+
+        if (record !== undefined) {
+          playPuppet(panOf(record));
+        }
+
+        return;
+      }
+
+      if (event.status === "stunned") {
+        const record = records.get(event.targetUnitId);
+
+        if (record !== undefined && !stunningHits.has(hitKey(event.causeSequence, event.targetUnitId))) {
+          playStun(panOf(record));
+        }
+
+        return;
+      }
+
+      if (event.status !== "form") {
+        return;
+      }
+
+      const record = records.get(event.targetUnitId);
+      const key = record?.state.form?.definition.key;
+      const visual = record === undefined || key === undefined ? null : formVisual(stage.particles, key, record.position.clone(), FORM_BURST_RADIUS);
+
+      if (visual !== null) {
+        showSpell(visual);
+      }
+
+      if (record !== undefined && key !== undefined && selfRevivals.get(event.targetUnitId) !== event.tick) {
+        playForm(key, panOf(record));
+      }
+
+      return;
+    }
+
+    if (event.kind === "revived" && event.sourceUnitId === event.unitId) {
+      const record = records.get(event.unitId);
+
+      if (record !== undefined) {
+        playRevive(upgradesOf(event.unitId), panOf(record));
+      }
+
+      return;
+    }
+
+    if (event.kind === "emitter-started") {
+      emitterAbilities.set(event.emitterId, event.abilityId);
+      playEmitter(event.abilityId, panAt(stage.toScene(event.from, 0)));
+
+      return;
+    }
+
+    if (event.kind === "zone-created") {
+      playZone(event.abilityId, panAt(stage.toScene(event.center, 0)));
+
+      return;
+    }
+
+    if (event.kind === "hp-paid") {
+      const record = records.get(event.unitId);
+
+      if (record !== undefined) {
+        playPayment(event.reason, panOf(record));
+      }
+
+      return;
+    }
+
+    if (event.kind === "emitter-fired") {
+      shotOrigins.set(event.sequence, {
+        from: stage.toScene(event.from, 0),
+        abilityId: emitterAbilities.get(event.emitterId) ?? event.abilityId,
+        tick: event.tick,
+      });
+
+      return;
+    }
+
+    if (event.kind === "passive-triggered" && event.passive === HARVEST && event.targetUnitId !== undefined) {
+      const harvester = records.get(event.unitId);
+
+      if (harvester !== undefined) {
+        playPassive(event.passive, panOf(harvester));
+        projectile(event.targetUnitId, event.unitId, HARVEST, () => {
+          const flare = passiveVisual(stage.particles, HARVEST, harvester.position.clone(), HARVEST_FLARE_RADIUS);
+
+          if (flare !== null) {
+            showSpell(flare);
+          }
+        });
+      }
+
+      return;
+    }
+
+    if (event.kind === "passive-triggered") {
+      const record = (event.targetUnitId === undefined ? undefined : records.get(event.targetUnitId)) ?? records.get(event.unitId);
+
+      if (record !== undefined) {
+        playPassive(event.passive, panOf(record));
+        const flare = passiveVisual(stage.particles, event.passive, record.position.clone(), WEAVER_FLARE_RADIUS);
+
+        if (flare !== null) {
+          showSpell(flare);
+        }
       }
 
       return;
@@ -845,7 +1721,94 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         stage.particles.emit(DEATH_DUST, record.position.clone().setY(0.6), UP, DEATH_DUST_COUNT);
         playDeath(sourceOf(record), panOf(record));
       }
+
+      const linkId = boundTo.get(event.unitId);
+
+      if (linkId !== undefined) {
+        knellSources.set(linkId, event.unitId);
+      }
     }
+  }
+
+  function shareAlongThread(event: DamageDealtEvent, land: () => void): void {
+    const struck = struckUnits.get(event.causeSequence);
+    const origin = struck === undefined ? undefined : records.get(struck);
+
+    if (struck === undefined || origin === undefined || struck === event.targetUnitId) {
+      land();
+
+      return;
+    }
+
+    projectile(struck, event.targetUnitId, sharedFate.id, land, flightTimes.get(event.causeSequence) ?? 0, chestOf(origin));
+  }
+
+  function reappearLater(record: UnitRecord, seconds: number): void {
+    vanishToken += 1;
+    const token = vanishToken;
+    const entry = vanished.get(record.unitId);
+
+    if (entry !== undefined) {
+      entry.token = token;
+    }
+
+    delayed(seconds, () => {
+      if (vanished.get(record.unitId)?.token !== token) {
+        return;
+      }
+
+      vanished.delete(record.unitId);
+      record.figure.root.visible = true;
+      duskPuff(stage.particles, chestOf(record), 0.8);
+    });
+  }
+
+  function vanish(record: UnitRecord): void {
+    duskPuff(stage.particles, chestOf(record), 1);
+    record.figure.root.visible = false;
+    vanished.set(record.unitId, { token: 0, from: chestOf(record) });
+    reappearLater(record, DUSK_REAPPEAR_SECONDS * 2);
+  }
+
+  function duskHit(event: DamageDealtEvent): void {
+    const target = records.get(event.targetUnitId);
+
+    if (target === undefined) {
+      return;
+    }
+
+    const shade = shadeCasts.has(event.causeSequence);
+    const strength = shade ? SHADE_RAKE : event.abilityId === duskStrike.id ? DUSK_STRIKE_RAKE : event.crit === true ? 1.3 : 1;
+    showSpell(clawRake(stage.particles, chestOf(target), strength));
+    const source = records.get(event.sourceUnitId);
+    const entry = shade ? undefined : vanished.get(event.sourceUnitId);
+
+    if (source === undefined || entry === undefined) {
+      return;
+    }
+
+    showSpell(duskStreak(stage.particles, entry.from, chestOf(target)));
+    entry.from = chestOf(target);
+    reappearLater(source, DUSK_REAPPEAR_SECONDS);
+  }
+
+  function tollKnell(event: DamageDealtEvent, land: () => void): void {
+    const linkId = boundTo.get(event.targetUnitId);
+    const fallen = linkId === undefined ? undefined : knellSources.get(linkId);
+    const source = fallen === undefined ? undefined : records.get(fallen);
+
+    if (fallen === undefined || source === undefined) {
+      land();
+
+      return;
+    }
+
+    if (tolledAt.get(fallen) !== event.tick) {
+      tolledAt.set(fallen, event.tick);
+      showSpell(deathKnell(stage.particles, source.position.clone(), KNELL_RADIUS));
+    }
+
+    projectile(fallen, event.targetUnitId, DEATH_KNELL, land, KNELL_TOLL_SECONDS, source.position.clone().setY(KNELL_HEIGHT));
   }
 
   function createRecord(unit: UnitState): UnitRecord {
@@ -876,7 +1839,48 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     conditionRing.rotation.x = -Math.PI / 2;
     conditionRing.visible = false;
-    stage.scene.add(bubble, frost, conditionRing);
+
+    const aura = new Mesh(
+      auraGeometry,
+      new MeshBasicMaterial({ color: AURA_COLOR, transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    aura.rotation.x = -Math.PI / 2;
+    aura.visible = false;
+
+    const formRing = new Mesh(
+      frostGeometry,
+      new MeshBasicMaterial({ color: FORM_COLOR, transparent: true, opacity: 0.6, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    formRing.rotation.x = -Math.PI / 2;
+    formRing.visible = false;
+
+    const ice = new Mesh(
+      iceGeometry,
+      new MeshStandardMaterial({
+        color: ICE_BLOCK_COLOR,
+        emissive: ICE_BLOCK_GLOW,
+        emissiveIntensity: 0.35,
+        roughness: 0.15,
+        metalness: 0.05,
+        flatShading: true,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      }),
+    );
+
+    ice.visible = false;
+
+    const plague = new Mesh(
+      frostGeometry,
+      new MeshBasicMaterial({ color: PLAGUE_COLOR, transparent: true, opacity: 0.5, blending: AdditiveBlending, depthWrite: false }),
+    );
+
+    plague.rotation.x = -Math.PI / 2;
+    plague.visible = false;
+    stage.scene.add(bubble, frost, conditionRing, aura, formRing, ice, plague);
 
     const plate = createPlate(unit, isFriendly, options.showUnitIds);
     stage.overlay.append(plate);
@@ -899,12 +1903,41 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       plateMana: plate.querySelector<HTMLElement>(".unit-plate-mana-fill"),
       plateCondition: plate.querySelector<HTMLElement>(".unit-plate-condition")!,
       plateStatus: plate.querySelector<HTMLElement>(".unit-plate-status")!,
+      plateStacks: plate.querySelector<HTMLElement>(".unit-plate-stacks"),
+      plateChain: plate.querySelector<HTMLElement>(".unit-plate-chain")!,
       conditionKey: "",
       statusKey: "",
+      stacksKey: "",
+      chainEndsAtTick: 0,
       bubble,
       frost,
       conditionRing,
+      level: unitLevel(unit),
+      plateLevel: plate.querySelector<HTMLElement>(".unit-plate-level"),
+      aura,
+      plateMeter: plate.querySelector<HTMLElement>(".unit-plate-meter-fill"),
+      leap: null,
+      formRing,
+      ice,
+      plague,
+      frozen: false,
+      grow: growTarget(unit),
     };
+  }
+
+  function syncLevel(record: UnitRecord, unit: UnitState): void {
+    const level = unitLevel(unit);
+
+    if (level === record.level) {
+      return;
+    }
+
+    record.level = level;
+
+    if (record.plateLevel !== null) {
+      record.plateLevel.textContent = romanLevel(level);
+      record.plateLevel.dataset.level = String(level);
+    }
   }
 
   function removeRecord(record: UnitRecord): void {
@@ -915,15 +1948,110 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     record.frost.material.dispose();
     record.conditionRing.removeFromParent();
     record.conditionRing.material.dispose();
+    record.aura.removeFromParent();
+    record.aura.material.dispose();
+    record.formRing.removeFromParent();
+    record.formRing.material.dispose();
+    record.ice.removeFromParent();
+    record.ice.material.dispose();
+    record.plague.removeFromParent();
+    record.plague.material.dispose();
     record.plate.remove();
   }
 
-  function syncRecords(next: BattleSnapshot, snapAll: boolean): void {
+  function leapsIn(events: readonly BattleEvent[]): Map<string, string> {
+    const leaps = new Map<string, string>();
+
+    for (const event of events) {
+      if (event.kind === "cast" && leapArc(event.abilityId) !== null) {
+        leaps.set(event.sourceUnitId, event.abilityId);
+      }
+    }
+
+    return leaps;
+  }
+
+  function startLeap(record: UnitRecord, abilityId: string): void {
+    const arc = leapArc(abilityId);
+
+    if (arc === null) {
+      return;
+    }
+
+    record.leap = { abilityId, from: record.position.clone(), to: record.destination.clone(), age: 0, seconds: arc.seconds, height: arc.height };
+  }
+
+  function stepLeap(record: UnitRecord, deltaSeconds: number): number {
+    const leap = record.leap;
+
+    if (leap === null) {
+      return 0;
+    }
+
+    leap.age += deltaSeconds;
+    const progress = Math.min(1, leap.age / leap.seconds);
+    record.position.lerpVectors(leap.from, leap.to, progress);
+
+    if (progress < 1) {
+      return leap.height * Math.sin(Math.PI * progress);
+    }
+
+    record.leap = null;
+    const landing = landingVisual(stage.particles, leap.abilityId, leap.to.clone(), leapRadius(record, leap.abilityId));
+
+    if (landing !== null) {
+      showSpell(landing);
+    }
+
+    playLanding(leap.abilityId, upgradesOf(record.unitId), panAt(leap.to));
+
+    return 0;
+  }
+
+  function leapRadius(record: UnitRecord, abilityId: string): number {
+    return (record.state.abilities[abilityId] ?? abilityDefinition(abilityId))?.dash?.splashRadiusUnits ?? areaRadius(record, abilityId);
+  }
+
+  function placeFigure(record: UnitRecord): void {
+    record.grow = growTarget(record.state);
+    record.figure.root.position.copy(record.position);
+    record.figure.root.rotation.y = record.yaw;
+    record.figure.root.scale.setScalar(levelFigureScale(record.level) * record.grow);
+  }
+
+  function syncFrozen(record: UnitRecord, unit: UnitState, snapAll: boolean): void {
+    const frozen = unit.alive && unit.control?.control === "frozen";
+
+    if (frozen !== record.frozen && !snapAll) {
+      stage.particles.emit(frozen ? FREEZE_MIST : ICE_SHATTER, chestOf(record), UP, frozen ? FREEZE_MIST_COUNT : ICE_SHATTER_COUNT);
+
+      if (!frozen) {
+        playThaw(panOf(record));
+      }
+    }
+
+    record.frozen = frozen;
+    record.ice.visible = frozen;
+    record.frost.visible = unit.alive && unit.slow !== null && unit.condition === null && !frozen;
+    record.plague.visible = unit.alive && unit.pandemic !== null;
+  }
+
+  function syncRecords(next: BattleSnapshot, snapAll: boolean, leaps: ReadonlyMap<string, string>): void {
     const present = new Set<string>();
+    const raisers = next.units.some(raisesCorpses);
+    const revivers = next.units.filter(revivesCorpses);
 
     for (const unit of next.units) {
       present.add(unit.unitId);
       let record = records.get(unit.unitId);
+
+      if (record !== undefined && record.state.heroId !== unit.heroId) {
+        removeRecord(record);
+        records.delete(unit.unitId);
+        record = undefined;
+      }
+
+      const created = record === undefined;
 
       if (record === undefined) {
         record = createRecord(unit);
@@ -932,27 +2060,42 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       record.state = unit;
       record.destination = stage.toScene(unit.position, 0);
+      syncLevel(record, unit);
+      const leapAbility = leaps.get(unit.unitId);
 
-      if (snapAll || record.destination.distanceTo(record.position) > SNAP_DISTANCE_UNITS) {
+      if (snapAll) {
+        record.leap = null;
+        record.position.copy(record.destination);
+        record.plateChain.hidden = true;
+        record.chainEndsAtTick = 0;
+      } else if (leapAbility !== undefined) {
+        startLeap(record, leapAbility);
+      } else if (record.leap !== null) {
+        record.leap.to.copy(record.destination);
+      } else if (record.destination.distanceTo(record.position) > SNAP_DISTANCE_UNITS) {
         record.position.copy(record.destination);
       }
 
-      if (snapAll && unit.alive) {
-        record.figure.setDead(false);
+      if (snapAll || created) {
+        placeFigure(record);
       }
 
-      if (!unit.alive) {
-        record.figure.setDead(true);
-      }
+      record.figure.setDead(!unit.alive);
+      record.figure.setLinger(isCorpse(unit) && (raisers || revivers.some((reviver) => isRevivable(reviver, unit))));
+      record.figure.setSpectral(isRisen(unit));
+      record.figure.setOverclock(overclockLevel(next.units, unit));
 
       const hp = hpFraction(unit);
       const shieldFraction = unit.shield === null ? 0 : Math.min(1, unit.shield.amount / Math.max(1, unit.maxHp));
+      const blessed = unit.shield !== null && unit.shield.blessed !== null;
       record.plateHp.style.width = `${hp * 100}%`;
       record.plateTrail.update(hp, snapAll);
       record.plateShield.style.width = `${shieldFraction * 100}%`;
+      record.plateShield.classList.toggle("is-blessed", blessed);
       record.plate.hidden = !unit.alive;
       record.bubble.visible = unit.alive && unit.shield !== null;
-      record.frost.visible = unit.alive && unit.slow !== null && unit.condition === null;
+      record.bubble.material.color.set(blessed ? BLESSED_COLOR : SHIELD_COLOR);
+      syncFrozen(record, unit, snapAll || created);
       syncPlateExtras(record, unit, next.tick);
     }
 
@@ -964,7 +2107,50 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
   }
 
+  function syncStacks(record: UnitRecord, unit: UnitState): void {
+    const fraction = meterFraction(unit);
+    const passive = stackPassive(unit);
+    const stacks = passive === null ? 0 : (unit.memory.stacks[passive.key] ?? 0);
+    const key = `${stacks}:${fraction === null ? "" : Math.round(fraction * 100)}`;
+
+    if (key === record.stacksKey) {
+      return;
+    }
+
+    record.stacksKey = key;
+
+    if (record.plateMeter !== null && fraction !== null) {
+      record.plateMeter.style.width = `${fraction * 100}%`;
+      record.plateMeter.parentElement?.classList.toggle("is-full", fraction >= 1);
+    }
+
+    if (record.plateStacks === null || passive === null) {
+      return;
+    }
+
+    record.plateStacks.classList.toggle("is-full", stacks >= passive.max);
+
+    for (const [index, pip] of [...record.plateStacks.children].entries()) {
+      pip.classList.toggle("is-on", index < stacks);
+    }
+  }
+
+  function showChain(record: UnitRecord, link: number, tick: number): void {
+    const chain = record.plateChain;
+    chain.textContent = `×${link}`;
+    chain.hidden = false;
+    chain.classList.toggle("is-flourish", link >= CHAIN_FLOURISH_LINK);
+    chain.animate([{ scale: link >= CHAIN_FLOURISH_LINK ? "1.9" : "1.5" }, { scale: "1" }], { duration: 260, easing: "cubic-bezier(0.2, 0.9, 0.3, 1)" });
+    record.chainEndsAtTick = tick + CHAIN_HOLD_TICKS;
+  }
+
   function syncPlateExtras(record: UnitRecord, unit: UnitState, tick: number): void {
+    syncStacks(record, unit);
+
+    if (!record.plateChain.hidden && (tick > record.chainEndsAtTick || !unit.alive)) {
+      record.plateChain.hidden = true;
+    }
+
     if (record.plateMana !== null) {
       record.plateMana.style.width = `${Math.min(100, (unit.mana / Math.max(1, unit.maxMana)) * 100)}%`;
       record.plateMana.parentElement?.classList.toggle("is-full", unit.mana >= unit.maxMana);
@@ -1001,10 +2187,22 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       statuses.push({ kind: "taunted", buff: false, stacks: 0 });
     }
 
+    if (unit.alive && unit.chill !== null) {
+      statuses.push({ kind: "chill", buff: false, stacks: unit.chill.stacks });
+    }
+
     if (unit.alive) {
       for (const dot of unit.dots) {
         statuses.push({ kind: dot.dot, buff: false, stacks: dot.stacks });
       }
+    }
+
+    if (unit.alive && unit.pandemic !== null) {
+      statuses.push({ kind: "pandemic", buff: false, stacks: 0 });
+    }
+
+    if (unit.alive && unit.graveMark !== null) {
+      statuses.push({ kind: "grave-marked", buff: false, stacks: 0 });
     }
 
     if (unit.alive && unit.invulnerableUntilTick !== 0) {
@@ -1019,8 +2217,16 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       statuses.push({ kind: "linked", buff: false, stacks: 0 });
     }
 
+    if (unit.alive && unit.link !== null && unit.link.puppetUntilTick !== 0) {
+      statuses.push({ kind: "puppeted", buff: false, stacks: 0 });
+    }
+
     if (unit.alive && unit.channel !== null) {
       statuses.push({ kind: "channeling", buff: true, stacks: 0 });
+    }
+
+    if (unit.alive && unit.form !== null) {
+      statuses.push({ kind: `form:${unit.form.definition.key}`, buff: true, stacks: 0 });
     }
 
     const statusKey = statuses.map((status) => `${status.kind}:${status.stacks}`).join("|");
@@ -1083,6 +2289,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
 
     for (const zone of next.zones) {
+      if (pendingTrails.has(zone.zoneId)) {
+        continue;
+      }
+
       const key = `zone-${zone.zoneId}`;
       let marker = groundMarkers.get(key);
 
@@ -1096,8 +2306,27 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       marker.seen = true;
       syncStateVisual(key, next.tick, spellKeys, () =>
-        zoneVisual(stage.particles, zone.abilityId, stage.toScene(zone.center, 0), zone.radiusUnits, zone.zoneId),
+        zoneVisual(stage.particles, zone.abilityId, stage.toScene(zone.center, 0), zone.radiusUnits, zone.zoneId, zone.periodTicks),
       );
+
+      if (zone.followsUnitId !== null) {
+        const center = stage.toScene(zone.center, 0);
+        marker.mesh.position.set(center.x, marker.mesh.position.y, center.z);
+        stateVisuals.get(key)?.root.position.set(center.x, 0, center.z);
+      }
+    }
+
+    for (const emitter of next.emitters) {
+      const key = `emitter-${emitter.emitterId}`;
+      const position = stage.toScene(emitter.position, 0);
+      const ahead = stage.toScene({ x: emitter.position.x + emitter.velocity.x, y: emitter.position.y + emitter.velocity.y }, 0);
+      const motion = emitterMotions.get(key) ?? { position: new Vector3(), velocity: new Vector3(), tick: next.tick };
+      motion.position.copy(position);
+      motion.velocity.subVectors(ahead, position);
+      motion.tick = next.tick;
+      emitterMotions.set(key, motion);
+      emitterAbilities.set(emitter.emitterId, emitter.abilityId);
+      syncStateVisual(key, next.tick, spellKeys, () => emitterVisual(stage.particles, emitter.abilityId, motion, emitter.emitterId));
     }
 
     for (const [key, visual] of stateVisuals) {
@@ -1106,6 +2335,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       stateVisuals.delete(key);
+      emitterMotions.delete(key);
 
       if (visual !== null) {
         visual.end();
@@ -1193,10 +2423,16 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   function stepRecords(deltaSeconds: number): void {
     const blend = 1 - Math.exp(-POSITION_SMOOTHING * deltaSeconds);
     const turn = 1 - Math.exp(-YAW_SMOOTHING * deltaSeconds);
+    auraClock = (auraClock + deltaSeconds) % AURA_PULSE_SECONDS;
 
     for (const record of records.values()) {
       const before = record.position.clone();
-      record.position.lerp(record.destination, blend);
+
+      if (record.leap === null) {
+        record.position.lerp(record.destination, blend);
+      }
+
+      const lift = stepLeap(record, deltaSeconds);
       const speed = deltaSeconds > 0 ? before.distanceTo(record.position) / deltaSeconds : 0;
       const moving = record.state.alive && speed > MOVING_UNITS_PER_SECOND;
 
@@ -1215,15 +2451,36 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       record.figure.setMoving(moving);
       record.figure.setChanneling(record.state.alive && record.state.channel !== null);
       record.figure.root.position.copy(record.position);
+      record.figure.root.position.y += lift;
       record.figure.root.rotation.y = record.yaw;
-      record.figure.root.scale.setScalar(record.state.alive && record.state.control?.control === "hexed" ? HEXED_SCALE : 1);
-      record.figure.update(deltaSeconds);
-      record.bubble.position.set(record.position.x, record.figure.height * 0.5, record.position.z);
+      record.grow += (growTarget(record.state) - record.grow) * (1 - Math.exp(-GROW_SMOOTHING * deltaSeconds));
+      record.figure.root.scale.setScalar(hexCritters.figureScale(record.unitId) * levelFigureScale(record.level) * record.grow);
+      record.figure.setCharge(record.state.alive ? stackCharge(record.state) : 0);
+      record.figure.update(record.frozen ? 0 : deltaSeconds);
+
+      if (record.frozen) {
+        const height = figureHeight(record);
+        const width = Math.max(3.2, height * 0.42);
+        record.ice.position.set(record.position.x, height * 0.5, record.position.z);
+        record.ice.scale.set(width, height * 0.62, width);
+      }
+
+      record.plague.position.set(record.position.x, 0.15, record.position.z);
+      record.plague.scale.setScalar(1.1 + 0.06 * Math.sin((auraClock / AURA_PULSE_SECONDS) * Math.PI * 6));
+      record.plague.material.opacity = 0.35 + 0.2 * Math.sin((auraClock / AURA_PULSE_SECONDS) * Math.PI * 4);
+      record.bubble.position.set(record.position.x, figureHeight(record) * 0.5, record.position.z);
       record.frost.position.set(record.position.x, 0.1, record.position.z);
       record.conditionRing.position.set(record.position.x, 0.14, record.position.z);
+      record.aura.visible = record.state.alive && record.level >= MAX_HERO_LEVEL;
+      record.formRing.visible = record.state.alive && record.state.form !== null;
+      record.formRing.material.color.set(record.state.form?.definition.key === "inferno" ? INFERNO_COLOR : FORM_COLOR);
+      record.formRing.position.set(record.position.x, 0.16, record.position.z);
+      record.formRing.scale.setScalar(1.15 + 0.08 * Math.sin((auraClock / AURA_PULSE_SECONDS) * Math.PI * 4));
+      record.aura.position.set(record.position.x, 0.08, record.position.z);
+      record.aura.material.opacity = 0.32 + 0.18 * Math.sin((auraClock / AURA_PULSE_SECONDS) * Math.PI * 2);
       record.plateTrail.step(deltaSeconds);
 
-      const platePoint = stage.toScreen(record.position.clone().setY(record.figure.height + PLATE_GAP_UNITS));
+      const platePoint = stage.toScreen(record.position.clone().setY(figureHeight(record) + PLATE_GAP_UNITS + lift));
 
       if (platePoint !== null) {
         record.plate.style.transform = `translate(${platePoint.x}px, ${platePoint.y}px) translate(-50%, -100%)`;
@@ -1250,6 +2507,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     stepRecords(deltaSeconds);
     stepEffects(deltaSeconds);
     stepSpells(deltaSeconds);
+    stepThreads(deltaSeconds);
+    stepCritters(deltaSeconds);
     updateSelection();
     updateTargetLines();
   });
@@ -1259,7 +2518,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     const clickX = event.clientX - rect.left;
     const clickY = event.clientY - rect.top;
     let closest: UnitRecord | null = null;
-    let closestDistance = PICK_RADIUS_PIXELS;
+    let closestScore = Number.POSITIVE_INFINITY;
 
     for (const record of records.values()) {
       const point = stage.toScreen(chestOf(record));
@@ -1269,10 +2528,11 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       const distance = Math.hypot(point.x - clickX, point.y - clickY);
+      const score = distance + (record.state.alive ? 0 : PICK_RADIUS_PIXELS);
 
-      if (distance < closestDistance) {
+      if (distance < PICK_RADIUS_PIXELS && score < closestScore) {
         closest = record;
-        closestDistance = distance;
+        closestScore = score;
       }
     }
 
@@ -1294,22 +2554,70 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       if (snapAll) {
         chainTargets.clear();
-        falling.reset();
+        bounceCounts.clear();
+        flightTimes.clear();
+        pendingTrails.clear();
+        hexOrigins.clear();
+        omenOrigins.clear();
+        struckUnits.clear();
+        boundTo.clear();
+        knellSources.clear();
+        tolledAt.clear();
+
+        for (const unitId of vanished.keys()) {
+          const hidden = records.get(unitId);
+
+          if (hidden !== undefined) {
+            hidden.figure.root.visible = true;
+          }
+        }
+
+        vanished.clear();
+        shadeCasts.clear();
+        hexCritters.clear();
+        fateThreads.clear();
+        emitterAbilities.clear();
+        shotOrigins.clear();
+        burstCenters.clear();
+        falling.reset(next.impacts);
         stage.particles.clear();
+
+        for (const effect of effects) {
+          disposeEffectObjects(effect);
+        }
+
+        effects.length = 0;
+
+        for (const visual of spellVisuals) {
+          visual.dispose();
+        }
+
+        spellVisuals.clear();
       }
 
-      syncRecords(next, snapAll);
+      forgetBefore(shotOrigins, next.tick - SHOT_MEMORY_TICKS);
+      forgetBefore(burstCenters, next.tick - SHOT_MEMORY_TICKS);
+
+      syncRecords(next, snapAll, leapsIn(latestEvents));
+
+      if (!snapAll) {
+        holdTrails(latestEvents);
+      }
+
       syncGroundMarkers(next);
 
       if (snapAll) {
         return;
       }
 
+      selfRevivals = selfRevivalsIn(latestEvents);
+      stunningHits = stunningHitsIn(latestEvents);
+
       for (const event of latestEvents) {
         handleEvent(event);
       }
 
-      falling.sync(next.impacts, next.tick, (impactId) => {
+      falling.sync(next.impacts, next.tick, upgradesOf, (impactId) => {
         const impact = next.impacts.find((candidate) => candidate.impactId === impactId);
 
         return impact === undefined ? undefined : panAt(stage.toScene(impact.center, 0));
@@ -1344,6 +2652,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       records.clear();
+      emitterMotions.clear();
+      emitterAbilities.clear();
+      shotOrigins.clear();
+      burstCenters.clear();
 
       for (const marker of groundMarkers.values()) {
         marker.mesh.removeFromParent();
@@ -1360,8 +2672,10 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       targetLines.removeFromParent();
       targetLineGeometry.dispose();
       targetLines.material.dispose();
+      fateThreads.dispose();
+      hexCritters.dispose();
 
-      for (const geometry of [bubbleGeometry, frostGeometry, sparkGeometry, boltGeometry, selectionGeometry]) {
+      for (const geometry of [iceGeometry, bubbleGeometry, frostGeometry, auraGeometry, sparkGeometry, boltGeometry, selectionGeometry]) {
         geometry.dispose();
       }
 

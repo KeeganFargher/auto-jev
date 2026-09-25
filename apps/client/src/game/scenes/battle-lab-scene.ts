@@ -4,7 +4,7 @@ import type { BoardStage, ViewportInsets } from "../views/board-stage.js";
 import { createEventLogView } from "../../hud/event-log.js";
 import { createUnitInspectorView } from "../../hud/unit-inspector.js";
 import { createBattleControlsView } from "../../hud/battle-controls.js";
-import type { BattleLabSession, LabScenarioKind, LabTeams, TeamAUpgradeIdsByHero } from "../../session/types.js";
+import type { BattleLabSession, LabScenarioKind, LabTeams, LabPicksByHero } from "../../session/types.js";
 import { audio } from "../../audio/engine.js";
 
 export interface BattleLabScene {
@@ -37,7 +37,7 @@ export function createBattleLabScene(
   statusEl: HTMLElement,
   session: BattleLabSession,
   onReplay: () => void,
-  onReset: (seed: number, scenario?: LabScenarioKind, teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero, teams?: LabTeams) => void,
+  onReset: (seed: number, scenario?: LabScenarioKind, teamAPicksByHero?: LabPicksByHero, teams?: LabTeams) => void,
   isReplay: boolean,
 ): BattleLabScene {
   void audio.preload("battle");

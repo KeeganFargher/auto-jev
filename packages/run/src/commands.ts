@@ -1,10 +1,10 @@
-import { createHeroBuild, isValidFormation, type BoardCell, type Catalogue } from "@jev-game/game";
+import { createHeroBuild, isValidFormation, type BoardCell, type Catalogue, type SkillSlot } from "@jev-game/game";
 import { boardArena, defaultFormation } from "@jev-game/content";
 import type { PlayerId } from "./ids.js";
-import type { HeroOffer, PlayerSeat, RunPhase, RunState } from "./types.js";
+import type { HeroOffer, OwnedPiece, PlayerSeat, RunPhase, RunState } from "./types.js";
 import { isSeatReady } from "./readiness.js";
 import { applyRewardOffer } from "./rewards.js";
-import { hasStashRoom, itemCanGoOn, runeCanGoOn } from "./inventory.js";
+import { gemCanGoOn, hasStashRoom, itemCanGoOn, stashOverflowGems } from "./inventory.js";
 
 export type RunCommand =
   | { kind: "select-heroes"; playerId: PlayerId; offerIds: readonly string[]; expectedRevision: number }
@@ -17,10 +17,18 @@ export type RunCommand =
       decisionId: string;
       offerId: string;
       heroSlot: number | null;
+      skill: SkillSlot | null;
       expectedRevision: number;
     }
   | { kind: "move-item"; playerId: PlayerId; instanceId: string; heroSlot: number | null; expectedRevision: number }
-  | { kind: "socket-rune"; playerId: PlayerId; instanceId: string; heroSlot: number | null; expectedRevision: number }
+  | {
+      kind: "socket-gem";
+      playerId: PlayerId;
+      instanceId: string;
+      heroSlot: number | null;
+      skill: SkillSlot | null;
+      expectedRevision: number;
+    }
   | { kind: "discard-item"; playerId: PlayerId; instanceId: string; expectedRevision: number };
 
 export type RunCommandRejectionReason =
@@ -38,7 +46,7 @@ export type RunCommandRejectionReason =
   | "unknown-piece"
   | "no-room"
   | "team-full"
-  | "rune-does-not-fit";
+  | "gem-does-not-fit";
 
 export type RunCommandResult =
   | { accepted: true; state: RunState }
@@ -51,7 +59,7 @@ const COMMAND_PHASES: Record<RunCommand["kind"], readonly RunPhase[]> = {
   "place-heroes": ["preparing"],
   "choose-offer": ["reward"],
   "move-item": ["reward", "preparing"],
-  "socket-rune": ["reward", "preparing"],
+  "socket-gem": ["reward", "preparing"],
   "discard-item": ["reward", "preparing"],
 };
 
@@ -159,7 +167,7 @@ function applyChooseOffer(
   }
 
   const round = (state.currentRound?.round ?? 0) + 1;
-  const applied = applyRewardOffer(catalogue, state.rules, round, seat, offer, command.heroSlot);
+  const applied = applyRewardOffer(catalogue, state.rules, round, seat, offer, command.heroSlot, command.skill);
 
   if (!applied.accepted) {
     return reject(applied.reason);
@@ -175,6 +183,12 @@ function applyChooseOffer(
   });
 }
 
+function withItems(seat: PlayerSeat, items: OwnedPiece[], catalogue: Catalogue): PlayerSeat {
+  const moved = { ...seat, items };
+
+  return { ...moved, gems: stashOverflowGems(moved, catalogue) };
+}
+
 function applyMoveItem(state: RunState, seat: PlayerSeat, instanceId: string, heroSlot: number | null, catalogue: Catalogue): RunCommandResult {
   const piece = seat.items.find((candidate) => candidate.instanceId === instanceId);
 
@@ -188,41 +202,43 @@ function applyMoveItem(state: RunState, seat: PlayerSeat, instanceId: string, he
 
   const items = seat.items.map((candidate) => (candidate.instanceId === instanceId ? { ...candidate, heroSlot } : candidate));
 
-  return accept(withSeat(state, { ...seat, items }));
+  return accept(withSeat(state, withItems(seat, items, catalogue)));
 }
 
-function applySocketRune(
+function applySocketGem(
   state: RunState,
   seat: PlayerSeat,
-  instanceId: string,
-  heroSlot: number | null,
+  command: Extract<RunCommand, { kind: "socket-gem" }>,
   catalogue: Catalogue,
 ): RunCommandResult {
-  const piece = seat.runes.find((candidate) => candidate.instanceId === instanceId);
+  const { instanceId, heroSlot } = command;
+  const piece = seat.gems.find((candidate) => candidate.instanceId === instanceId);
 
   if (piece === undefined) {
     return reject("unknown-piece");
   }
 
-  if (heroSlot !== null && !runeCanGoOn(seat, piece.pieceId, heroSlot, catalogue, instanceId)) {
-    return reject("rune-does-not-fit");
+  const skill = heroSlot === null ? null : command.skill;
+
+  if (heroSlot !== null && (skill === null || !gemCanGoOn(seat, piece.pieceId, heroSlot, skill, catalogue, instanceId))) {
+    return reject("gem-does-not-fit");
   }
 
-  const runes = seat.runes.map((candidate) => (candidate.instanceId === instanceId ? { ...candidate, heroSlot } : candidate));
+  const gems = seat.gems.map((candidate) => (candidate.instanceId === instanceId ? { ...candidate, heroSlot, skill } : candidate));
 
-  return accept(withSeat(state, { ...seat, runes }));
+  return accept(withSeat(state, { ...seat, gems }));
 }
 
-function applyDiscardItem(state: RunState, seat: PlayerSeat, instanceId: string): RunCommandResult {
+function applyDiscardItem(state: RunState, seat: PlayerSeat, instanceId: string, catalogue: Catalogue): RunCommandResult {
   if (!seat.items.some((candidate) => candidate.instanceId === instanceId)) {
     return reject("unknown-piece");
   }
 
-  return accept(withSeat(state, { ...seat, items: seat.items.filter((candidate) => candidate.instanceId !== instanceId) }));
+  return accept(withSeat(state, withItems(seat, seat.items.filter((candidate) => candidate.instanceId !== instanceId), catalogue)));
 }
 
 function isEquipmentCommand(command: RunCommand): boolean {
-  return command.kind === "move-item" || command.kind === "socket-rune" || command.kind === "discard-item";
+  return command.kind === "move-item" || command.kind === "socket-gem" || command.kind === "discard-item";
 }
 
 export function applyCommand(
@@ -273,11 +289,11 @@ export function applyCommand(
     case "move-item":
       return applyMoveItem(state, seat, command.instanceId, command.heroSlot, catalogue);
 
-    case "socket-rune":
-      return applySocketRune(state, seat, command.instanceId, command.heroSlot, catalogue);
+    case "socket-gem":
+      return applySocketGem(state, seat, command, catalogue);
 
     case "discard-item":
-      return applyDiscardItem(state, seat, command.instanceId);
+      return applyDiscardItem(state, seat, command.instanceId, catalogue);
 
     default: {
       const exhaustive: never = command;

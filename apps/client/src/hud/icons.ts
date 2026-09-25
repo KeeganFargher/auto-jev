@@ -72,9 +72,9 @@ const SPIRAL =
 
 const GEM = "M6.5 3h11L22 9l-10 12.5L2 9Zm1.2 2L5 9h14l-2.7-4Z";
 
-const RUNE = "M12 1.5 21 7v10l-9 5.5L3 17V7Zm-1 5v11h2v-4.4l3 2.4 1.2-1.6L13 10.6V6.5Z";
+const POUCH = "M8 2.5h8l-1.6 3.6H9.6ZM7.2 7.6h9.6l3.7 6v5.9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-5.9Zm3.5 5.4v3.4h2.6V13Z";
 
-const TALENT = "M12 2.5 15 9l7 .6-5.3 4.6 1.6 6.8L12 17.4 5.7 21l1.6-6.8L2 9.6 9 9Z";
+const LEVEL = "M12 2.5 15 9l7 .6-5.3 4.6 1.6 6.8L12 17.4 5.7 21l1.6-6.8L2 9.6 9 9Z";
 
 const PLUS = "M10.5 3.5h3v7h7v3h-7v7h-3v-7h-7v-3h7Z";
 
@@ -151,6 +151,16 @@ const UNTARGETABLE_GLYPH = "M3.3 2 22 20.7 20.7 22l-3.5-3.5A10.7 10.7 0 0 1 12 2
 
 const POISON_GLYPH = "M12 2.5c3.3 4.4 6.5 8.2 6.5 11.9A6.5 6.5 0 0 1 12 21a6.5 6.5 0 0 1-6.5-6.6C5.5 10.7 8.7 6.9 12 2.5Z";
 
+const CHILL_GLYPH = "M3 3h18v3.2H3ZM4.2 6.2h4L6.2 15ZM9.4 6.2h5.2L12 21ZM15.8 6.2h4L17.8 13Z";
+
+const GRAVE_GLYPH = "M6 21V9a6 6 0 0 1 12 0v12ZM11 7.5h2V10h2.2v2H13v5.5h-2V12H8.8v-2H11ZM4 21h16v1.8H4Z";
+
+const PUPPETED_GLYPH =
+  "M3 4h18v2.4H3ZM10.8 1.2h2.4V4h-2.4ZM10.8 6.4h2.4v2.2h-2.4ZM4.2 6.4h1.4v9H4.2ZM18.4 6.4h1.4v9h-1.4ZM11.3 8.6h1.4v6.8h-1.4ZM4.9 15.4a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8ZM12 15.4a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8ZM19.1 15.4a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z";
+
+const PANDEMIC_GLYPH =
+  "M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10ZM10.2 9.4a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6ZM13.9 12.4a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2ZM16.5 2.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM21 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM16.5 17.8a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM7.5 17.8a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM3 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM7.5 2.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4ZM15.3 8.1 16.3 6.4 14.7 5.5 13.7 7.2ZM17 12.9 19 12.9 19 11.1 17 11.1ZM13.7 16.8 14.7 18.5 16.3 17.6 15.3 15.9ZM8.7 15.9 7.7 17.6 9.3 18.5 10.3 16.8ZM7 11.1 5 11.1 5 12.9 7 12.9ZM10.3 7.2 9.3 5.5 7.7 6.4 8.7 8.1Z";
+
 function statusGlyph(status: string): string {
   switch (status) {
     case "frozen":
@@ -174,6 +184,25 @@ function statusGlyph(status: string): string {
     case "poison":
       return POISON_GLYPH;
 
+    case "chill":
+      return CHILL_GLYPH;
+
+    case "pandemic":
+      return PANDEMIC_GLYPH;
+
+    case "puppeted":
+      return PUPPETED_GLYPH;
+
+    case "grave-marked":
+      return GRAVE_GLYPH;
+
+    case "form:lich":
+      return SKULL;
+
+    case "form:mech":
+    case "overclock":
+      return COG;
+
     case "hexed":
       return FATE_EYE;
 
@@ -184,7 +213,7 @@ function statusGlyph(status: string): string {
       return CROSSED_AXES;
 
     default:
-      return STUNNED_GLYPH;
+      return status.startsWith("form:") ? SUN : STUNNED_GLYPH;
   }
 }
 
@@ -212,65 +241,76 @@ const WIDEN_GLYPH = "M2.5 2.5h7v2.6H6.9l3.4 3.4-1.8 1.8-3.4-3.4v2.6H2.5ZM21.5 2.
 
 const LEECH_GLYPH = "M12 2c3.4 4.5 6.7 8.4 6.7 12.2A6.7 6.7 0 0 1 12 21a6.7 6.7 0 0 1-6.7-6.8C5.3 10.4 8.6 6.5 12 2Zm-1.1 9.3v2.2H8.7v2.2h2.2v2.2h2.2v-2.2h2.2v-2.2h-2.2v-2.2Z";
 
+const TRIPLE_SLASH_GLYPH = "M2.5 13.5 12.5 3.5l2 2-10 10ZM6 19 17.5 7.5l2 2L8 21ZM11.5 21.5l9-9 2 2-9 9Z";
+
+const CROSSHAIR_GLYPH =
+  "M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 2.8a7.2 7.2 0 1 0 0 14.4 7.2 7.2 0 0 0 0-14.4Zm-1.3 1.9h2.6v4h4v2.6h-4v4h-2.6v-4h-4v-2.6h4Z";
+
 const SPIKES_GLYPH = "M12 1.5 14.1 7.1 19.4 4.5 16.8 9.8 22.5 12 16.8 14.2 19.4 19.5 14.1 16.9 12 22.5 9.9 16.9 4.6 19.5 7.2 14.2 1.5 12 7.2 9.8 4.6 4.5 9.9 7.1Z";
 
 function pieceGlyph(pieceId: string): string | null {
   switch (pieceId) {
-    case "rune-chain":
+    case "gem-chain":
       return CHAIN_GLYPH;
 
-    case "rune-echo":
+    case "gem-multicast":
       return RIPPLE_GLYPH;
 
-    case "rune-widen":
+    case "gem-multistrike":
+      return TRIPLE_SLASH_GLYPH;
+
+    case "gem-widen":
       return WIDEN_GLYPH;
 
-    case "rune-primer-staggered":
+    case "gem-primer-staggered":
       return ZIGZAG;
 
-    case "rune-leech":
+    case "gem-leech":
       return LEECH_GLYPH;
 
-    case "rune-retaliate":
+    case "gem-cast-when-damaged":
       return SPIKES_GLYPH;
 
-    case "rune-overcharge":
+    case "gem-overcharge":
       return FLAME;
 
-    case "rune-primer-disoriented":
+    case "gem-primer-disoriented":
       return SPIRAL;
 
-    case "rune-twincast":
+    case "gem-cast-on-crit":
       return STAR;
 
-    case "rune-last-word":
+    case "gem-cast-on-kill":
+      return CROSSHAIR_GLYPH;
+
+    case "gem-last-word":
       return SKULL;
 
-    case "rune-primer-brittle":
+    case "gem-primer-brittle":
       return SNOWFLAKE;
 
-    case "rune-fork":
+    case "gem-fork":
       return CROSSED_AXES;
 
-    case "rune-split":
+    case "gem-split":
       return PLUS;
 
-    case "rune-empower":
+    case "gem-empower":
       return HAMMER;
 
-    case "rune-linger":
+    case "gem-linger":
       return HOURGLASS_GLYPH;
 
-    case "rune-opener":
+    case "gem-opener":
       return BOLT_GLYPH;
 
-    case "rune-tandem":
+    case "gem-cast-on-detonation":
       return SUN;
 
-    case "rune-resonance":
+    case "gem-resonance":
       return CRACKED_ORB_GLYPH;
 
-    case "rune-haste":
+    case "gem-haste":
       return BOOT_GLYPH;
 
     default:
@@ -278,26 +318,26 @@ function pieceGlyph(pieceId: string): string | null {
   }
 }
 
-export function pieceIcon(pieceId: string, kind: "item" | "rune"): SVGSVGElement {
+export function pieceIcon(pieceId: string, kind: "item" | "gem"): SVGSVGElement {
   const glyph = pieceGlyph(pieceId);
 
   if (glyph === null) {
-    return kind === "item" ? itemIcon() : runeIcon();
+    return kind === "item" ? itemIcon() : gemIcon();
   }
 
   return svg("0 0 24 24", path(glyph, "evenodd"));
 }
 
 export function itemIcon(): SVGSVGElement {
+  return svg("0 0 24 24", path(POUCH, "evenodd"));
+}
+
+export function gemIcon(): SVGSVGElement {
   return svg("0 0 24 24", path(GEM, "evenodd"));
 }
 
-export function runeIcon(): SVGSVGElement {
-  return svg("0 0 24 24", path(RUNE, "evenodd"));
-}
-
-export function talentIcon(): SVGSVGElement {
-  return svg("0 0 24 24", path(TALENT));
+export function levelIcon(): SVGSVGElement {
+  return svg("0 0 24 24", path(LEVEL));
 }
 
 export function plusIcon(): SVGSVGElement {

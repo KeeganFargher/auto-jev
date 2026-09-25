@@ -1,4 +1,4 @@
-import { CircleGeometry, Color, DataTexture, Group, LinearFilter, Mesh, MeshBasicMaterial, type Object3D } from "three";
+import { CircleGeometry, Color, DataTexture, Group, LinearFilter, Mesh, MeshBasicMaterial, type MeshStandardMaterial, type Object3D } from "three";
 
 export interface FigureBase {
   readonly root: Object3D;
@@ -25,6 +25,32 @@ export const LUNGE_UNITS = 2.2;
 export const CHEST_FRACTION = 0.55;
 
 export const DEAD_COLOR = new Color("#6b7280");
+
+export const SPECTRAL_GLOW = new Color("#5cf2c0");
+
+const SPECTRAL_TINT = 0.5;
+
+const SPECTRAL_OPACITY = 0.62;
+
+export interface SpectralMemory {
+  colors: Map<MeshStandardMaterial, Color>;
+}
+
+export function paintSpectral(surfaces: readonly MeshStandardMaterial[], memory: SpectralMemory, spectral: boolean): void {
+  for (const surface of surfaces) {
+    const original = memory.colors.get(surface) ?? surface.color.clone();
+    memory.colors.set(surface, original);
+    surface.color.copy(original);
+
+    if (spectral) {
+      surface.color.lerp(SPECTRAL_GLOW, SPECTRAL_TINT);
+    }
+
+    surface.transparent = spectral;
+    surface.opacity = spectral ? SPECTRAL_OPACITY : 1;
+    surface.depthWrite = !spectral;
+  }
+}
 
 const TEXELS = 128;
 

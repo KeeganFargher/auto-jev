@@ -6,7 +6,7 @@ import { mountEnvironment, type MountedEnvironment } from "../environments/envir
 import { savedBoardTheme } from "../environments/board-choice.js";
 import { boardArena } from "@jev-game/content";
 import { parseScenario, serializeScenario, type LabScenario } from "../../dev/scenario-editor.js";
-import type { BattleLabSession, LabScenarioKind, LabTeams, TeamAUpgradeIdsByHero } from "../../session/types.js";
+import type { BattleLabSession, LabScenarioKind, LabTeams, LabPicksByHero } from "../../session/types.js";
 
 export interface BattleLab {
   show(): void;
@@ -73,21 +73,21 @@ export function createBattleLab(canvasRoot: HTMLElement, hudRoot: HTMLElement): 
   function handleReset(
     seed: number,
     scenario?: LabScenarioKind,
-    teamAUpgradeIdsByHero?: TeamAUpgradeIdsByHero,
+    teamAPicksByHero?: LabPicksByHero,
     teams?: LabTeams,
   ): void {
     if (activeIsReplay) {
       const current = activeSession.peekSnapshot();
 
       mount(
-        createLocalBattleLabSession(seed, scenario ?? current.scenario, teamAUpgradeIdsByHero, teams ?? current.teams),
+        createLocalBattleLabSession(seed, scenario ?? current.scenario, teamAPicksByHero, teams ?? current.teams),
         false,
       );
 
       return;
     }
 
-    activeSession.reset(seed, scenario, teamAUpgradeIdsByHero, teams);
+    activeSession.reset(seed, scenario, teamAPicksByHero, teams);
   }
 
   function currentScenario(): LabScenario {

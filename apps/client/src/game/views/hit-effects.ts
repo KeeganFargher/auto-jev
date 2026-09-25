@@ -1,7 +1,7 @@
 import { Color, Vector3 } from "three";
 import type { ParticleStyle, ParticleSystem } from "./particles.js";
 
-export type HitKind = "strike" | "blunt" | "blade" | "fire" | "frost" | "dark" | "thorn" | "rivet" | "holy";
+export type HitKind = "strike" | "blunt" | "blade" | "fire" | "frost" | "dark" | "thorn" | "rivet" | "holy" | "fate";
 
 interface HitBurst {
   style: ParticleStyle;
@@ -12,32 +12,47 @@ const ABILITY_HITS = {
   "bulwark-strike": "blunt",
   "shield-bash": "blunt",
   "oath-hammer": "blunt",
-  consecrate: "holy",
-  mend: "holy",
-  "ward-bell": "holy",
+  judgment: "holy",
+  "avatar-judgment": "holy",
+  "blessed-burst": "holy",
+  resurrection: "holy",
+  "ember-trail": "fire",
   "ravager-axes": "blade",
-  leap: "blunt",
+  "leap-slam": "blunt",
+  whirlwind: "blade",
+  "shield-toss": "blunt",
+  "last-stand": "blunt",
   "dusk-strike": "blade",
-  shadowstep: "blade",
+  "flicker-strike": "blade",
+  "thousand-cuts": "blade",
   firebolt: "fire",
+  fireball: "fire",
+  "inferno-bolt": "fire",
+  "living-bomb": "fire",
   meteor: "fire",
-  "flame-ward": "fire",
   "frost-bolt": "frost",
-  "glacial-lance": "frost",
-  "spite-bolt": "dark",
-  "shared-fate": "dark",
-  hex: "dark",
+  "frozen-orb": "frost",
+  "glacial-prison": "frost",
+  "spite-bolt": "fate",
+  "shared-fate": "fate",
+  hex: "fate",
+  "death-knell": "fate",
+  "ill-omen": "fate",
   thornshot: "thorn",
-  "caustic-spit": "thorn",
-  "plague-cloud": "thorn",
+  "plague-bloom": "thorn",
+  "plague-burst": "thorn",
+  pandemic: "thorn",
   "thrall-blade": "blade",
   "golem-slam": "blunt",
   "grave-bolt": "dark",
+  "lich-bolt": "dark",
   "corpse-explosion": "dark",
-  "raise-dead": "dark",
+  voidheart: "dark",
   "turret-shot": "rivet",
   "rivet-gun": "rivet",
-  flashbang: "rivet",
+  "mech-rocket": "fire",
+  "self-destruct": "fire",
+  "mech-suit": "fire",
 } as const satisfies Record<string, HitKind>;
 
 const HIT_TINTS: Readonly<Record<HitKind, string>> = {
@@ -50,6 +65,7 @@ const HIT_TINTS: Readonly<Record<HitKind, string>> = {
   thorn: "#a3e635",
   rivet: "#ffd27a",
   holy: "#fff1b0",
+  fate: "#e45cff",
 };
 
 const HEAVY_BURST = 1.8;
@@ -173,6 +189,11 @@ const HIT_BURSTS: Readonly<Record<HitKind, readonly HitBurst[]>> = {
     flash(HIT_TINTS.rivet),
   ],
   holy: [{ style: { ...tinted(MOTES, "#fff1a8", "#d99a00"), gravity: -10 }, count: 10 }, flash(HIT_TINTS.holy)],
+  fate: [
+    { style: { ...tinted(SPARKS, "#ffd1f4", "#b0127a"), size: [2.2, 0.45], life: [0.3, 0.55], speed: [18, 36], gravity: 22, drag: 4, stretch: 0.09 }, count: 16 },
+    { style: { ...tinted(MOTES, "#7a1455", "#2a0620"), size: [2.4, 0.6], speed: [5, 12], gravity: 14 }, count: 10 },
+    flash(HIT_TINTS.fate),
+  ],
 };
 
 const RELEASE_COUNT = 8;
@@ -210,6 +231,7 @@ const TRAILS: Readonly<Record<HitKind, ParticleStyle>> = {
   thorn: tinted(TRAIL, "#d9f99d", "#3f7d0a"),
   rivet: tinted(TRAIL, "#ffe08a", "#ff7a00"),
   holy: tinted(TRAIL, "#fff1a8", "#d99a00"),
+  fate: tinted(TRAIL, "#ffd1f4", "#c0136a"),
 };
 
 function isMappedAbility(abilityId: string): abilityId is keyof typeof ABILITY_HITS {

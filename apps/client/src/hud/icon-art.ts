@@ -1,9 +1,9 @@
-import { pieceIcon, roleIcon, talentIcon } from "./icons.js";
+import { levelIcon, pieceIcon, roleIcon } from "./icons.js";
 
 const ICON_ART_KINDS = {
   items: { pixels: 192, className: "icon-art" },
-  runes: { pixels: 192, className: "icon-art" },
-  talents: { pixels: 192, className: "icon-art" },
+  gems: { pixels: 192, className: "icon-art" },
+  levels: { pixels: 192, className: "icon-art" },
   heroes: { pixels: 320, className: "hero-art" },
   faces: { pixels: 128, className: "face-art" },
 } as const;
@@ -40,16 +40,16 @@ function iconArt(kind: IconArtKind, id: string): HTMLImageElement | null {
   return image;
 }
 
-export function pieceArt(pieceId: string, kind: "item" | "rune"): HTMLImageElement | SVGSVGElement {
-  return iconArt(kind === "item" ? "items" : "runes", pieceId) ?? pieceIcon(pieceId, kind);
+export function pieceArt(pieceId: string, kind: "item" | "gem"): HTMLImageElement | SVGSVGElement {
+  return iconArt(kind === "item" ? "items" : "gems", pieceId) ?? pieceIcon(pieceId, kind);
 }
 
-export function pieceSocketArt(pieceId: string, kind: "item" | "rune"): HTMLImageElement | SVGSVGElement {
-  return kind === "rune" ? pieceIcon(pieceId, kind) : pieceArt(pieceId, kind);
+export function pieceSocketArt(pieceId: string, kind: "item" | "gem"): HTMLImageElement | SVGSVGElement {
+  return kind === "gem" ? pieceIcon(pieceId, kind) : pieceArt(pieceId, kind);
 }
 
-export function talentArt(talentId: string): HTMLImageElement | SVGSVGElement {
-  return iconArt("talents", talentId) ?? talentIcon();
+export function levelArt(pickId: string): HTMLImageElement | SVGSVGElement {
+  return iconArt("levels", pickId) ?? levelIcon();
 }
 
 export function heroArt(heroId: string): HTMLImageElement | SVGSVGElement {

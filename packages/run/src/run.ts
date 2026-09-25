@@ -32,7 +32,7 @@ export function createRun(
       heroBuilds: [],
       formation: [],
       items: [],
-      runes: [],
+      gems: [],
       nextInstanceId: 1,
       runHealth: rules.startingHealth,
       eliminated: false,

@@ -27,25 +27,26 @@ interface Mix {
   maxVoices: number;
   cooldownMs: number;
   onLimit: LimitBehaviour;
+  priority: number;
   pitchJitter: number;
   volumeJitter: number;
 }
 
 const AUDIO_ROOT = "/assets/audio";
 
-const SWING: Mix = { volume: 0.32, maxVoices: 4, cooldownMs: 45, onLimit: "steal-oldest", pitchJitter: 0.08, volumeJitter: 0.15 };
+const SWING: Mix = { volume: 0.32, maxVoices: 4, cooldownMs: 45, onLimit: "steal-oldest", priority: 0, pitchJitter: 0.08, volumeJitter: 0.15 };
 
-const IMPACT: Mix = { volume: 0.42, maxVoices: 4, cooldownMs: 35, onLimit: "steal-oldest", pitchJitter: 0.08, volumeJitter: 0.15 };
+const IMPACT: Mix = { volume: 0.42, maxVoices: 4, cooldownMs: 35, onLimit: "steal-oldest", priority: 0, pitchJitter: 0.08, volumeJitter: 0.15 };
 
-const ABILITY: Mix = { volume: 0.6, maxVoices: 3, cooldownMs: 80, onLimit: "steal-oldest", pitchJitter: 0.04, volumeJitter: 0.08 };
+const ABILITY: Mix = { volume: 0.6, maxVoices: 3, cooldownMs: 80, onLimit: "steal-oldest", priority: 1, pitchJitter: 0.04, volumeJitter: 0.08 };
 
-const HEAVY: Mix = { volume: 0.8, maxVoices: 2, cooldownMs: 120, onLimit: "steal-oldest", pitchJitter: 0.03, volumeJitter: 0.05 };
+const HEAVY: Mix = { volume: 0.8, maxVoices: 2, cooldownMs: 120, onLimit: "steal-oldest", priority: 2, pitchJitter: 0.03, volumeJitter: 0.05 };
 
-const STING: Mix = { volume: 0.85, maxVoices: 1, cooldownMs: 500, onLimit: "skip", pitchJitter: 0, volumeJitter: 0 };
+const STING: Mix = { volume: 0.85, maxVoices: 1, cooldownMs: 500, onLimit: "skip", priority: 3, pitchJitter: 0, volumeJitter: 0 };
 
-const UI: Mix = { volume: 0.45, maxVoices: 2, cooldownMs: 40, onLimit: "steal-oldest", pitchJitter: 0.04, volumeJitter: 0.05 };
+const UI: Mix = { volume: 0.45, maxVoices: 2, cooldownMs: 40, onLimit: "steal-oldest", priority: 3, pitchJitter: 0.04, volumeJitter: 0.05 };
 
-const LINE: Mix = { volume: 1, maxVoices: 1, cooldownMs: 0, onLimit: "skip", pitchJitter: 0, volumeJitter: 0 };
+const LINE: Mix = { volume: 1, maxVoices: 1, cooldownMs: 0, onLimit: "skip", priority: 3, pitchJitter: 0, volumeJitter: 0 };
 
 function sfx(file: string, group: PreloadGroup, mix: Mix, overrides: Partial<Mix> = {}): SoundDefinition {
   return { url: `${AUDIO_ROOT}/${file}.mp3`, bus: "sfx", group, ...mix, ...overrides };
@@ -81,35 +82,70 @@ export const SOUNDS = {
   "hit-dark": sfx("hit-dark", "battle", IMPACT),
   "hit-thorn": sfx("hit-thorn", "battle", IMPACT),
   "hit-rivet": sfx("hit-rivet", "battle", IMPACT),
+  "hit-rocket": sfx("hit-rocket", "battle", IMPACT, { volume: 0.5, maxVoices: 2 }),
   "cast-firebolt": sfx("cast-firebolt", "battle", SWING, { volume: 0.36 }),
   "cast-frostbolt": sfx("cast-frostbolt", "battle", SWING, { volume: 0.36 }),
   "cast-darkbolt": sfx("cast-darkbolt", "battle", SWING, { volume: 0.36 }),
+  "cast-lichbolt": sfx("cast-lichbolt", "battle", SWING, { volume: 0.36 }),
   "cast-thorn": sfx("cast-thorn", "battle", SWING, { volume: 0.36 }),
   "cast-rivet": sfx("cast-rivet", "battle", SWING, { volume: 0.36 }),
+  "cast-rocket": sfx("cast-rocket", "battle", SWING, { volume: 0.4 }),
   "crit-hit": sfx("crit-hit", "battle", IMPACT, { volume: 0.55, maxVoices: 2 }),
   "crit-heavy": sfx("crit-heavy", "battle", HEAVY, { volume: 0.75 }),
+  stun: sfx("stun", "battle", IMPACT, { volume: 0.5, maxVoices: 2, cooldownMs: 80 }),
   challenge: sfx("challenge", "battle", ABILITY),
   "shield-bash": sfx("shield-bash", "battle", ABILITY),
-  consecrate: sfx("consecrate", "battle", ABILITY),
-  mend: sfx("mend", "battle", ABILITY, { volume: 0.5, cooldownMs: 150 }),
+  "shield-toss": sfx("shield-toss", "battle", ABILITY, { volume: 0.5 }),
+  "shield-ricochet": sfx("shield-ricochet", "battle", IMPACT, { volume: 0.5 }),
+  "last-stand": sfx("last-stand", "battle", HEAVY),
+  "judgment-throw": sfx("judgment-throw", "battle", ABILITY, { volume: 0.5 }),
+  "judgment-hit": sfx("judgment-hit", "battle", ABILITY, { volume: 0.5, pitchJitter: 0.08 }),
+  "judgment-heal": sfx("judgment-heal", "battle", ABILITY, { volume: 0.5, cooldownMs: 150 }),
+  resurrection: sfx("resurrection", "battle", HEAVY),
+  "holy-pillar": sfx("holy-pillar", "battle", HEAVY),
+  "blessed-burst": sfx("blessed-burst", "battle", ABILITY, { cooldownMs: 100, pitchJitter: 0.08 }),
   whirlwind: sfx("whirlwind", "battle", HEAVY),
-  leap: sfx("leap", "battle", ABILITY),
-  shadowstep: sfx("shadowstep", "battle", ABILITY),
-  "meteor-fall": sfx("meteor-fall", "battle", ABILITY, { volume: 0.7 }),
-  "meteor-impact": sfx("meteor-impact", "battle", HEAVY, { volume: 0.9 }),
-  "flame-ward": sfx("flame-ward", "battle", ABILITY),
-  "glacial-lance": sfx("glacial-lance", "battle", ABILITY),
+  leap: sfx("leap", "battle", ABILITY, { volume: 0.5 }),
+  "leap-slam": sfx("leap-slam", "battle", HEAVY),
+  "flicker-strike": sfx("flicker-strike", "battle", IMPACT, { volume: 0.5 }),
+  "thousand-cuts": sfx("thousand-cuts", "battle", HEAVY),
+  "fireball-throw": sfx("fireball-throw", "battle", ABILITY, { volume: 0.5 }),
+  "fireball-blast": sfx("fireball-blast", "battle", ABILITY),
+  "living-bomb": sfx("living-bomb", "battle", HEAVY),
+  "inferno-burst": sfx("inferno-burst", "battle", IMPACT),
+  inferno: sfx("inferno", "battle", ABILITY),
+  phoenix: sfx("phoenix", "battle", HEAVY),
+  "meteor-streak": sfx("meteor-streak", "battle", ABILITY, { maxVoices: 4, cooldownMs: 100 }),
+  "meteor-strike": sfx("meteor-strike", "battle", HEAVY, { maxVoices: 4, cooldownMs: 100 }),
+  "supernova-fall": sfx("supernova-fall", "battle", ABILITY, { volume: 0.7 }),
+  "supernova-impact": sfx("supernova-impact", "battle", HEAVY, { volume: 0.9 }),
+  "frozen-orb": sfx("frozen-orb", "battle", ABILITY, { volume: 0.5 }),
+  "ice-shard": sfx("ice-shard", "battle", IMPACT, { volume: 0.3, maxVoices: 3, cooldownMs: 70 }),
+  "glacial-prison": sfx("glacial-prison", "battle", HEAVY),
+  hailstorm: sfx("hailstorm", "battle", ABILITY, { volume: 0.45, maxVoices: 1, onLimit: "skip" }),
+  "deep-freeze": sfx("deep-freeze", "battle", ABILITY, { volume: 0.5, cooldownMs: 120 }),
+  "ice-mirror": sfx("ice-mirror", "battle", HEAVY),
+  "ice-break": sfx("ice-break", "battle", ABILITY, { volume: 0.45, cooldownMs: 100, pitchJitter: 0.08 }),
   "shared-fate": sfx("shared-fate", "battle", ABILITY),
   hex: sfx("hex", "battle", ABILITY),
-  "plague-cloud": sfx("plague-cloud", "battle", ABILITY),
-  "caustic-spit": sfx("caustic-spit", "battle", ABILITY),
-  "raise-dead": sfx("raise-dead", "battle", ABILITY),
+  weaver: sfx("weaver", "battle", ABILITY, { volume: 0.5 }),
+  "omen-echo": sfx("omen-echo", "battle", ABILITY),
+  "death-knell": sfx("death-knell", "battle", ABILITY, { volume: 0.7 }),
+  puppeteer: sfx("puppeteer", "battle", ABILITY),
+  "plague-bloom": sfx("plague-bloom", "battle", ABILITY),
+  pandemic: sfx("pandemic", "battle", HEAVY),
+  "plague-burst": sfx("plague-burst", "battle", ABILITY, { cooldownMs: 100, pitchJitter: 0.08 }),
+  "grave-rise": sfx("grave-rise", "battle", ABILITY),
+  "thrall-rise": sfx("thrall-rise", "battle", ABILITY),
+  "army-of-the-dead": sfx("army-of-the-dead", "battle", HEAVY),
   "corpse-explosion": sfx("corpse-explosion", "battle", ABILITY, { volume: 0.7 }),
   "deploy-turret": sfx("deploy-turret", "battle", ABILITY),
-  flashbang: sfx("flashbang", "battle", ABILITY, { volume: 0.65 }),
-  smoke: sfx("smoke", "battle", ABILITY, { volume: 0.5 }),
-  "ice-block": sfx("ice-block", "battle", ABILITY),
-  "ward-bell": sfx("ward-bell", "battle", ABILITY, { volume: 0.55 }),
+  "mech-suit": sfx("mech-suit", "battle", HEAVY, { volume: 0.95 }),
+  doomsday: sfx("doomsday", "battle", HEAVY),
+  "self-destruct": sfx("self-destruct", "battle", ABILITY, { volume: 0.65 }),
+  voidheart: sfx("voidheart", "battle", ABILITY, { volume: 0.7 }),
+  "ember-trail": sfx("ember-trail", "battle", ABILITY, { volume: 0.45, cooldownMs: 800 }),
+  "unstable-core": sfx("unstable-core", "battle", ABILITY, { volume: 0.45 }),
   "golem-rise": sfx("golem-rise", "battle", ABILITY, { volume: 0.7 }),
   "shield-up": sfx("shield-up", "battle", IMPACT, { maxVoices: 2, cooldownMs: 150 }),
   "combo-overload": sfx("combo-overload", "battle", HEAVY, { volume: 0.85, cooldownMs: 100 }),

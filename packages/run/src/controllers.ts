@@ -1,9 +1,10 @@
-import { createRng, nextInt, sameFormation, type BoardCell, type Catalogue, type HeroBuild } from "@jev-game/game";
+import { SKILL_SLOTS, createRng, nextInt, sameFormation, type BoardCell, type Catalogue, type HeroBuild, type SkillSlot } from "@jev-game/game";
 import { boardArena, centreOutColumns, defaultFormation } from "@jev-game/content";
 import type { PendingDecision, RunState } from "./types.js";
 import type { PlayerId } from "./ids.js";
 import { deriveControllerSeed, deriveDecisionSeed } from "./seed.js";
-import { itemCanGoOn, piecesOnHero, runeCanGoOn, stashedPieces } from "./inventory.js";
+import { gemCanGoOn, itemCanGoOn, piecesOnHero, stashedPieces } from "./inventory.js";
+import { defaultTrainSkill } from "./rewards.js";
 import { applyCommand, type RunCommand } from "./commands.js";
 import { isSeatReady } from "./readiness.js";
 import { getPlayerView, type PlayerView } from "./player-view.js";
@@ -52,10 +53,17 @@ function itemSlotFor(view: PlayerView, pieceId: string, catalogue: Catalogue): n
   return best;
 }
 
-function runeSlotFor(view: PlayerView, runeId: string, catalogue: Catalogue): number | null {
+export interface GemPlacement {
+  heroSlot: number;
+  skill: SkillSlot;
+}
+
+export function gemPlacementFor(view: PlayerView, gemId: string, catalogue: Catalogue): GemPlacement | null {
   for (let heroSlot = 0; heroSlot < view.you.heroBuilds.length; heroSlot += 1) {
-    if (runeCanGoOn(view.you, runeId, heroSlot, catalogue, null)) {
-      return heroSlot;
+    for (const skill of SKILL_SLOTS) {
+      if (gemCanGoOn(view.you, gemId, heroSlot, skill, catalogue, null)) {
+        return { heroSlot, skill };
+      }
     }
   }
 
@@ -70,11 +78,17 @@ function chooseOffer(view: PlayerView, decision: PendingDecision, offerIndex: nu
   }
 
   let heroSlot: number | null = null;
+  let skill: SkillSlot | null = null;
 
   if (offer.kind === "item" && offer.pieceId !== null) {
     heroSlot = itemSlotFor(view, offer.pieceId, catalogue);
-  } else if (offer.kind === "rune" && offer.pieceId !== null) {
-    heroSlot = runeSlotFor(view, offer.pieceId, catalogue);
+  } else if (offer.kind === "gem" && offer.pieceId !== null) {
+    const placement = gemPlacementFor(view, offer.pieceId, catalogue);
+    heroSlot = placement?.heroSlot ?? null;
+    skill = placement?.skill ?? null;
+  } else if (offer.kind === "train" && offer.heroSlot !== null) {
+    const build = view.you.heroBuilds[offer.heroSlot];
+    skill = build === undefined ? null : defaultTrainSkill(build, catalogue);
   }
 
   return {
@@ -83,6 +97,7 @@ function chooseOffer(view: PlayerView, decision: PendingDecision, offerIndex: nu
     decisionId: decision.decisionId,
     offerId: offer.offerId,
     heroSlot,
+    skill,
     expectedRevision: view.you.decisionRevision,
   };
 }
@@ -98,11 +113,18 @@ function equipStash(view: PlayerView, catalogue: Catalogue): RunCommand | null {
     }
   }
 
-  for (const rune of stashedPieces(view.you.runes)) {
-    const heroSlot = runeSlotFor(view, rune.pieceId, catalogue);
+  for (const gem of stashedPieces(view.you.gems)) {
+    const placement = gemPlacementFor(view, gem.pieceId, catalogue);
 
-    if (heroSlot !== null) {
-      return { kind: "socket-rune", playerId, instanceId: rune.instanceId, heroSlot, expectedRevision: decisionRevision };
+    if (placement !== null) {
+      return {
+        kind: "socket-gem",
+        playerId,
+        instanceId: gem.instanceId,
+        heroSlot: placement.heroSlot,
+        skill: placement.skill,
+        expectedRevision: decisionRevision,
+      };
     }
   }
 

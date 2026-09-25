@@ -30,14 +30,15 @@ function toRunCommand(playerId: string, expectedRevision: number, intent: Comman
         decisionId: intent.decisionId,
         offerId: intent.offerId,
         heroSlot: intent.heroSlot,
+        skill: intent.skill,
         expectedRevision,
       };
 
     case "move-item":
       return { kind: "move-item", playerId, instanceId: intent.instanceId, heroSlot: intent.heroSlot, expectedRevision };
 
-    case "socket-rune":
-      return { kind: "socket-rune", playerId, instanceId: intent.instanceId, heroSlot: intent.heroSlot, expectedRevision };
+    case "socket-gem":
+      return { kind: "socket-gem", playerId, instanceId: intent.instanceId, heroSlot: intent.heroSlot, skill: intent.skill, expectedRevision };
 
     case "discard-item":
       return { kind: "discard-item", playerId, instanceId: intent.instanceId, expectedRevision };

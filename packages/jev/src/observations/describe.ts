@@ -4,16 +4,17 @@ import {
   ATTUNEMENT_MIGHT_MAX_HP,
   ATTUNEMENT_THRESHOLD,
   computeTeamTraits,
+  SKILL_SLOTS,
   createHeroBuild,
+  skillIdFor,
   type Catalogue,
   type ComboKind,
   type ConditionKind,
   type HeroBuild,
   type School,
   type TeamTraits,
-  withEquipment,
 } from "@jev-game/game";
-import { piecesOnHero, type Loadout } from "@jev-game/run";
+import { loadoutBuilds as runLoadoutBuilds, type Loadout } from "@jev-game/run";
 
 const SCHOOL_NAMES: Readonly<Record<School, string>> = { might: "Might", arcana: "Arcana", cunning: "Cunning" };
 
@@ -69,11 +70,12 @@ export function heroSummary(catalogue: Catalogue, heroId: string): string {
 
   const parts = [`${hero.name}, ${heroRole(catalogue, heroId)}${hero.title === undefined ? "" : ` ("${hero.title}")`}.`];
 
-  for (const abilityId of hero.abilityIds) {
-    const ability = catalogue.abilities[abilityId];
+  for (const slot of SKILL_SLOTS) {
+    const skillId = skillIdFor(hero, slot);
+    const ability = skillId === null ? undefined : catalogue.abilities[skillId];
 
     if (ability?.description !== undefined) {
-      parts.push(`${ability.name}: ${ability.description}`);
+      parts.push(`${slot === "ultimate" ? "Ultimate" : "Ability"}, ${ability.name}: ${ability.description}`);
     }
   }
 
@@ -159,13 +161,7 @@ export function describeTraitChange(before: TeamTraits, after: TeamTraits): stri
 }
 
 export function loadoutBuilds(loadout: Loadout): HeroBuild[] {
-  return loadout.heroBuilds.map((build, slot) =>
-    withEquipment(
-      build,
-      piecesOnHero(loadout.items, slot).map((piece) => piece.pieceId),
-      piecesOnHero(loadout.runes, slot).map((piece) => piece.pieceId),
-    ),
-  );
+  return runLoadoutBuilds(loadout);
 }
 
 export function loadoutTraits(loadout: Loadout, catalogue: Catalogue): TeamTraits {

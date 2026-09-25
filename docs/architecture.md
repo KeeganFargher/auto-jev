@@ -172,18 +172,176 @@ the matching visual, through `game/fx/battle-sounds.ts`. Which sound a
 cue plays comes from the tables in `sound-map.ts`:
 
 - `abilitySounds(id)`: an ability's cast and hit sounds, plus any heal,
-  falling or landing sound.
+  falling, landing or zone sound.
+- `impactSounds(id, upgradeIds)`: an impact's falling and landing
+  sounds, given the caster's upgrades. An upgrade listed in
+  `UPGRADE_IMPACT_SOUNDS` replaces the ability's pair, so Supernova's
+  Meteor swaps the streak and strike for a riser and a bigger blast.
+- `formSound(key)`: the sound when a hero enters a form (Inferno,
+  Avatar).
+- `reviveSound(upgradeIds)`: the sound when a hero revives itself
+  (Phoenix, Ice Mirror). It is keyed by upgrade rather than hero,
+  because Aegis lets any hero revive and has no sound.
+- `emitterSound(id)`: the sound when an emitter starts, keyed by the
+  ability that owns it (Hailstorm is on `glacial-prison`).
+- `passiveSound(name)`: the sound when a passive triggers, keyed by the
+  event's `passive` name (Deep Freeze, Virulence, Blessed Overflow,
+  Weaver's `threads`, Harvest).
+- `reactionSound(id)`: the sound of a passive's reaction hit, keyed by
+  the hit's `abilityId` (Death Knell).
+- `paymentSound(reason)`: the sound when a hero pays HP, keyed by the
+  `hp-paid` event's `reason` (Unstable Core).
+- `shieldSound(id)`: `shield-up`, unless the shield's ability or
+  passive is in `SILENT_SHIELDS`.
 - `unitSounds(id)`: a summon's spawn and death sounds. Heroes use
-  `death`.
-- The combo, crit, shield and teleport sounds.
+  `death`. Risen copies use `RISE_SOUND` and `CRUMBLE_SOUND` instead.
+- The combo, Ill Omen echo, puppet, crit, stun, thaw and teleport
+  sounds.
 
-`pnpm audio:check` fails if an ability or voiced hero has no entry.
+`pnpm audio:check` fails if an ability or voiced hero has no entry, if
+an upgrade, form, revive, emitter, passive, reaction or silent shield
+entry names something the catalogue doesn't have, or if an ability with
+a zone sound leaves no zone.
 
 - Hits sound when a projectile lands, not when the event arrives. A hit
   worth 20% or more of the target's max HP adds `crit-heavy`, and any
   other crit adds `crit-hit`.
-- DoT ticks and reactions are silent.
-- A meteor's whistle starts 45% of the way through its fall.
+- A leap's landing sound plays when its jump arc touches down, 0.36 s
+  after the cast and damage events arrive. That is why leaps have no hit
+  sound.
+- Heals and shields sound when they reach their target. Each hop of a
+  bouncing ability flies 0.16 s from the previous target, to an ally
+  as well as to an enemy (`allyHop`). So Judgment sounds hit, heal,
+  hit, heal, hit at 0.16, 0.32, 0.48, 0.64 and 0.8 s after the throw.
+  Oathbound's shields sound between Shield Toss's hits, and Captain's
+  Return's shield sounds as the shield gets back to Anvil. Other heals
+  and shields sound when their event arrives.
+- Blessed Overflow's shields are silent (`SILENT_SHIELDS`). Overhealing
+  makes one, and with Hallowed Path that is up to about once a second.
+  `blessed-overflow` doesn't bounce, so a shield made by a Judgment heal
+  would also sound before the hammer reached the ally.
+- DoT ticks are silent, and so are reactions unless `REACTION_SOUNDS`
+  maps them. Death Knell hits every surviving bound enemy on one tick,
+  and `death-knell`'s cooldown folds those hits into one toll. Ill
+  Omen's bonus hits stay silent because its echo already sounds.
+- A falling sound ends as its impact lands. It starts
+  `ceil(duration × 30)` ticks before `landsAtTick`, so a short streak
+  starts late in the fall and a long riser starts early. Impacts already
+  in the air after a snap stay silent.
+- An impact's landing sound plays on `impact-landed`. Living Bomb's
+  detonation arrives as one, carrying the blast's ability id.
+- An emitter's start sound plays on `emitter-started`, panned at its
+  `from` point. Its shots are ordinary hits, so each Frozen Orb or
+  Hailstorm shard plays `ice-shard` when its projectile lands. Orbs have
+  no visual yet, so their shots fly from Rime's chest, and that flight
+  sets when each shard sounds.
+- A passive's sound plays on `passive-triggered`, panned at the
+  event's `targetUnitId` when it has one (the frozen enemy for Deep
+  Freeze, the Bursting enemy for Virulence, the ally whose Blessed
+  shield broke for Blessed Overflow), else at the hero that holds the
+  passive. Deep Freeze sounds as the freeze starts, which is as the
+  bolt or shard that caused it leaves Rime, 0.16 s before that
+  projectile lands. A Burst also sends an `impact-landed` for
+  `plague-burst`, which has no landing sound, so each Burst plays once.
+  Blessed Overflow's burst works the same way: its `impact-landed` for
+  `blessed-burst` is silent, and its damage arrives as reactions.
+- A unit that stops being frozen plays `ice-break`, panned at the unit,
+  as its ice block breaks into chips. That happens when the freeze runs
+  out, a knock-down or hex replaces it, or the unit dies. The engine
+  sends no thaw event, so `syncFrozen` spots the change between
+  snapshots. Glacial Prison thaws up to 7 enemies within 100 ms, and
+  the sound's 100 ms cooldown plays them as one.
+- Hex has no cast sound. Its landing sound, `hex`, plays on each
+  `hexed` status as the violet puff appears: on the first enemy at
+  once, and on any others (Hex Bolt's second target, Weaver's extras)
+  when their fate bolt lands 0.2 s later. Extras that land together
+  fold into one puff.
+- Weaver plays `weaver` on `passive-triggered` for `threads`, panned at
+  Moira. It triggers on the tick Hex spends the 10 Threads, so it
+  sounds under that Hex's first puff.
+- An Ill Omen echo (`combo-detonated` with `echo`) plays `omen-echo`
+  instead of the combo's sound, when its fate bolt reaches the other
+  bound enemy 0.2 s after the combo. The engine sends the combo first,
+  then one echo per other bound enemy, all with the combo's
+  `causeSequence`. Echoes that land together fold into one caw.
+- Puppeteer plays `puppeteer` on each `puppeted` status. Shared Fate
+  puppets every bound enemy on one tick, which folds into one creak.
+  The puppet running out (`status-expired` for `puppet`) and the
+  threads between bound enemies are silent.
+- A self-revive (a `revived` event whose source is the hero itself)
+  plays the revive sound, and the form the hero enters on that tick
+  stays silent, so Phoenix doesn't also play Inferno's burst.
+- Resurrection plays its bell on the cast. Each ally it raises sends an
+  `impact-landed` for `resurrection` at that ally on the same tick,
+  which plays `holy-pillar` there. With Avatar, Morrow's form plays
+  `holy-pillar` at her first, and the raise's copy falls inside the
+  sound's 120 ms cooldown, so one pillar sounds, panned at Morrow. Mass
+  Resurrection's raises fold into one pillar the same way. If nobody
+  has fallen, the team turns invulnerable instead, and only the bell
+  plays.
+- A risen copy (`unit-spawned` with a `corpseUnitId`) plays
+  `grave-rise` at its corpse instead of a spawn sound. Army of the Dead
+  can raise several on one tick, and the sound's 80 ms cooldown plays
+  one. The Colossus plays `golem-rise`. Thralls rise silently: Harvest's
+  `passive-triggered` plays `thrall-rise` as its soul wisp leaves the
+  corpse, and Army thralls arrive under the Army cast.
+- Risen units never speak. `SoundSource.risen` is set for a unit with a
+  summoner that isn't a summon itself, and `playCast` and `playDeath`
+  skip its lines. Its death plays `death-bones` (`CRUMBLE_SOUND`)
+  instead of `death`. So does a `unit-dismissed` on or after the unit's
+  `expiresAtTick`: an Army timing out drops its copies and thralls on
+  one tick, which folds into one crumble. Blown thralls are dismissed
+  on their blast's tick and stay silent under it.
+- Corpse Explosion sounds on its `impact-landed` at the body, which
+  arrives on the cast's tick. Manual casts, Grave Chain and the
+  cast-on-kill gem all sound the same way. `isRangedAbility` skips its
+  `busiest-corpse` target policy, so its hits land at once and a big
+  one's `crit-heavy` sounds with the blast.
+- Golem Slam hits every enemy near its target on one tick, and
+  `hit-blunt`'s cooldown plays one thump. Its taunts, Grave Mark,
+  `corpse-spent` and the Lich form are silent. The form arrives with
+  the Army cast.
+- A projectile's area hits land with it. The first hit of a cast flies
+  the projectile, and `projectile()` returns its flight time, which
+  `flightTimes` keeps under the cast's `causeSequence`. The cast's other
+  hits wait that long, so they land in one frame. Mech Rocket's rocket
+  flies 0.3 s, and `hit-rocket`'s cooldown folds its hits into one
+  burst.
+- Mech Suit plays `mech-suit` on the cast. Its shield is silent
+  (`SILENT_SHIELDS`) and the `mech` form has no sound. With Doomsday,
+  the suit ending sends an `impact-landed` for `mech-suit` at
+  Brassjack, which plays `doomsday`. It doesn't come if he dies in the
+  suit.
+- With Self-Destruct, a turret that dies or is replaced sends an
+  `impact-landed` for `self-destruct` 0.3 s later, which plays
+  `self-destruct`. A death plays `death-turret` first. A replaced
+  turret is dismissed with no death event, so only the blast sounds,
+  and without Self-Destruct it goes quietly under the new turret's
+  `deploy-turret`. The hits of Doomsday and Self-Destruct are reactions
+  and stay silent.
+- Tesla Coils' chain hit has no area or bounces, so it takes `arc()`
+  and lands 66 ms after the event. That is 94 ms before the turret's
+  bolt reaches the first enemy. Both play `hit-rivet`.
+- A `stunned` status plays `stun`. A stun that rides on a hit (Skull
+  Basher, Ruthless) shares the hit's `causeSequence` and target, and
+  `stunningHitsIn` finds that hit in the same batch, so the stun sounds
+  right after the hit's own sound, when its projectile or leap lands. A
+  stun with no hit (Sentinel Ward) sounds when its status arrives.
+  Whirlwind stuns several enemies on one tick, and the 80 ms cooldown
+  plays one crack.
+- Ember Brand's fire zones (`zone-created` for `ember-trail`) play
+  `ember-trail` at the zone. A leap drops all its zones on the cast's
+  tick, so the fire sounds with the takeoff. Vesper drops zones on every
+  hop, 0.2 s apart. The sound's 800 ms cooldown, its full length, keeps
+  that to one whoosh at a time.
+- A Voidheart burst sends an `impact-landed` for `voidheart` at the body
+  0.3 s after the death, which plays `voidheart`. Its hits are reactions
+  and stay silent, like Self-Destruct's.
+- Unstable Core's cost (`hp-paid` with reason `unstable-core`) comes on
+  the original cast, so its sizzle sits between the cast and the echo
+  0.3 s later. The echo is a `cast` with `repeat: "multicast"`, which
+  plays the skill's cast sound again. Echoes are `triggered`, so they
+  never start a voice line.
 - Teleport beats play only while the teleport runs forward in real time.
 - Snaps (skip to end, catching up after a stall) skip event handling
   entirely, so they stay silent.
@@ -198,7 +356,8 @@ line may play right now is decided by `line-policy.ts`, a pure function:
   the dialogue channel; cast and death lines wait.
 - Cast and death lines need gaps since the last line, and play less
   often for enemies.
-- Cast lines fire only on signature casts (abilities with a mana cost).
+- Cast lines fire only on ultimate casts (the skill that costs mana), never on triggered ones.
+- Risen copies never speak.
 
 The numbers are in `docs/audio.md`.
 
@@ -211,9 +370,13 @@ The numbers are in `docs/audio.md`.
   avoids a click. `"skip"` drops the new one instead, so a stinger or
   line never restarts over itself.
 - `GLOBAL_VOICE_LIMIT` (16) caps each channel's one-shots. Voice lines
-  never compete with effects for slots. When a channel is full, the new
-  sound always takes the oldest one's slot. A stinger or line is never
-  dropped because a fight is busy.
+  never compete with effects for slots. Each sound has a `priority`:
+  swings and hits 0, abilities 1, big impacts 2, stingers, UI sounds
+  and lines 3. When a channel is full, the new sound takes the slot of
+  the oldest sound in the lowest tier at or below its own, and is
+  dropped if everything playing outranks it. A hit only ever replaces
+  another hit, so a busy fight never cuts a spell short, and a stinger
+  or line is never dropped because a fight is busy.
 - Each copy gets a small random pitch and volume change so repeats don't
   sound robotic. Battle sounds are also panned by the unit's position on
   screen.
@@ -280,16 +443,66 @@ sounds. Music is still a placeholder (`missing_assets.md` entry 7).
   flares leave from. It's the catalogue's `castBone` when a model names
   one (Cinder's `flame` bone), otherwise the chest.
 - **Spell visuals.** `game/views/spell-visuals.ts` maps ability ids to
-  code-drawn visuals. The battle view asks it at five points, and an
+  code-drawn visuals. The battle view asks it at nine points, and an
   ability without an entry keeps the generic effect:
   - pending impacts (Meteor's falling rock and ground shadow, timed from
     ticks so it lands on the hit at any playback speed);
-  - impact landings (the blast);
-  - zones (burning ground);
-  - casts (Flame Ward's ring of fire);
-  - projectiles (Firebolt's fireball).
-  Rocks and burning ground are rebuilt from the snapshot's impacts and
-  zones, so seeks and resets never leave them behind.
+  - impact landings (Fireball's blast, Leap Slam's shockwave, Nettle's
+    Burst splash, a Blessed shield's gold burst, the Resurrection pillar
+    over a raised ally, Hex's violet puff on each hexed enemy, Corpse
+    Explosion's bone burst, which Grave Chain blasts reuse, and the
+    shrapnel of Brassjack's rockets, with gears flying out of
+    Self-Destruct and Doomsday);
+  - zones (Meteor's burning ground, Whirlwind's axes, Plague Bloom's
+    flower, Hallowed Path's sun glyph);
+  - emitters (the Frozen Orb, and Hailstorm's cloud over Glacial
+    Prison);
+  - casts, drawn at the area's centre with the caster's own radius
+    (Glacial Prison's ice spikes, Pandemic's wave, Resurrection's call,
+    Shared Fate's curse ring, Army of the Dead's grave ring);
+  - form starts (Inferno's burst, Avatar's pillar, the Lich's teal
+    pillar, the Mech's brass plates snapping on);
+  - summons arriving (`spawnVisual`: a turret drops in with a brass
+    ring, steam and sparks);
+  - passive triggers (Weaver's flare when a full meter is spent, and
+    Harvest's pop when a soul reaches Sexton);
+  - projectiles (Firebolt's fireball, Rime's ice shards, the globs a
+    Contagion Burst throws, Judgment's tumbling hammer, the fate bolt
+    that carries Hex and Ill Omen from one enemy to the next, Grave and
+    Lich bolts, the soul that flies from a death to Sexton when
+    Harvest raises a thrall, and the Mech's arcing rockets). Emitter
+    shots fly from the emitter: `emitter-fired` carries the origin, and
+    hail falls from above its target.
+  A bouncing skill's hits, heals and shields share one cause sequence,
+  so they draw as one path: each hop flies after the last one lands,
+  and a bounce trail's zone waits until the hop that dropped it
+  arrives. A Hex that reaches more than one enemy (Hex Bolt, a full
+  Weaver meter) flies from the first hexed enemy to the others, and an
+  Ill Omen echo (`combo-detonated` with `echo`) flies from the combo it
+  copies before it pops. An area projectile's other hits wait for the
+  first hit's real flight time (`flightTimes`), so a rocket's splash
+  lands with the rocket. Hits from abilities that target a corpse
+  (Corpse Explosion) land at once instead of flying from the caster.
+  `game/views/fate-threads.ts` draws Shared Fate's bonds every frame from
+  the snapshot's links: sagging threads between the enemies on one link,
+  closed into a net at three or more, with marionette strings over each
+  puppet.
+  Rocks, burning ground, flowers and orbs are rebuilt from the
+  snapshot's impacts, zones and emitters, so seeks and resets never
+  leave them behind. Orbs move between ticks by the emitter's velocity.
+  Frozen units stand in an ice block with their pose held, and it
+  breaks into chips when the freeze ends or the unit dies. A raised
+  ally stands back up, a Blessed shield turns the bubble gold,
+  Avatar grows Morrow to 1.45×, and the Mech grows Brassjack to 1.3×.
+  Turrets spin up with Overclock: `HeroFigure.setOverclock` takes the
+  bonus from `overclockBonus` as a share of its maximum, and speeds the
+  rotor and brightens the brass accents with it.
+  Corpses lie where they fell while a living unit could still use them
+  (`HeroFigure.setLinger`): any corpse while Sexton lives, and Morrow's
+  side's fallen heroes while she lives. Otherwise they sink as before. A
+  corpse Army of the Dead raises (`unit-spawned` with `corpseUnitId`)
+  rises in a teal pillar and fights see-through and teal
+  (`HeroFigure.setSpectral`). The Bone Colossus stands 1.6× tall.
 - **Dev lab.** `#models` is the model lab: clips on demand, a crowd
   button that cycles ×16 and ×32 stress crowds, a placeholder comparison and the stats panel with a
   leak test. In dev builds, `window.jevModels` exposes the library.

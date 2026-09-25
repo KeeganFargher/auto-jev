@@ -22,7 +22,7 @@ export * from "./roster/clockwright.js";
 
 export * from "./pieces/items.js";
 
-export * from "./pieces/runes.js";
+export * from "./pieces/gems.js";
 
 export * from "./catalogue.js";
 

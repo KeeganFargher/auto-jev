@@ -2,8 +2,9 @@ import type { AbilityDefinitionId, UnitId } from "../ids.js";
 import type { ComboKind, ConditionKind, ControlKind, DotKind } from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
 import type { BattleResult } from "./result.js";
+import type { RepeatKind } from "./state.js";
 
-export type AppliedStatusKind = ControlKind | DotKind | "taunted" | "invulnerable" | "untargetable" | "linked" | "channeling";
+export type AppliedStatusKind = ControlKind | DotKind | "taunted" | "invulnerable" | "untargetable" | "linked" | "puppeted" | "channeling" | "form" | "chill" | "pandemic" | "grave-marked";
 
 export type ExpiredStatusKind =
   | "shield"
@@ -14,10 +15,15 @@ export type ExpiredStatusKind =
   | "invulnerable"
   | "untargetable"
   | "link"
+  | "puppet"
   | "channel"
-  | DotKind;
+  | DotKind
+  | "form"
+  | "chill"
+  | "pandemic"
+  | "grave-mark";
 
-export type HpPaymentReason = "overcharge" | "blood-contract" | "soulbound";
+export type HpPaymentReason = "overcharge" | "blood-pact" | "soulbound" | "martyr" | "unstable-core";
 
 export interface CastEvent {
   kind: "cast";
@@ -27,8 +33,12 @@ export interface CastEvent {
   abilityId: AbilityDefinitionId;
   targetUnitId: UnitId;
   isBasicAttack: boolean;
-  signature?: true;
+  ultimate?: true;
   triggered?: true;
+  repeat?: RepeatKind;
+  trigger?: string;
+  chainRoot?: number;
+  chainLink?: number;
 }
 
 export interface DamageDealtEvent {
@@ -104,6 +114,7 @@ export type BattleEvent =
       combo: ComboKind;
       tier: number;
       bonusDamage: number;
+      echo?: true;
     }
   | {
       kind: "status-applied";
@@ -123,7 +134,7 @@ export type BattleEvent =
       unitId: UnitId;
       from: Vector2;
       to: Vector2;
-      reason: "blink" | "knockback";
+      reason: "blink" | "dash" | "knockback" | "pull";
     }
   | {
       kind: "impact-scheduled";
@@ -146,6 +157,27 @@ export type BattleEvent =
       radiusUnits: number;
     }
   | {
+      kind: "emitter-started";
+      tick: number;
+      sequence: number;
+      causeSequence: number;
+      emitterId: number;
+      sourceUnitId: UnitId;
+      abilityId: AbilityDefinitionId;
+      from: Vector2;
+      endsAtTick: number;
+    }
+  | {
+      kind: "emitter-fired";
+      tick: number;
+      sequence: number;
+      emitterId: number;
+      sourceUnitId: UnitId;
+      abilityId: AbilityDefinitionId;
+      from: Vector2;
+      targetUnitId: UnitId;
+    }
+  | {
       kind: "zone-created";
       tick: number;
       sequence: number;
@@ -165,7 +197,7 @@ export type BattleEvent =
       sourceUnitId: UnitId;
       targetUnitId: UnitId;
     }
-  | { kind: "revived"; tick: number; sequence: number; unitId: UnitId; hp: number }
+  | { kind: "revived"; tick: number; sequence: number; unitId: UnitId; sourceUnitId: UnitId; hp: number }
   | {
       kind: "unit-spawned";
       tick: number;
@@ -175,9 +207,12 @@ export type BattleEvent =
       teamId: string;
       summonerUnitId: UnitId;
       position: Vector2;
+      corpseUnitId?: UnitId;
+      expiresAtTick?: number;
     }
   | { kind: "unit-dismissed"; tick: number; sequence: number; unitId: UnitId }
-  | { kind: "passive-triggered"; tick: number; sequence: number; unitId: UnitId; passive: string }
+  | { kind: "corpse-spent"; tick: number; sequence: number; unitId: UnitId }
+  | { kind: "passive-triggered"; tick: number; sequence: number; unitId: UnitId; passive: string; targetUnitId?: UnitId }
   | { kind: "hp-paid"; tick: number; sequence: number; unitId: UnitId; amount: number; reason: HpPaymentReason }
   | {
       kind: "cast-fizzled";

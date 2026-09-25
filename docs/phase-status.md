@@ -1520,3 +1520,33 @@ pnpm survey --seeds 20 --runs 200
   already about a million matchups. With every piece it is 1.87 million
   (15 million battles at 4 seeds). See `docs/decisions.md`.
 - **Icon art** for the 25 new pieces.
+
+## Hero redesign, slice 1 — 2026-09-24
+
+### What works now
+
+- Every hero has an ability and an ultimate, and gems socket into either
+  one. Vesper plays her new kit: Flicker Strike, Frenzy and Thousand
+  Cuts.
+- Trigger gems loop under the proposal's rules, with chains shown as ×N
+  over the caster and Frenzy shown as pips on Vesper's plate.
+- Seven heroes show their new non-human bodies as placeholder figures.
+- The run offers gems on the old rune rounds and Train asks which skill
+  gets the socket. Bots and the Jev stub pick and socket gems.
+
+### Verified, not assumed
+
+- Endless Flicker and Blender replay byte-identically in the lab.
+- 10,000 random maxed builds: zero budget events, zero failures.
+- Team survey and 200 full runs (numbers in `docs/hero-redesign.md` §13).
+- Browser: a lab fight with Cast on Crit on Flicker Strike showed the ×2
+  counter and filling Frenzy pips, with no console errors.
+- `pnpm -r build`, `pnpm typecheck`, `pnpm typecheck:scripts`, `pnpm
+  lint` clean; server tests 15 passing.
+
+### Not done yet
+
+- Slices 2–4: Gorrak, Anvil and Cinder rebuilt, levels in place of
+  talents, the rest of the gems and items, then the other six heroes.
+- Blender models for the seven new bodies. Their portraits and slice
+  1's icons are delivered (`docs/icons.md`).
