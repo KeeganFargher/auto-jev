@@ -7,13 +7,14 @@ export interface GraphicsSettings {
   shadows: ShadowQuality;
   glow: boolean;
   monitor: boolean;
+  fightCamera: boolean;
 }
 
 export const RENDER_RESOLUTIONS: readonly RenderResolution[] = ["sharp", "balanced", "fast"];
 
 export const SHADOW_QUALITIES: readonly ShadowQuality[] = ["soft", "simple"];
 
-export const DEFAULT_GRAPHICS: GraphicsSettings = { resolution: "sharp", shadows: "soft", glow: true, monitor: false };
+export const DEFAULT_GRAPHICS: GraphicsSettings = { resolution: "sharp", shadows: "soft", glow: true, monitor: false, fightCamera: true };
 
 const STORAGE_PREFIX = "jev-game.graphics";
 
@@ -24,6 +25,8 @@ const SHADOWS_KEY = `${STORAGE_PREFIX}.shadows`;
 const GLOW_KEY = `${STORAGE_PREFIX}.glow`;
 
 const MONITOR_KEY = `${STORAGE_PREFIX}.monitor`;
+
+const FIGHT_CAMERA_KEY = `${STORAGE_PREFIX}.fightCamera`;
 
 const MAX_DEVICE_PIXEL_RATIO = 2;
 
@@ -54,6 +57,7 @@ export function parseGraphicsSettings(read: (key: string) => string | null): Gra
     shadows: isShadowQuality(shadows) ? shadows : DEFAULT_GRAPHICS.shadows,
     glow: parseSwitch(read(GLOW_KEY), DEFAULT_GRAPHICS.glow),
     monitor: parseSwitch(read(MONITOR_KEY), DEFAULT_GRAPHICS.monitor),
+    fightCamera: parseSwitch(read(FIGHT_CAMERA_KEY), DEFAULT_GRAPHICS.fightCamera),
   };
 }
 
@@ -75,6 +79,7 @@ function writeStoredSettings(settings: GraphicsSettings): void {
     localStorage.setItem(SHADOWS_KEY, settings.shadows);
     localStorage.setItem(GLOW_KEY, settings.glow ? "1" : "0");
     localStorage.setItem(MONITOR_KEY, settings.monitor ? "1" : "0");
+    localStorage.setItem(FIGHT_CAMERA_KEY, settings.fightCamera ? "1" : "0");
   } catch {
     return;
   }
@@ -86,6 +91,7 @@ export interface GraphicsSettingsStore {
   setShadows(shadows: ShadowQuality): void;
   setGlow(glow: boolean): void;
   setMonitor(monitor: boolean): void;
+  setFightCamera(fightCamera: boolean): void;
   subscribe(listener: (settings: GraphicsSettings) => void): () => void;
 }
 
@@ -121,6 +127,10 @@ export function createGraphicsSettingsStore(): GraphicsSettingsStore {
 
     setMonitor(monitor) {
       commit({ ...settings, monitor });
+    },
+
+    setFightCamera(fightCamera) {
+      commit({ ...settings, fightCamera });
     },
 
     subscribe(listener) {

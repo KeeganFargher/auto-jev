@@ -6,9 +6,9 @@ function stored(values: Readonly<Record<string, string>>): (key: string) => stri
   return (key) => values[key] ?? null;
 }
 
-test("a fresh browser gets sharp resolution, soft shadows, glow on and no monitor", () => {
+test("a fresh browser gets sharp resolution, soft shadows, glow on, no monitor and the fight camera on", () => {
   assert.deepEqual(parseGraphicsSettings(stored({})), DEFAULT_GRAPHICS);
-  assert.deepEqual(DEFAULT_GRAPHICS, { resolution: "sharp", shadows: "soft", glow: true, monitor: false });
+  assert.deepEqual(DEFAULT_GRAPHICS, { resolution: "sharp", shadows: "soft", glow: true, monitor: false, fightCamera: true });
 });
 
 test("saved choices come back as they were saved", () => {
@@ -18,10 +18,11 @@ test("saved choices come back as they were saved", () => {
       "jev-game.graphics.shadows": "simple",
       "jev-game.graphics.glow": "0",
       "jev-game.graphics.monitor": "1",
+      "jev-game.graphics.fightCamera": "0",
     }),
   );
 
-  assert.deepEqual(settings, { resolution: "fast", shadows: "simple", glow: false, monitor: true });
+  assert.deepEqual(settings, { resolution: "fast", shadows: "simple", glow: false, monitor: true, fightCamera: false });
 });
 
 test("values another version or a hand edit left behind fall back to the defaults", () => {
@@ -31,6 +32,7 @@ test("values another version or a hand edit left behind fall back to the default
       "jev-game.graphics.shadows": "raytraced",
       "jev-game.graphics.glow": "yes",
       "jev-game.graphics.monitor": "",
+      "jev-game.graphics.fightCamera": "maybe",
     }),
   );
 

@@ -135,7 +135,7 @@ export function createFateThreads(particles: ParticleSystem): FateThreads {
   const glowSurface = new MeshBasicMaterial({
     color: THREAD_COLOR,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.26,
     blending: AdditiveBlending,
     depthWrite: false,
   });
@@ -143,7 +143,7 @@ export function createFateThreads(particles: ParticleSystem): FateThreads {
   const puppetSurface = new MeshBasicMaterial({
     color: PUPPET_COLOR,
     transparent: true,
-    opacity: 0.9,
+    opacity: 0.5,
     blending: AdditiveBlending,
     depthWrite: false,
   });
@@ -154,7 +154,7 @@ export function createFateThreads(particles: ParticleSystem): FateThreads {
   const knotGlowSurface = new MeshBasicMaterial({
     color: THREAD_COLOR,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.3,
     blending: AdditiveBlending,
     depthWrite: false,
     side: DoubleSide,
@@ -397,8 +397,8 @@ export function createFateThreads(particles: ParticleSystem): FateThreads {
 
       snaps.length = recoiling;
 
-      glowSurface.opacity = 0.4 + 0.12 * Math.sin(time * 3.2);
-      knotGlowSurface.opacity = 0.45 + 0.2 * Math.sin(time * 4.1);
+      glowSurface.opacity = 0.26 + 0.08 * Math.sin(time * 3.2);
+      knotGlowSurface.opacity = 0.3 + 0.12 * Math.sin(time * 4.1);
       cores.end();
       sheaths.end();
       strings.end();

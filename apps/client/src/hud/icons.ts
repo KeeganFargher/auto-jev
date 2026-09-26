@@ -416,6 +416,14 @@ export function glowIcon(): SVGSVGElement {
   return svg("0 0 24 24", path(SUN));
 }
 
+export function cameraIcon(): SVGSVGElement {
+  return svg(
+    "0 0 24 24",
+    path("M4 7h3.2l1.6-2.2h6.4L16.8 7H20a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 19H4a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 4 7Zm8 2.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 1 0 0-7.2Z", "evenodd"),
+    circle(12, 13, 1.8),
+  );
+}
+
 export function gaugeIcon(): SVGSVGElement {
   return svg(
     "0 0 24 24",

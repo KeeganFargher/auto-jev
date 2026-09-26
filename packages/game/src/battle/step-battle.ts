@@ -5,7 +5,7 @@ import type { BattleResult } from "./result.js";
 import type { Catalogue } from "../definitions.js";
 import type { CompiledAbility } from "../builds/compile-build.js";
 import { isCastTarget, resolveTarget } from "./targeting.js";
-import { proposeDrift, proposeFollow, proposeMovement } from "./movement.js";
+import { proposeDrift, proposeFollow, proposeMovement, separateUnits } from "./movement.js";
 import { getEngageRange, proposeAction, type ActionProposal } from "./abilities.js";
 import { expireShield, expireSlow, expireTimedStatuses } from "./statuses.js";
 import {
@@ -267,7 +267,7 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
         ? null
         : (state.units.find((candidate) => candidate.unitId === unit.targetUnitId) ?? null);
 
-    return [proposeMovement(unit, target, getEngageRange(unit), state.arenaWidth, state.arenaHeight)];
+    return [proposeMovement(unit, target, getEngageRange(unit), state.units, state.arenaWidth, state.arenaHeight)];
   });
 
   for (const proposal of movementProposals) {
@@ -277,6 +277,8 @@ export function stepBattle(state: BattleState, catalogue: Catalogue): BattleStep
       unit.position = proposal.position;
     }
   }
+
+  separateUnits(state.units, busy, state.arenaWidth, state.arenaHeight);
 
   updateOverclock(state);
 

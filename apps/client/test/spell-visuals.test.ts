@@ -17,6 +17,7 @@ import {
   mechRocket,
   mechSuit,
   meteor,
+  oathHammer,
   pandemic,
   plagueBloom,
   resurrection,
@@ -31,17 +32,21 @@ import { deathKnell } from "../src/game/views/fate-visuals.js";
 import { createHexCritters } from "../src/game/views/hex-critters.js";
 import { paintSpectral } from "../src/game/views/figure-base.js";
 import { createParticleSystem } from "../src/game/views/particles.js";
+import { sanctuaryVisual } from "../src/game/views/shrine-visuals.js";
 import {
   castVisual,
   emitterShotOrigin,
   emitterVisual,
   formVisual,
+  hitVisual,
   landingVisual,
+  mendVisual,
   passiveVisual,
   projectileVisual,
   risenVisual,
   spawnVisual,
   waveArrivalSeconds,
+  zoneDrawsBoundary,
   zoneVisual,
   type EmitterMotion,
   type SpellVisual,
@@ -222,11 +227,43 @@ test("Blessed bursts, Resurrection and Avatar flashes play out and clean up", ()
   }
 });
 
+test("Morrow's hits ring her bell or stamp her seal, and her Judgment heals bloom a lotus", () => {
+  const particles = createParticleSystem(new Scene());
+  const center = new Vector3(4, 0, -6);
+  const chest = new Vector3(4, 4, -6);
+
+  const visuals = [
+    hitVisual(particles, oathHammer.id, center, chest),
+    hitVisual(particles, judgment.id, center, chest),
+    hitVisual(particles, avatarJudgment.id, center, chest),
+    mendVisual(particles, judgment.id, center, chest),
+  ];
+
+  for (const visual of visuals) {
+    assert.ok(visual !== null);
+    assert.equal(visual.root.position.distanceTo(center), 0, "it lands under the unit it touched");
+    assert.ok(playOut(visual) > 10);
+  }
+
+  assert.equal(hitVisual(particles, glacialPrison.id, center, chest), null, "other hits keep the shared spray");
+  assert.equal(mendVisual(particles, hallowedPath.id, center, chest), null, "Hallowed Path's heal ticks stay quiet");
+});
+
+test("Sanctuary closes a shell over its ally for as long as they are invulnerable, then shatters", () => {
+  const particles = createParticleSystem(new Scene());
+  const visual = sanctuaryVisual(particles, new Vector3(), 8.4);
+  visual.update(0.5);
+  assert.ok(Math.max(...visual.root.children.map((child) => child.scale.y)) >= 8.4, "the shell stands over the hero");
+  runTicked(visual, 60);
+});
+
 test("Hallowed Path glows while its ground lasts and fades after", () => {
   const particles = createParticleSystem(new Scene());
   const visual = zoneVisual(particles, hallowedPath.id, new Vector3(), 10, 5, 15);
   assert.ok(visual !== null);
   runTicked(visual, 60);
+  assert.ok(zoneDrawsBoundary(hallowedPath.id) && zoneDrawsBoundary(plagueBloom.id), "their own rings replace the generic zone ring");
+  assert.equal(zoneDrawsBoundary(meteor.id), false, "burning ground keeps the generic ring");
 });
 
 test("Hex opens an eye over its target, Shared Fate casts a web over the bound area and Weaver gathers its threads", () => {

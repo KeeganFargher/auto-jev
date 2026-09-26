@@ -70,6 +70,13 @@ export interface StageShot {
   height: number;
 }
 
+export interface StageFocus {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
 interface CameraGlide {
   from: CameraFit;
   to: CameraFit;
@@ -149,6 +156,7 @@ export interface BoardStage {
   readonly particles: ParticleSystem;
   showBoard(grid: BoardGrid, side: ViewSide, insets: ViewportInsets): void;
   frame(shot: StageShot | null): void;
+  focus(area: StageFocus | null): void;
   setOrbit(radians: number): void;
   toScene(point: Vector2, height: number): Vector3;
   toScreen(point: Vector3): ScreenPoint | null;
@@ -194,6 +202,16 @@ const GROUND_RADIUS = 260;
 const CORNER_CAP_SIZE = 4.2;
 
 const GLIDE_SECONDS = 0.5;
+
+const CHASE_SECONDS = 0.9;
+
+const CHASE_SETTLE_UNITS = 0.05;
+
+const CHASE_SETTLE_PIXELS = 0.5;
+
+const MAX_FOCUS_ZOOM = 1.5;
+
+const FOCUS_MARGIN_UNITS = 4;
 
 export function boardFootprint(grid: BoardGrid): number {
   return Math.max(grid.width, grid.height) / 2 + FRAME_WIDTH + 1;
@@ -428,6 +446,8 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   let fit: CameraFit | null = null;
   let glide: CameraGlide | null = null;
   let shot: StageShot | null = null;
+  let focusShot: StageShot | null = null;
+  let chasing = false;
   let orbit = 0;
   let theme = DEFAULT_STAGE_THEME;
   let exposureBoost = 1;
@@ -535,11 +555,21 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     placeFog();
   }
 
+  function focusFraming(area: StageFocus): StageShot {
+    const board = boardShot();
+    const halfWidth = Math.min(board.halfWidth, Math.max(board.halfWidth / MAX_FOCUS_ZOOM, (area.maxX - area.minX) / 2 + FOCUS_MARGIN_UNITS));
+    const halfDepth = Math.min(board.halfDepth, Math.max(board.halfDepth / MAX_FOCUS_ZOOM, (area.maxZ - area.minZ) / 2 + FOCUS_MARGIN_UNITS));
+    const centerX = Math.min(board.halfWidth - halfWidth, Math.max(halfWidth - board.halfWidth, (area.minX + area.maxX) / 2));
+    const centerZ = Math.min(board.halfDepth - halfDepth, Math.max(halfDepth - board.halfDepth, (area.minZ + area.maxZ) / 2));
+
+    return { ...board, target: new Vector3(centerX, 0, centerZ), halfWidth, halfDepth };
+  }
+
   function solveFit(): CameraFit {
     camera.aspect = viewportWidth / viewportHeight;
     camera.clearViewOffset();
 
-    const framing = shot ?? boardShot();
+    const framing = shot ?? focusShot ?? boardShot();
     const safeWidth = Math.max(1, viewportWidth - insets.left - insets.right - FIT_PADDING_PIXELS * 2);
     const safeHeight = Math.max(1, viewportHeight - insets.top - insets.bottom - FIT_PADDING_PIXELS * 2);
 
@@ -579,6 +609,16 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     applyFit(solveFit());
   }
 
+  function blendFits(from: CameraFit, to: CameraFit, amount: number): CameraFit {
+    return {
+      distance: from.distance + (to.distance - from.distance) * amount,
+      offsetX: from.offsetX + (to.offsetX - from.offsetX) * amount,
+      offsetY: from.offsetY + (to.offsetY - from.offsetY) * amount,
+      pitch: from.pitch + (to.pitch - from.pitch) * amount,
+      target: from.target.clone().lerp(to.target, amount),
+    };
+  }
+
   function glideCamera(from: CameraFit): void {
     glide = { from, to: solveFit(), elapsed: 0 };
     applyFit(from);
@@ -597,13 +637,27 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       glide = null;
     }
 
-    applyFit({
-      distance: from.distance + (to.distance - from.distance) * progress,
-      offsetX: from.offsetX + (to.offsetX - from.offsetX) * progress,
-      offsetY: from.offsetY + (to.offsetY - from.offsetY) * progress,
-      pitch: from.pitch + (to.pitch - from.pitch) * progress,
-      target: from.target.clone().lerp(to.target, progress),
-    });
+    applyFit(blendFits(from, to, progress));
+  }
+
+  function fitsSettled(from: CameraFit, to: CameraFit): boolean {
+    return (
+      Math.abs(to.distance - from.distance) < CHASE_SETTLE_UNITS &&
+      Math.abs(to.offsetX - from.offsetX) < CHASE_SETTLE_PIXELS &&
+      Math.abs(to.offsetY - from.offsetY) < CHASE_SETTLE_PIXELS &&
+      to.target.distanceTo(from.target) < CHASE_SETTLE_UNITS
+    );
+  }
+
+  function stepChase(deltaSeconds: number): void {
+    if (!chasing || glide !== null || fit === null) {
+      return;
+    }
+
+    const from = fit;
+    const to = solveFit();
+    chasing = !fitsSettled(from, to);
+    applyFit(chasing ? blendFits(from, to, 1 - Math.exp(-deltaSeconds / CHASE_SECONDS)) : to);
   }
 
   function measure(): boolean {
@@ -657,6 +711,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     const deltaSeconds = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - lastFrameTime) / 1000));
     lastFrameTime = now;
     stepGlide(deltaSeconds);
+    stepChase(deltaSeconds);
     particles.update(deltaSeconds);
 
     for (const listener of listeners) {
@@ -728,6 +783,11 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       } else {
         glideCamera(fit);
       }
+    },
+
+    focus(area) {
+      focusShot = area === null ? null : focusFraming(area);
+      chasing = true;
     },
 
     setOrbit(radians) {

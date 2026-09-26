@@ -110,9 +110,9 @@ const FLASH: ParticleStyle = {
   blend: "glow",
   from: new Color("#ffffff"),
   to: new Color("#ffffff"),
-  brightness: 1.2,
-  opacity: 0.8,
-  size: [4, 5.2],
+  brightness: 1,
+  opacity: 0.5,
+  size: [2.6, 3.4],
   life: [0.08, 0.11],
   speed: [0, 0],
   cone: Math.PI,
@@ -145,7 +145,7 @@ function tinted(style: ParticleStyle, from: string, to: string): ParticleStyle {
 }
 
 function flash(color: string): HitBurst {
-  return { style: tinted(FLASH, "#ffffff", color), count: 1 };
+  return { style: tinted(FLASH, color, color), count: 1 };
 }
 
 const HIT_BURSTS: Readonly<Record<HitKind, readonly HitBurst[]>> = {
@@ -159,7 +159,7 @@ const HIT_BURSTS: Readonly<Record<HitKind, readonly HitBurst[]>> = {
     {
       style: {
         ...tinted(SPARKS, "#ffcf33", "#ff3d00"),
-        size: [2.6, 0.8],
+        size: [1.9, 0.6],
         life: [0.35, 0.7],
         speed: [8, 20],
         cone: 1.2,
@@ -167,7 +167,7 @@ const HIT_BURSTS: Readonly<Record<HitKind, readonly HitBurst[]>> = {
         drag: 3,
         stretch: 0.02,
       },
-      count: 14,
+      count: 10,
     },
     { style: tinted(DUST, "#4a3b36", "#7a6f6a"), count: 3 },
     flash(HIT_TINTS.fire),
@@ -209,7 +209,7 @@ const RELEASE: ParticleStyle = {
   drag: 5,
 };
 
-const RELEASE_FLASH: ParticleStyle = { ...FLASH, size: [2.6, 3.2], opacity: 0.7 };
+const RELEASE_FLASH: ParticleStyle = { ...FLASH, size: [1.8, 2.2], opacity: 0.45 };
 
 const TRAIL: ParticleStyle = {
   ...MOTES,
@@ -259,5 +259,5 @@ export function trailStyle(kind: HitKind): ParticleStyle {
 export function emitRelease(particles: ParticleSystem, kind: HitKind, point: Vector3): void {
   const trail = TRAILS[kind];
   particles.emit({ ...RELEASE, from: trail.from, to: trail.to }, point, UP, RELEASE_COUNT);
-  particles.emit({ ...RELEASE_FLASH, to: trail.to }, point, UP, 1);
+  particles.emit({ ...RELEASE_FLASH, from: trail.from, to: trail.to }, point, UP, 1);
 }

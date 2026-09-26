@@ -437,42 +437,48 @@ sounds. Music is still a placeholder (`missing_assets.md` entry 7).
   Cinder uses it because her placeholder wears a tall hat. The model
   figure scales to it, and `HeroFigure.height` (health plates, chest
   point) follows it, including after a placeholder swaps to the model.
+- **Forms.** `HeroFigure.setForm` is optional. The battle view tells a
+  figure its unit's form key, or null when it has none or is dead.
+  Morrow's sun disc spins faster in Avatar.
 - **Celebrating.** `HeroFigure.setCelebrating` loops the `victory` clip
   (for the draft lineup). Placeholders ignore it.
 - **Cast socket.** `HeroFigure.castOrigin` is where projectiles and cast
   flares leave from. It's the catalogue's `castBone` when a model names
   one (Cinder's `flame` bone), otherwise the chest.
 - **Spell visuals.** `game/views/spell-visuals.ts` maps ability ids to
-  code-drawn visuals. The battle view asks it at nine points, and an
+  code-drawn visuals. The battle view asks it at eleven points, and an
   ability without an entry keeps the generic effect:
   - pending impacts (Meteor's falling rock and ground shadow, timed from
     ticks so it lands on the hit at any playback speed);
   - impact landings (Fireball's blast, Leap Slam's shockwave, Nettle's
-    Burst splash, a Blessed shield's gold burst, the Resurrection pillar
-    over a raised ally, Hex's violet puff on each hexed enemy, Corpse
+    Burst splash, Blessed Overflow's burst of shell scutes, the torii gate
+    that rises over an ally Resurrection raises, Hex's violet puff on each hexed enemy, Corpse
     Explosion's bone burst, which Grave Chain blasts reuse, and the
     shrapnel of Brassjack's rockets, with gears flying out of
     Self-Destruct and Doomsday);
   - zones (Meteor's burning ground, Whirlwind's axes, Plague Bloom's
-    flower, Hallowed Path's sun glyph);
+    hellebore, Hallowed Path's floating rope circle);
   - emitters (the Frozen Orb, and Hailstorm's cloud over Glacial
     Prison);
   - casts, drawn at the area's centre with the caster's own radius
-    (Glacial Prison's ice spikes, Pandemic's wave, Resurrection's call,
+    (Glacial Prison's ice spikes, Pandemic's surge, Resurrection's bell toll,
     Shared Fate's curse ring, Army of the Dead's grave ring);
-  - form starts (Inferno's burst, Avatar's pillar, the Lich's teal
+  - form starts (Inferno's burst, Avatar's rising sun, the Lich's teal
     pillar, the Mech's brass plates snapping on);
   - summons arriving (`spawnVisual`: a turret drops in with a brass
     ring, steam and sparks);
   - passive triggers (Weaver's flare when a full meter is spent, and
     Harvest's pop when a soul reaches Sexton);
   - projectiles (Firebolt's fireball, Rime's ice shards, the globs a
-    Contagion Burst throws, Judgment's tumbling hammer, the fate bolt
+    Contagion Burst throws, Nettle's thorn, Judgment's spirit mallet, the fate bolt
     that carries Hex and Ill Omen from one enemy to the next, Grave and
     Lich bolts, the soul that flies from a death to Sexton when
     Harvest raises a thrall, and the Mech's arcing rockets). Emitter
     shots fly from the emitter: `emitter-fired` carries the origin, and
     hail falls from above its target.
+  - hits (`hitVisual`: Oath Hammer's bell ring, the seal Judgment
+    stamps on each enemy it hits);
+  - heals (`mendVisual`: the lotus over each ally Judgment heals).
   A bouncing skill's hits, heals and shields share one cause sequence,
   so they draw as one path: each hop flies after the last one lands,
   and a bounce trail's zone waits until the hop that dropped it
@@ -491,7 +497,11 @@ sounds. Music is still a placeholder (`missing_assets.md` entry 7).
   snapshot's impacts, zones and emitters, so seeks and resets never
   leave them behind. Orbs move between ticks by the emitter's velocity.
   Frozen units stand in an ice block with their pose held, and it
-  breaks into chips when the freeze ends or the unit dies. A raised
+  breaks into chips when the freeze ends or the unit dies. When
+  Morrow's Resurrection finds nobody to raise, each ally she makes
+  invulnerable stands in a shell dome; the battle view keeps one per
+  unit and shatters it when `invulnerableUntilTick` drops back to 0.
+  Other sources of invulnerability keep a plain flash. A raised
   ally stands back up, a Blessed shield turns the bubble gold,
   Avatar grows Morrow to 1.45×, and the Mech grows Brassjack to 1.3×.
   Turrets spin up with Overclock: `HeroFigure.setOverclock` takes the

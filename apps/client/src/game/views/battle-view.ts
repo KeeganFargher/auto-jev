@@ -4,6 +4,7 @@ import {
   Color,
   DynamicDrawUsage,
   Float32BufferAttribute,
+  Line,
   LineDashedMaterial,
   LineLoop,
   LineSegments,
@@ -13,9 +14,10 @@ import {
   RingGeometry,
   SphereGeometry,
   Vector3,
+  type Material,
+  type Object3D,
 } from "three";
 import {
-  CONDITION_DURATION_TICKS,
   heroLevel,
   isCorpse,
   isRevivable,
@@ -33,41 +35,47 @@ import {
   type PassiveDefinition,
   type UnitState,
 } from "@jev-game/game";
-import { boneGolem, duskStrike, flickerStrike, hex as hexSpell, pandemic as pandemicSpell, sharedFate, thousandCuts, voidheartBlast } from "@jev-game/content";
+import { boneGolem, duskStrike, flickerStrike, hex as hexSpell, oathkeeper, pandemic as pandemicSpell, sharedFate, thousandCuts, voidheartBlast } from "@jev-game/content";
 import { abilityDefinition, gameCatalogue, heroDefinition } from "../catalogues.js";
 import {
   castVisual,
   emitterShotOrigin,
   emitterVisual,
   formVisual,
+  hitVisual,
   iceChunkGeometry,
   impactVisual,
   landingVisual,
   leapArc,
+  mendVisual,
   passiveVisual,
   releaseDelay,
   risenVisual,
   spawnVisual,
   waveArrivalSeconds,
+  zoneDrawsBoundary,
   zoneVisual,
   type EmitterMotion,
   type SpellVisual,
   type TickedVisual,
 } from "./spell-visuals.js";
-import { conditionIcon, statusIcon } from "../../hud/icons.js";
+import { statusIcon } from "../../hud/icons.js";
 import { comboName } from "../../hud/tips.js";
 import { levelBadge, romanLevel } from "../../hud/levels.js";
 import { CONDITION_COLORS, createBattleEffects, PROJECTILE_SECONDS, type GroundMarker } from "./battle-effects.js";
-import type { BoardStage, ViewSide, ViewportInsets } from "./board-stage.js";
+import type { BoardStage, StageFocus, ViewSide, ViewportInsets } from "./board-stage.js";
+import { graphicsSettings } from "../../graphics/settings.js";
 import { CHEST_FRACTION } from "./figure-base.js";
 import { createFateThreads, type Tie } from "./fate-threads.js";
 import { deathKnell, HEX_POP_SECONDS, KNELL_HEIGHT, KNELL_TOLL_SECONDS } from "./fate-visuals.js";
 import { createHexCritters, type HexedUnit } from "./hex-critters.js";
-import { clawRake, duskPuff, duskStreak } from "./dusk-visuals.js";
+import { infectionVisual } from "./blight-visuals.js";
+import { sanctuaryVisual } from "./shrine-visuals.js";
+import { clawRake, duskPuff, duskStreak, shadeStrike, shadowStrike } from "./dusk-visuals.js";
 import { createHealthTrail, type HealthTrail } from "./health-trail.js";
 import { createHeroFigure, levelFigureScale, type HeroFigure } from "./hero-figures.js";
 import { emitHit, emitRelease, hitKind } from "./hit-effects.js";
-import type { ParticleStyle } from "./particles.js";
+import type { ParticleStyle, ParticleSystem } from "./particles.js";
 import {
   createFallingTracker,
   playCast,
@@ -141,10 +149,6 @@ const BURST_TARGET_UNITS = 2;
 
 const GLOB_LAUNCH_HEIGHT = 4.5;
 
-const TAINT_RADIUS = 7;
-
-const TAINT_SPORE_COUNT = 10;
-
 const ICE_SHATTER_COUNT = 18;
 
 const FREEZE_MIST_COUNT = 12;
@@ -162,6 +166,8 @@ const TICK_JUMP_FOR_SNAP = 20;
 const PICK_RADIUS_PIXELS = 44;
 
 const PLATE_GAP_UNITS = 1.8;
+
+const PLATE_STATUS_LIMIT = 2;
 
 const UP = new Vector3(0, 1, 0);
 
@@ -214,6 +220,24 @@ const DEATH_DUST: ParticleStyle = {
 };
 
 const FLOAT_NUMBER_MILLISECONDS = 900;
+
+const QUIET_OPACITY = 0.45;
+
+const QUIET_PARTICLE_SHARE = 0.5;
+
+const FLOAT_NUMBER_LIMIT = 3;
+
+const FLOAT_BESIDE_PIXELS = 26;
+
+const FLOAT_CHIP_PIXELS = 17;
+
+const FLOAT_BADGE_PIXELS = 16;
+
+const FLOAT_LIFT_PIXELS = 7;
+
+const FOCUS_SLACK_UNITS = 3;
+
+const FOCUS_SHRINK_RATIO = 0.6;
 
 const HP_PER_SEGMENT = 250;
 
@@ -327,23 +351,6 @@ const FREEZE_MIST: ParticleStyle = {
   softness: 0.6,
 };
 
-const TAINT_SPORES: ParticleStyle = {
-  blend: "glow",
-  from: new Color("#ecfccb"),
-  to: new Color(PLAGUE_COLOR),
-  brightness: 0.9,
-  opacity: 0.85,
-  size: [1.4, 0.4],
-  life: [0.6, 1],
-  speed: [2, 6],
-  cone: 0.9,
-  spread: 1.5,
-  gravity: -3,
-  drag: 1.5,
-  stretch: 0,
-  softness: 0.5,
-};
-
 function zoneColor(abilityId: string): string {
   switch (abilityId) {
     case "plague-bloom":
@@ -367,7 +374,7 @@ interface Vanish {
 }
 
 interface MarkedArea {
-  marker: GroundMarker;
+  marker: GroundMarker | null;
   seen: boolean;
 }
 
@@ -383,7 +390,6 @@ interface UnitRecord {
   plateTrail: HealthTrail;
   plateShield: HTMLElement;
   plateMana: HTMLElement | null;
-  plateCondition: HTMLElement;
   plateStatus: HTMLElement;
   plateStacks: HTMLElement | null;
   plateChain: HTMLElement;
@@ -535,6 +541,59 @@ function figureHeight(record: UnitRecord): number {
   return record.figure.height * levelFigureScale(record.level) * record.grow;
 }
 
+function quietParticles(particles: ParticleSystem): ParticleSystem {
+  return {
+    emit(style, origin, direction, count) {
+      const hushed = { ...style, opacity: style.opacity * QUIET_OPACITY, brightness: Math.min(style.brightness, 1) };
+      particles.emit(hushed, origin, direction, Math.ceil(count * QUIET_PARTICLE_SHARE));
+    },
+
+    clear: () => particles.clear(),
+    update: (deltaSeconds) => particles.update(deltaSeconds),
+    alive: () => particles.alive(),
+    dispose: () => particles.dispose(),
+  };
+}
+
+function materialsIn(root: Object3D): Material[] {
+  const found = new Set<Material>();
+
+  root.traverse((object) => {
+    if (object instanceof Mesh || object instanceof Line) {
+      for (const material of [object.material].flat()) {
+        found.add(material);
+      }
+    }
+  });
+
+  return [...found];
+}
+
+function quieted(visual: SpellVisual): SpellVisual {
+  const loud = new Map<Material, number>();
+
+  return {
+    root: visual.root,
+
+    update(deltaSeconds) {
+      for (const [material, opacity] of loud) {
+        material.opacity = opacity;
+      }
+
+      visual.update(deltaSeconds);
+      loud.clear();
+
+      for (const material of materialsIn(visual.root)) {
+        loud.set(material, material.opacity);
+        material.opacity *= QUIET_OPACITY;
+      }
+    },
+
+    finished: () => visual.finished(),
+    dispose: () => visual.dispose(),
+  };
+}
+
 function isRisen(unit: UnitState): boolean {
   return unit.summonerUnitId !== null && heroDefinition(unit.heroId)?.summon !== true;
 }
@@ -569,6 +628,62 @@ function overclockLevel(units: readonly UnitState[], unit: UnitState): number {
   return overclock === null ? 0 : overclockBonus(units, unit) / overclock.maxBonus;
 }
 
+interface FloatingNumber {
+  element: HTMLElement;
+  anchor: Vector3;
+  offsetX: number;
+}
+
+interface PlateStatus {
+  kind: string;
+  buff: boolean;
+  stacks: number;
+}
+
+const MODEL_SHOWN_CONTROLS: ReadonlySet<string> = new Set(["frozen", "hexed"]);
+
+function plateStatuses(unit: UnitState): PlateStatus[] {
+  if (!unit.alive) {
+    return [];
+  }
+
+  const statuses: PlateStatus[] = [];
+
+  if (unit.control !== null && !MODEL_SHOWN_CONTROLS.has(unit.control.control)) {
+    statuses.push({ kind: unit.control.control, buff: false, stacks: 0 });
+  }
+
+  if (unit.taunt !== null) {
+    statuses.push({ kind: "taunted", buff: false, stacks: 0 });
+  }
+
+  if (unit.invulnerableUntilTick !== 0) {
+    statuses.push({ kind: "invulnerable", buff: true, stacks: 0 });
+  }
+
+  if (unit.untargetableUntilTick !== 0) {
+    statuses.push({ kind: "untargetable", buff: true, stacks: 0 });
+  }
+
+  if (unit.link !== null) {
+    statuses.push({ kind: unit.link.puppetUntilTick !== 0 ? "puppeted" : "linked", buff: false, stacks: 0 });
+  }
+
+  if (unit.graveMark !== null) {
+    statuses.push({ kind: "grave-marked", buff: false, stacks: 0 });
+  }
+
+  for (const dot of unit.dots) {
+    statuses.push({ kind: dot.dot, buff: false, stacks: dot.stacks });
+  }
+
+  if (unit.chill !== null) {
+    statuses.push({ kind: "chill", buff: false, stacks: unit.chill.stacks });
+  }
+
+  return statuses;
+}
+
 function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean): HTMLElement {
   const plate = document.createElement("div");
   plate.className = `unit-plate ${isFriendly ? "is-friendly" : "is-enemy"}`;
@@ -589,26 +704,25 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
 
   bar.append(trail, hp, shield);
 
-  const barRow = document.createElement("div");
-  barRow.className = "unit-plate-bar-row";
-  barRow.append(bar);
-
-  if (isHeroUnit(unit)) {
-    barRow.append(levelBadge(unitLevel(unit), "unit-plate-level"));
-  }
-
-  const condition = document.createElement("div");
-  condition.className = "unit-plate-condition";
-  condition.hidden = true;
-
   const status = document.createElement("div");
   status.className = "unit-plate-status";
+
+  const barRow = document.createElement("div");
+  barRow.className = "unit-plate-bar-row";
+  barRow.append(bar, status);
+
+  if (isHeroUnit(unit)) {
+    const level = unitLevel(unit);
+    const badge = levelBadge(level, "unit-plate-level");
+    badge.hidden = level <= 1;
+    barRow.append(badge);
+  }
 
   const chain = document.createElement("div");
   chain.className = "unit-plate-chain";
   chain.hidden = true;
 
-  plate.append(chain, condition, status, barRow);
+  plate.append(chain, barRow);
 
   if (unit.maxMana > 0) {
     const mana = document.createElement("div");
@@ -656,6 +770,9 @@ function createPlate(unit: UnitState, isFriendly: boolean, showUnitId: boolean):
 
 export function createBattleView(stage: BoardStage, options: BattleViewOptions): BattleView {
   const records = new Map<string, UnitRecord>();
+  const liveNumbers: FloatingNumber[] = [];
+  const floatSides = new WeakMap<UnitRecord, number>();
+  let focusArea: StageFocus | null = null;
   const effects = createBattleEffects(stage.scene, stage.particles);
   const chainTargets = new Map<number, string>();
   const bounceCounts = new Map<number, number>();
@@ -663,6 +780,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
   const falling = createFallingTracker();
   const spellVisuals = new Set<SpellVisual>();
+  const sanctuaries = new Map<string, TickedVisual>();
   const stateVisuals = new Map<string, TickedVisual | null>();
   const emitterMotions = new Map<string, EmitterMotion>();
   const emitterAbilities = new Map<number, string>();
@@ -677,6 +795,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   const tolledAt = new Map<string, number>();
   const vanished = new Map<string, Vanish>();
   const shadeCasts = new Set<number>();
+  const quietCasts = new Set<number>();
+  const hushed = quietParticles(stage.particles);
   let vanishToken = 0;
   const fateThreads = createFateThreads(stage.particles);
   const hexCritters = createHexCritters(stage.particles);
@@ -750,6 +870,17 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   }
 
   function stepSpells(deltaSeconds: number): void {
+    for (const [unitId, dome] of sanctuaries) {
+      const record = records.get(unitId);
+
+      if (record === undefined || !record.state.alive || record.state.invulnerableUntilTick === 0) {
+        dome.end();
+        sanctuaries.delete(unitId);
+      } else {
+        dome.root.position.set(record.position.x, 0, record.position.z);
+      }
+    }
+
     for (const visual of stateVisuals.values()) {
       visual?.update(deltaSeconds);
     }
@@ -777,20 +908,67 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     return area?.kind === "circle" && area.center === "target" && target !== undefined ? target.destination.clone() : record.position.clone();
   }
 
-  function floatNumber(record: UnitRecord, text: string, kind: string): HTMLElement | null {
-    const point = stage.toScreen(record.position.clone().setY(figureHeight(record) + PLATE_GAP_UNITS));
+  function plateEdgePixels(record: UnitRecord, side: number): number {
+    if (side > 0) {
+      return record.plateStatus.childElementCount * FLOAT_CHIP_PIXELS;
+    }
 
-    if (point === null) {
+    return record.plateLevel === null || record.plateLevel.hidden ? 0 : FLOAT_BADGE_PIXELS;
+  }
+
+  function floatSide(record: UnitRecord, sourceUnitId: string | null): number {
+    const source = sourceUnitId === null ? undefined : records.get(sourceUnitId);
+    const from = source === undefined || source === record ? null : stage.toScreen(source.position);
+    const at = stage.toScreen(record.position);
+
+    if (from !== null && at !== null && Math.abs(at.x - from.x) >= 1) {
+      return at.x > from.x ? 1 : -1;
+    }
+
+    const side = -(floatSides.get(record) ?? -1);
+    floatSides.set(record, side);
+
+    return side;
+  }
+
+  function placeNumber(number: FloatingNumber): void {
+    const point = stage.toScreen(number.anchor);
+
+    if (point !== null) {
+      number.element.style.left = `${point.x + number.offsetX}px`;
+      number.element.style.top = `${point.y - FLOAT_LIFT_PIXELS}px`;
+    }
+  }
+
+  function floatNumber(record: UnitRecord, text: string, kind: string, sourceUnitId: string | null): HTMLElement | null {
+    const anchor = record.position.clone().setY(figureHeight(record) + PLATE_GAP_UNITS);
+
+    if (stage.toScreen(anchor) === null) {
       return null;
     }
 
+    const side = floatSide(record, sourceUnitId);
     const element = document.createElement("div");
     element.className = `float-number is-${kind}`;
     element.textContent = text;
-    element.style.left = `${point.x + (Math.random() - 0.5) * 18}px`;
-    element.style.top = `${point.y - 12}px`;
+    element.style.setProperty("--side", String(side));
+    const number = { element, anchor, offsetX: side * (FLOAT_BESIDE_PIXELS + plateEdgePixels(record, side)) };
+    placeNumber(number);
     stage.overlay.append(element);
-    window.setTimeout(() => element.remove(), FLOAT_NUMBER_MILLISECONDS);
+    liveNumbers.push(number);
+
+    while (liveNumbers.length > FLOAT_NUMBER_LIMIT) {
+      liveNumbers.shift()?.element.remove();
+    }
+
+    window.setTimeout(() => {
+      element.remove();
+      const index = liveNumbers.indexOf(number);
+
+      if (index >= 0) {
+        liveNumbers.splice(index, 1);
+      }
+    }, FLOAT_NUMBER_MILLISECONDS);
 
     return element;
   }
@@ -821,7 +999,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       if (total > 0) {
         record.figure.trigger("hit");
         sprayHit(event, record, true);
-        const callout = floatNumber(record, String(total), "burst");
+        const callout = floatNumber(record, String(total), "burst", event.sourceUnitId);
 
         if (callout !== null) {
           callout.dataset.label = "Burst";
@@ -835,6 +1013,11 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       record.figure.trigger("hit");
       sprayHit(event, record, big || event.crit === true);
       playHit(event, big, panOf(record));
+      const touch = hitVisual(stage.particles, event.abilityId, record.position.clone(), chestOf(record));
+
+      if (touch !== null) {
+        showSpell(touch);
+      }
     }
 
     if (event.dot === undefined && stuns) {
@@ -842,7 +1025,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
 
     if (event.combo !== undefined) {
-      const callout = floatNumber(record, total > 0 ? String(total) : "", "combo");
+      const callout = floatNumber(record, total > 0 ? String(total) : "", "combo", event.sourceUnitId);
 
       if (callout !== null) {
         callout.dataset.condition = COMBO_CONDITION[event.combo];
@@ -857,15 +1040,15 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
 
     if (event.abilityId === voidheartBlast.id) {
-      const callout = floatNumber(record, String(total), "voidheart");
+      const callout = floatNumber(record, String(total), "voidheart", event.sourceUnitId);
 
       if (callout !== null) {
         callout.dataset.label = voidheartBlast.name;
       }
     } else if (event.crit === true) {
-      floatNumber(record, String(total), big ? "crit is-huge" : "crit");
+      floatNumber(record, String(total), big ? "crit is-huge" : "crit", event.sourceUnitId);
     } else if (big && record.state.summonerUnitId === null) {
-      floatNumber(record, String(total), "big");
+      floatNumber(record, String(total), "big", event.sourceUnitId);
     }
   }
 
@@ -914,7 +1097,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     stage.particles.emit(HEAL_MOTES, record.position.clone().setY(HEAL_MOTE_HEIGHT), UP, HEAL_MOTE_COUNT);
 
     if (amount >= record.state.maxHp * BIG_HEAL_FRACTION) {
-      floatNumber(record, `+${amount}`, "heal");
+      floatNumber(record, `+${amount}`, "heal", null);
     }
   }
 
@@ -1009,8 +1192,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     const distance = Math.hypot(target.position.x - source.position.x, target.position.z - source.position.z);
 
     effects.delay(waveArrivalSeconds(distance, areaRadius(source, pandemicSpell.id)), () => {
-      effects.impactFlash(target.position, TAINT_RADIUS, PLAGUE_COLOR);
-      stage.particles.emit(TAINT_SPORES, chestOf(target), UP, TAINT_SPORE_COUNT);
+      showSpell(infectionVisual(stage.particles, target.position.clone().setY(0), chestOf(target)));
     });
   }
 
@@ -1085,13 +1267,24 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     hexCritters.update(hexed, deltaSeconds);
   }
 
-  function sanctify(unitId: string): void {
-    const record = records.get(unitId);
+  function sanctify(event: StatusAppliedEvent): void {
+    const record = records.get(event.targetUnitId);
 
-    if (record !== undefined) {
+    if (record === undefined) {
+      return;
+    }
+
+    if (records.get(event.sourceUnitId)?.state.heroId !== oathkeeper.id) {
       effects.impactFlash(record.position, SANCTIFY_RADIUS, SANCTIFY_COLOR);
       stage.particles.emit(HEAL_MOTES, chestOf(record), UP, SANCTIFY_MOTE_COUNT);
+
+      return;
     }
+
+    sanctuaries.get(event.targetUnitId)?.end();
+    const dome = sanctuaryVisual(stage.particles, record.position.clone(), figureHeight(record));
+    sanctuaries.set(event.targetUnitId, dome);
+    showSpell(dome);
   }
 
   function isTrail(unitId: string, abilityId: string): boolean {
@@ -1145,8 +1338,12 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       if (event.repeat === "clone") {
         shadeCasts.add(event.sequence);
-      } else if (DUSK_DASHES.has(event.abilityId)) {
-        vanish(record);
+      }
+
+      const quiet = event.triggered === true || event.repeat !== undefined;
+
+      if (quiet) {
+        quietCasts.add(event.sequence);
       }
 
       if (event.chainLink !== undefined && event.chainLink >= 2) {
@@ -1154,13 +1351,14 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       if (isRangedAbility(event.abilityId)) {
-        emitRelease(stage.particles, hitKind(event.abilityId), record.figure.castOrigin(new Vector3()));
+        emitRelease(quiet ? hushed : stage.particles, hitKind(event.abilityId), record.figure.castOrigin(new Vector3()));
       }
 
-      const flourish = castVisual(stage.particles, event.abilityId, castCenter(record, event), areaRadius(record, event.abilityId), record.figure.castOrigin(new Vector3()));
+      const particles = quiet ? hushed : stage.particles;
+      const flourish = castVisual(particles, event.abilityId, castCenter(record, event), areaRadius(record, event.abilityId), record.figure.castOrigin(new Vector3()));
 
       if (flourish !== null) {
-        showSpell(flourish);
+        showSpell(quiet ? quieted(flourish) : flourish);
       }
 
       return;
@@ -1299,10 +1497,11 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
           land();
 
           if (blast?.kind === "circle" && target !== undefined) {
-            const visual = landingVisual(stage.particles, event.abilityId, target.position.clone(), blast.radiusUnits);
+            const quiet = quietCasts.has(event.causeSequence);
+            const visual = landingVisual(quiet ? hushed : stage.particles, event.abilityId, target.position.clone(), blast.radiusUnits);
 
             if (visual !== null) {
-              showSpell(visual);
+              showSpell(quiet ? quieted(visual) : visual);
             }
           }
         };
@@ -1333,6 +1532,11 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         allyHop(event.causeSequence, event.targetUnitId, event.abilityId, () => {
           healBurst(record, event.amount);
           playHeal(event.abilityId, panOf(record));
+          const bloom = mendVisual(stage.particles, event.abilityId, record.position.clone(), chestOf(record));
+
+          if (bloom !== null) {
+            showSpell(bloom);
+          }
         });
       }
 
@@ -1357,7 +1561,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       if (event.status === "invulnerable") {
-        sanctify(event.targetUnitId);
+        sanctify(event);
 
         return;
       }
@@ -1545,6 +1749,17 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     reappearLater(record, DUSK_REAPPEAR_SECONDS * 2);
   }
 
+  function vanishDashers(events: readonly BattleEvent[]): void {
+    for (const event of events) {
+      const dashes = event.kind === "cast" && event.repeat !== "clone" && DUSK_DASHES.has(event.abilityId);
+      const record = dashes ? records.get(event.sourceUnitId) : undefined;
+
+      if (record !== undefined) {
+        vanish(record);
+      }
+    }
+  }
+
   function duskHit(event: DamageDealtEvent): void {
     const target = records.get(event.targetUnitId);
 
@@ -1553,15 +1768,23 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
 
     const shade = shadeCasts.has(event.causeSequence);
+    const quiet = quietCasts.has(event.causeSequence);
     const strength = shade ? SHADE_RAKE : event.abilityId === duskStrike.id ? DUSK_STRIKE_RAKE : event.crit === true ? 1.3 : 1;
-    showSpell(clawRake(stage.particles, chestOf(target), strength));
+    const rake = clawRake(quiet ? hushed : stage.particles, chestOf(target), strength);
+    showSpell(quiet ? quieted(rake) : rake);
     const source = records.get(event.sourceUnitId);
+
+    if (source !== undefined && shade) {
+      showSpell(shadeStrike(stage.particles, source.position, target.position, strength));
+    }
+
     const entry = shade ? undefined : vanished.get(event.sourceUnitId);
 
     if (source === undefined || entry === undefined) {
       return;
     }
 
+    showSpell(shadowStrike(stage.particles, entry.from, target.position, strength));
     showSpell(duskStreak(stage.particles, entry.from, chestOf(target)));
     entry.from = chestOf(target);
     reappearLater(source, DUSK_REAPPEAR_SECONDS);
@@ -1676,7 +1899,6 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       plateTrail: createHealthTrail(plate.querySelector<HTMLElement>(".unit-plate-trail")!, hpFraction(unit)),
       plateShield: plate.querySelector<HTMLElement>(".unit-plate-shield")!,
       plateMana: plate.querySelector<HTMLElement>(".unit-plate-mana-fill"),
-      plateCondition: plate.querySelector<HTMLElement>(".unit-plate-condition")!,
       plateStatus: plate.querySelector<HTMLElement>(".unit-plate-status")!,
       plateStacks: plate.querySelector<HTMLElement>(".unit-plate-stacks"),
       plateChain: plate.querySelector<HTMLElement>(".unit-plate-chain")!,
@@ -1712,6 +1934,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     if (record.plateLevel !== null) {
       record.plateLevel.textContent = romanLevel(level);
       record.plateLevel.dataset.level = String(level);
+      record.plateLevel.hidden = level <= 1;
     }
   }
 
@@ -1807,8 +2030,21 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     record.frozen = frozen;
     record.ice.visible = frozen;
-    record.frost.visible = unit.alive && unit.slow !== null && unit.condition === null && !frozen;
-    record.plague.visible = unit.alive && unit.pandemic !== null;
+  }
+
+  function syncDecorations(record: UnitRecord): void {
+    const unit = record.state;
+    const present = unit.alive && !vanished.has(record.unitId);
+    record.plague.visible = present && unit.pandemic !== null;
+    record.bubble.visible = present && unit.shield !== null;
+    record.frost.visible = present && unit.slow !== null && unit.condition === null && !record.frozen;
+    record.conditionRing.visible = present && unit.condition !== null;
+    record.aura.visible = present && record.level >= MAX_HERO_LEVEL;
+    record.formRing.visible = present && unit.form !== null;
+  }
+
+  function plateHidden(record: UnitRecord): boolean {
+    return !record.state.alive || vanished.has(record.unitId);
   }
 
   function syncRecords(next: BattleSnapshot, snapAll: boolean, leaps: ReadonlyMap<string, string>): void {
@@ -1856,6 +2092,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       record.figure.setDead(!unit.alive);
+      record.figure.setForm?.(unit.alive ? (unit.form?.definition.key ?? null) : null);
       record.figure.setLinger(isCorpse(unit) && (raisers || revivers.some((reviver) => isRevivable(reviver, unit))));
       record.figure.setSpectral(isRisen(unit));
       record.figure.setOverclock(overclockLevel(next.units, unit));
@@ -1867,8 +2104,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       record.plateTrail.update(hp, snapAll);
       record.plateShield.style.width = `${shieldFraction * 100}%`;
       record.plateShield.classList.toggle("is-blessed", blessed);
-      record.plate.hidden = !unit.alive;
-      record.bubble.visible = unit.alive && unit.shield !== null;
+      record.plate.hidden = plateHidden(record);
       record.bubble.material.color.set(blessed ? BLESSED_COLOR : SHIELD_COLOR);
       syncFrozen(record, unit, snapAll || created);
       syncPlateExtras(record, unit, next.tick);
@@ -1936,74 +2172,13 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     if (conditionKey !== record.conditionKey) {
       record.conditionKey = conditionKey;
-      record.plateCondition.hidden = condition === null;
-      record.plateCondition.replaceChildren(...(condition === null ? [] : [conditionIcon(condition.condition)]));
 
       if (condition !== null) {
-        record.plateCondition.dataset.condition = condition.condition;
         record.conditionRing.material.color.set(CONDITION_COLORS[condition.condition]);
       }
     }
 
-    if (condition !== null) {
-      const remaining = Math.max(0, Math.min(1, (condition.expiresAtTick - tick) / CONDITION_DURATION_TICKS));
-      record.plateCondition.style.setProperty("--remaining", String(remaining));
-    }
-
-    record.conditionRing.visible = condition !== null;
-
-    const statuses: { kind: string; buff: boolean; stacks: number }[] = [];
-
-    if (unit.alive && unit.control !== null) {
-      statuses.push({ kind: unit.control.control, buff: false, stacks: 0 });
-    }
-
-    if (unit.alive && unit.taunt !== null) {
-      statuses.push({ kind: "taunted", buff: false, stacks: 0 });
-    }
-
-    if (unit.alive && unit.chill !== null) {
-      statuses.push({ kind: "chill", buff: false, stacks: unit.chill.stacks });
-    }
-
-    if (unit.alive) {
-      for (const dot of unit.dots) {
-        statuses.push({ kind: dot.dot, buff: false, stacks: dot.stacks });
-      }
-    }
-
-    if (unit.alive && unit.pandemic !== null) {
-      statuses.push({ kind: "pandemic", buff: false, stacks: 0 });
-    }
-
-    if (unit.alive && unit.graveMark !== null) {
-      statuses.push({ kind: "grave-marked", buff: false, stacks: 0 });
-    }
-
-    if (unit.alive && unit.invulnerableUntilTick !== 0) {
-      statuses.push({ kind: "invulnerable", buff: true, stacks: 0 });
-    }
-
-    if (unit.alive && unit.untargetableUntilTick !== 0) {
-      statuses.push({ kind: "untargetable", buff: true, stacks: 0 });
-    }
-
-    if (unit.alive && unit.link !== null) {
-      statuses.push({ kind: "linked", buff: false, stacks: 0 });
-    }
-
-    if (unit.alive && unit.link !== null && unit.link.puppetUntilTick !== 0) {
-      statuses.push({ kind: "puppeted", buff: false, stacks: 0 });
-    }
-
-    if (unit.alive && unit.channel !== null) {
-      statuses.push({ kind: "channeling", buff: true, stacks: 0 });
-    }
-
-    if (unit.alive && unit.form !== null) {
-      statuses.push({ kind: `form:${unit.form.definition.key}`, buff: true, stacks: 0 });
-    }
-
+    const statuses = plateStatuses(unit).slice(0, PLATE_STATUS_LIMIT);
     const statusKey = statuses.map((status) => `${status.kind}:${status.stacks}`).join("|");
 
     if (statusKey === record.statusKey) {
@@ -2047,7 +2222,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       area.seen = true;
-      area.marker.setOpacity(0.35 + 0.35 * Math.abs(Math.sin(next.tick / 3)));
+      area.marker?.setOpacity(0.35 + 0.35 * Math.abs(Math.sin(next.tick / 3)));
       syncStateVisual(key, next.tick, spellKeys, () =>
         impactVisual(
           stage.particles,
@@ -2065,11 +2240,16 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         continue;
       }
 
-      const key = `zone-${zone.zoneId}`;
+      const key =
+        zone.followsUnitId === null
+          ? `zone-${zone.abilityId}-${Math.round(zone.center.x)}-${Math.round(zone.center.y)}-${zone.radiusUnits}`
+          : `zone-${zone.zoneId}`;
+
       let area = groundMarkers.get(key);
 
       if (area === undefined) {
-        area = { marker: effects.marker(stage.toScene(zone.center, 0), 0.15, zone.radiusUnits, zoneColor(zone.abilityId), 0.28), seen: true };
+        const marker = zoneDrawsBoundary(zone.abilityId) ? null : effects.marker(stage.toScene(zone.center, 0), 0.9, zone.radiusUnits, zoneColor(zone.abilityId), 0.3);
+        area = { marker, seen: true };
         groundMarkers.set(key, area);
       }
 
@@ -2080,7 +2260,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
       if (zone.followsUnitId !== null) {
         const center = stage.toScene(zone.center, 0);
-        area.marker.place(center);
+        area.marker?.place(center);
         stateVisuals.get(key)?.root.position.set(center.x, 0, center.z);
       }
     }
@@ -2114,7 +2294,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     for (const [key, area] of groundMarkers) {
       if (!area.seen) {
-        area.marker.remove();
+        area.marker?.remove();
         groundMarkers.delete(key);
       }
     }
@@ -2238,14 +2418,15 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       record.bubble.position.set(record.position.x, figureHeight(record) * 0.5, record.position.z);
       record.frost.position.set(record.position.x, 0.1, record.position.z);
       record.conditionRing.position.set(record.position.x, 0.14, record.position.z);
-      record.aura.visible = record.state.alive && record.level >= MAX_HERO_LEVEL;
-      record.formRing.visible = record.state.alive && record.state.form !== null;
+      syncDecorations(record);
       record.formRing.material.color.set(record.state.form?.definition.key === "inferno" ? INFERNO_COLOR : FORM_COLOR);
       record.formRing.position.set(record.position.x, 0.16, record.position.z);
       record.formRing.scale.setScalar(1.15 + 0.08 * Math.sin((auraClock / AURA_PULSE_SECONDS) * Math.PI * 4));
       record.aura.position.set(record.position.x, 0.08, record.position.z);
       record.aura.material.opacity = 0.32 + 0.18 * Math.sin((auraClock / AURA_PULSE_SECONDS) * Math.PI * 2);
+
       record.plateTrail.step(deltaSeconds);
+      record.plate.hidden = plateHidden(record);
 
       const platePoint = stage.toScreen(record.position.clone().setY(figureHeight(record) + PLATE_GAP_UNITS + lift));
 
@@ -2255,8 +2436,66 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     }
   }
 
+  function fightersArea(): StageFocus | null {
+    let area: StageFocus | null = null;
+
+    for (const record of records.values()) {
+      if (!record.state.alive) {
+        continue;
+      }
+
+      const { x, z } = record.position;
+
+      area =
+        area === null
+          ? { minX: x, maxX: x, minZ: z, maxZ: z }
+          : { minX: Math.min(area.minX, x), maxX: Math.max(area.maxX, x), minZ: Math.min(area.minZ, z), maxZ: Math.max(area.maxZ, z) };
+    }
+
+    return area;
+  }
+
+  function holdsArea(outer: StageFocus, inner: StageFocus): boolean {
+    return inner.minX >= outer.minX && inner.maxX <= outer.maxX && inner.minZ >= outer.minZ && inner.maxZ <= outer.maxZ;
+  }
+
+  function areaSpread(area: StageFocus): number {
+    return Math.max(area.maxX - area.minX, area.maxZ - area.minZ);
+  }
+
+  function updateFocus(): void {
+    const needed = snapshot !== null && snapshot.result === null && graphicsSettings.get().fightCamera ? fightersArea() : null;
+
+    if (needed === null) {
+      if (focusArea !== null) {
+        focusArea = null;
+        stage.focus(null);
+      }
+
+      return;
+    }
+
+    if (focusArea !== null && holdsArea(focusArea, needed) && areaSpread(needed) >= areaSpread(focusArea) * FOCUS_SHRINK_RATIO) {
+      return;
+    }
+
+    focusArea = {
+      minX: needed.minX - FOCUS_SLACK_UNITS,
+      maxX: needed.maxX + FOCUS_SLACK_UNITS,
+      minZ: needed.minZ - FOCUS_SLACK_UNITS,
+      maxZ: needed.maxZ + FOCUS_SLACK_UNITS,
+    };
+    stage.focus(focusArea);
+  }
+
   const stopFrames = stage.onFrame((deltaSeconds) => {
+    updateFocus();
     stepRecords(deltaSeconds);
+
+    for (const number of liveNumbers) {
+      placeNumber(number);
+    }
+
     effects.step(deltaSeconds);
     stepSpells(deltaSeconds);
     stepThreads(deltaSeconds);
@@ -2330,6 +2569,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
         vanished.clear();
         shadeCasts.clear();
+        quietCasts.clear();
         hexCritters.clear();
         fateThreads.clear();
         emitterAbilities.clear();
@@ -2344,10 +2584,15 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         }
 
         spellVisuals.clear();
+        sanctuaries.clear();
       }
 
       forgetBefore(shotOrigins, next.tick - SHOT_MEMORY_TICKS);
       forgetBefore(burstCenters, next.tick - SHOT_MEMORY_TICKS);
+
+      if (!snapAll) {
+        vanishDashers(latestEvents);
+      }
 
       syncRecords(next, snapAll, leapsIn(latestEvents));
 
@@ -2377,6 +2622,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
 
     dispose() {
       stopFrames();
+      stage.focus(null);
       stage.canvas.removeEventListener("click", handleClick);
       stage.particles.clear();
       effects.dispose();
@@ -2386,6 +2632,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       spellVisuals.clear();
+      sanctuaries.clear();
 
       for (const visual of stateVisuals.values()) {
         visual?.dispose();
@@ -2404,7 +2651,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       burstCenters.clear();
 
       for (const area of groundMarkers.values()) {
-        area.marker.remove();
+        area.marker?.remove();
       }
 
       groundMarkers.clear();
@@ -2423,8 +2670,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         geometry.dispose();
       }
 
-      for (const element of stage.overlay.querySelectorAll(".float-number")) {
-        element.remove();
+      for (const number of liveNumbers.splice(0)) {
+        number.element.remove();
       }
     },
   };

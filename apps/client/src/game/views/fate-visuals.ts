@@ -356,7 +356,7 @@ export function spiteNeedle(particles: ParticleSystem, launch: Vector3): Project
   const body = new Mesh(new OctahedronGeometry(1, 0), inkSurface(INK, 1));
   const halo = new Mesh(new OctahedronGeometry(1, 0), glowSurface(FATE, 0.6));
   const tip = new Mesh(new SphereGeometry(0.5, 10, 8), glowSurface(FATE_PALE, 1));
-  const aura = new Mesh(new SphereGeometry(1.9, 14, 10), glowSurface(YARN, 0.35));
+  const aura = new Mesh(new SphereGeometry(1.3, 14, 10), glowSurface(YARN, 0.25));
   const coreThread = inkSurface(YARN, 1);
   const glowThread = glowSurface(FATE, 0.3);
   const core = createTubeBatch(coreThread, { tubes: 1, rings: SPITE_RINGS, sides: 6 });
@@ -772,7 +772,7 @@ export function fateWeb(particles: ParticleSystem, center: Vector3, radius: numb
         for (const direction of spokeEnds) {
           const spoke = [landing.clone(), landing.clone().addScaledVector(direction, reach * spokeGrow)];
           threadCore.tube(spoke, () => 0.26 * fade);
-          threadGlow.tube(spoke, () => (0.7 + 0.35 * pulse) * fade);
+          threadGlow.tube(spoke, () => (0.42 + 0.2 * pulse) * fade);
         }
       }
 
@@ -782,7 +782,7 @@ export function fateWeb(particles: ParticleSystem, center: Vector3, radius: numb
         if (sweep > 0.01) {
           const ring = webRing(center, reach, fraction, sweep, twist);
           threadCore.tube(ring, () => 0.24 * fade);
-          threadGlow.tube(ring, () => (0.62 + 0.35 * pulse) * fade);
+          threadGlow.tube(ring, () => (0.36 + 0.2 * pulse) * fade);
         }
       }
 
@@ -791,7 +791,7 @@ export function fateWeb(particles: ParticleSystem, center: Vector3, radius: numb
       discSurface.opacity = 0.14 * smooth((age - THROW_SECONDS) / 0.3) * fade;
       const ringAge = clamp01((age - THROW_SECONDS) / 0.4);
       shock.scale.setScalar(area * (0.2 + 0.85 * easeOut(ringAge)));
-      shockSurface.opacity = age < THROW_SECONDS ? 0 : 0.7 * (1 - ringAge);
+      shockSurface.opacity = age < THROW_SECONDS ? 0 : 0.4 * (1 - ringAge);
     },
 
     finished() {

@@ -4612,3 +4612,152 @@ next cast.
     materials, once per fight or per round rather than per cast.
   - Bolts, shards and ground discs still build and dispose their
     geometry on every cast.
+
+## Vesper is code-built and vanishes while she dashes (2026-09-25)
+
+- **Model.** Vesper (`duskblade`) is built in code like Moira, in
+  `apps/client/src/models/vesper/`. Her body and head are signed-distance
+  sculpts meshed with surface nets. The body is skinned to a spine, a
+  tail and four two-bone IK legs. That's about 42k triangles.
+  - A fur shader adds rosettes, stroke bump and a violet rim. She has
+    slit-pupil eyes, whiskers, fangs, curved claws and a team collar.
+  - Her crest is a row of violet flame billboards along the spine, with
+    normal blending. Additive flames stacked into a white spike when seen
+    along her spine.
+  - `vesper-figure.ts` drives a gallop, swipe, pounce, flinch, sit and
+    side-on death. `createHeroFigure` routes `duskblade` to it. Her GLB
+    request is gone from `missing_assets.md`.
+- **Vanish.** Flicker Strike and Thousand Cuts hide her on cast, like
+  Omnislash. The battle view hides her before it snaps her to her dash
+  destination, so the smoke puff marks where she stood.
+  - Each strike shows a translucent shadow Vesper lunging at the target
+    from where she last struck. A violet claw rake lands on the target's
+    chest and a violet streak runs along the hop.
+  - She reappears in a smoke puff 0.3 s after the last strike.
+  - Shade clones lunge in fainter from the target's flank and never
+    vanish.
+  - The ghost is a pooled Vesper drawn with a depth prepass, so it shows
+    as one clean translucent layer.
+  - Her rings and status decorations hide with her.
+  - A reset brings her back.
+  - The figure never sets `root.visible` while alive, because the battle
+    view owns it during the vanish.
+- **Hop targeting.** When the nearest enemy has already been struck, a
+  hop reaches up to twice its range for one that hasn't. After any dash
+  that moves the caster, the caster keeps the last hop's target, so
+  Vesper no longer walks back across the board to her old target.
+  - This also changes Gorrak's Leap Slam: he keeps attacking whoever he
+    leapt on.
+  - GAMEPLAY measured the balance shift, one swap against the field:
+    - Vesper went from 56.8% to 64.6%.
+    - Gorrak went from 64.0% to 67.4%.
+    - Both are above the 45–55% band and need pulling down in Slice 3.
+  - Side bias and loop checks came out clean.
+- **Sculpt lab.** `#sculpt/vesper` shows her on the board, and **Body**
+  toggles a close-up. The action buttons work for her too.
+- **Follow-ups.**
+  - Thousand Cuts already makes her untargetable while it runs, like
+    Omnislash. Flicker Strike doesn't. Whether it should is a question
+    for the user, and it would push her win rate higher.
+  - Flicker's opener still picks the weakest enemy anywhere.
+  - Her first build takes about 0.5 s, mostly meshing, and is then
+    cached. Pre-warm it or move it to a worker if it hitches the draft.
+- Nothing was committed from this session.
+
+## Gems restyled as cut gemstones (2026-09-25)
+
+- **Why.** Every gem was the same pale stone tablet, so at small sizes
+  only the glyph told them apart. A 3-gem test of chunky cut gemstones
+  was shown to the user, who chose to restyle all 29.
+- **Colour by kind.** The 8 trigger gems (Cast on Crit, Kill, Dash and
+  Detonation, Cast when Damaged, Opener, Last Word, Spellblade) are warm
+  amber topaz. Every other gem is emerald. Measured: the amber gems
+  are at most 2.6% near `#ff6b6b` and 0% near `#4ea1ff`. Resonance is
+  4.0% and 1.7%, from its coloured rings. Primers and Resonance keep
+  their coloured glyph light.
+- **32 px check.** Barrage vs Fork, Widen vs Concentrate and Vortex vs
+  Primer Disoriented were put side by side and all read apart.
+- **Template.** The new gem template is in `docs/icons.md`. Each gem
+  kept its old glyph wording, apart from three that were changed:
+  - Cast on Dash: the boot print with speed lines and a starburst
+    blurred at 32 px. It is now one boot with a single speed line.
+  - Split: its first take was three rings, like Chain. It is now a
+    disc cracked in half, pushed apart.
+  - Culling Strike: the scythe over a bar read as a dome. It is now a
+    scythe alone.
+- **Done.** 32 images at medium quality: the 3 test gems, 27 more and
+  2 retakes. 29 masters and WebPs; `icons:check` shows gems 29 of 29.
+  The gem WebPs total 248 KB, and the whole set 1.67 MB.
+- **Gem sockets** still draw their SVG glyphs in the 16 px diamonds,
+  because gems of the same colour can't be told apart at 12 px.
+- The old tablet masters are still in git history.
+- The gem section of `missing_assets.md` is gone.
+- Nothing was committed.
+
+## Vesper's plate hides while she's vanished (2026-09-25)
+
+- **Rule.** A plate shows only while its unit is alive and not vanished
+  (`plateHidden` in `battle-view.ts`). A bar floating over empty ground
+  read as a bug.
+- **Checked every update and every frame,** so it hides on the cast and
+  comes back on the frame she reappears, even when the reappear timer
+  fires between ticks or while paused.
+- **Verified in the lab** (Vesper, Rime and Moira vs Gorrak, Anvil and
+  Morrow). Flicker Strike at tick 90 and Thousand Cuts at 186 hid her
+  plate from the cast. It came back 8 ticks after her last strike, at 116
+  and 236, with no console errors.
+
+## Nettle and Morrow are code-built and fight in battle (2026-09-25)
+
+- **Nettle in battle.** `createHeroFigure` routes `blightmother` to
+  `nettle-figure.ts`. Her thorn throw leaves from the thorn in her hand,
+  her casts from her teacup. Plague Bloom, Pandemic's surge, each
+  infection and Thornshot draw from `blight-visuals.ts`. The old generic
+  plague flower and wave are gone from `spell-visuals.ts`.
+- **Morrow's model** (`oathkeeper`) is built in code in
+  `apps/client/src/models/morrow/`: about 44.8k triangles, cached after
+  a first build of about 0.9 s in Node.
+  - The shell is a parametric dome with Voronoi scutes and growth rings
+    baked into a 1024×512 colour and normal map.
+  - The shrine has a shingled roof, posts, a rope with paper streamers,
+    a gold sun disc, a bronze bell, two paper lanterns and a red
+    lacquered lucky mallet (kozuchi) on the deck.
+  - The head is an SDF sculpt with a beak, nostrils and heavy-lidded
+    amber eyes. The neck is four telescoping rings with irregular throat
+    creases.
+  - `morrow-figure.ts` drives a diagonal tortoise walk, a headbutt, a
+    rear-up cast, a flinch, a cheer and a death that pulls into the
+    shell, drops, rocks and sinks. The bell and lanterns swing on
+    pendulums, and the sun disc spins faster in Avatar.
+  - Casts leave from her beak. After a cast, and on Avatar attacks, the
+    Judgment hammer leaves from the mallet.
+- **Her spells** (`shrine-visuals.ts`), all from the effect pool:
+  - Judgment throws a red-and-gold spirit mallet that swells in flight,
+    trailing gold motes. Enemies it hits get a vermilion seal stamp and
+    a crest imprint on the ground; healed allies get a pink lotus that
+    opens over their head. Oath Hammer rings a gold bell ring.
+  - Hallowed Path is a floating twisted rope circle at the zone's exact
+    radius, with paper streamers, a gold floor and a crest that pulses
+    on each heal tick.
+  - Resurrection tolls three bell rings over her. The raised ally gets a
+    vermilion torii gate, a dawn light pillar and a gold stagger ring at
+    the exact radius.
+  - The invulnerability fallback closes an amber shell dome of hex
+    scutes over each ally. The dome lives exactly as long as the unit's
+    invulnerability and then shatters. Other sources of invulnerability
+    keep the old flash.
+  - Avatar raises a sun disc behind her that always faces the camera,
+    with a sunburst on the ground. Blessed Overflow bursts scute shards.
+- **Battle hooks.** `hitVisual` and `mendVisual` are new registries keyed
+  by ability. `HeroFigure.setForm` is optional and tells a figure its
+  form. The warm-up test covers the hit, mend and sanctuary visuals.
+- **Readability.** Everything was checked on the light beach board.
+  - Additive gold washed to white there, so the key rings, floors and
+    trails use normal-blend gold and solid particles.
+  - The first lotus hid under Nettle's roots, so it now blooms over the
+    ally's head.
+- **Verified.** In `#sandbox` and in two battle-lab fights: Morrow,
+  Nettle and Gorrak vs Cinder, Anvil and Vesper, then Morrow and Anvil
+  vs Gorrak and Cinder. Both Resurrection branches fired, with no
+  console errors. Lint, both typechecks and all 95 client tests pass.
+- Nothing was committed.

@@ -5,8 +5,7 @@ master PNG and one runtime WebP each. Every hero has two: a portrait
 bust and a head crop ("face") for small spots. The master is what you
 replace or regenerate. The WebP is what the game loads, always rebuilt
 from the master with one command, never edited by hand. Every item,
-level pick and hero has art (43, 60 and 10), and 21 of the 29 gems
-do. The palette, art
+gem, level pick and hero has art (43, 29, 60 and 10). The palette, art
 style and readability rules they follow are in `missing_assets.md`'s
 style guide; the prompts are below. `pnpm icons:check` enforces the
 runtime side.
@@ -117,23 +116,27 @@ spreading to the edges of the canvas; any glow kept tight to the object.
 The object fills 80% of the square canvas.
 ```
 
-**Gems** (for now every gem is the pale stone tablet the runes used;
-only the glyph changes, so keep it one bold symbol. Whether to restyle
-the set as cut gems is still the user's call; it would mean one new
-template and all 21 redone):
+**Gems** (every gem is the same cut gemstone and the colour says its
+kind: `<COLOUR>` is "warm amber topaz" for the 8 trigger gems and "rich
+emerald green" for every other gem. Only the glyph changes, so keep it
+one bold symbol, and check it at 32 px beside gems of the same colour):
 
 ```
-Fantasy rune icon, a chunky hexagonal tablet of pale weathered grey
-stone centred on a transparent background, with one big bold glyph
-deeply carved into its face and filled with bright warm gold light.
-Mature stylised cartoon illustration with bold confident brushwork,
-simple graphic shapes and a subtle dark outline, hand-painted colour
-with soft shading, no text, no letters, no real-world runic alphabet.
-The glyph shows: <SHOWS>. It must read instantly when shrunk to 48
-pixels on a dark navy background: the glyph is thick, simple and fills
-most of the tablet face; the stone is light-toned with a strong rim
-light; no fine engraving, cracks or small details. The tablet fills 80%
-of the square canvas.
+Fantasy gem icon, one chunky cut gemstone centred on a transparent
+background: a thick rounded hexagonal gem with a broad flat table facet
+on top and a ring of a few large bevelled facets around it, no mount or
+setting. The gem is <COLOUR>, translucent with a soft inner glow, and
+one big bold glyph is inlaid in glowing white-gold light across its
+flat table facet. Mature stylised cartoon illustration with bold
+confident brushwork, chunky proportions, simple graphic shapes and a
+subtle dark outline, hand-painted colour with soft shading, grounded
+and slightly weathered rather than glossy, no text, no letters, no
+real-world runic alphabet. The glyph shows: <SHOWS>. It must read
+instantly when shrunk to 48 pixels on a dark navy background: the glyph
+is thick, simple and fills most of the table facet; the gem is
+mid-to-light toned with a strong light rim light; only a few large
+facets; no fine sparkle, glints, particles or small details. The gem
+fills 80% of the square canvas.
 ```
 
 **Level picks** (describe the moment, not the pick's text: quoted numbers
@@ -229,8 +232,8 @@ What the Who lines had to spell out:
 
 Colour conventions the existing set follows:
 - **Condition primers.** The three Primer gems glow in their
-  condition's colour instead of gold: Staggered orange, Brittle pale
-  ice, Disoriented violet.
+  condition's colour instead of white-gold: Staggered orange, Brittle
+  pale ice, Disoriented violet.
 - **Schools.** Prism of Three and Resonance use the HUD's school colours
   (`#ff7d66` Might, `#7fb4ff` Arcana, `#7fe0a6` Cunning).
 - **Heroes.** Level picks lean on their hero's colour (`--color-role-*` in
@@ -289,9 +292,9 @@ Rules the check enforces, from `scripts/icons/contract.ts`:
    or level pick without art yet still draws something.
 6. **Gem sockets keep their glyphs.** `pieceSocketArt` (used by the
    ITEMS panel) draws item art in the round item sockets but the SVG
-   glyph in the 16 px gem diamonds. Every gem shares the same pale
-   stone tablet, so at 12 px painted gems can't be told apart, while
-   the glyphs can. That's why the gem glyph cases in `icons.ts` stay.
+   glyph in the 16 px gem diamonds. Gems share one cut gemstone in two
+   colours, so at 12 px painted gems of the same kind can't be told
+   apart, while the glyphs can. That's why the gem glyph cases in `icons.ts` stay.
    Gem art shows in the reward disc and the gem tooltips.
 7. **Sizes.** `.icon-art` is 62 px in the reward disc (50 px on short
    screens), 24 px in item sockets and 32 px in tooltip headers

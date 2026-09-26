@@ -7,7 +7,8 @@ import { createMatchScene, type MatchScene } from "./game/scenes/match-scene.js"
 import type { EnvironmentLabScene } from "./game/scenes/environment-lab-scene.js";
 import type { ModelLabScene } from "./game/scenes/model-lab-scene.js";
 import type { SculptLabScene } from "./game/scenes/sculpt-lab-scene.js";
-import { ENVIRONMENT_HASH, MODEL_LAB_HASH, SCULPT_HASH } from "./game/scenes/lab-routes.js";
+import type { SandboxScene } from "./game/scenes/sandbox-scene.js";
+import { ENVIRONMENT_HASH, MODEL_LAB_HASH, SANDBOX_HASH, SCULPT_HASH } from "./game/scenes/lab-routes.js";
 import { audio } from "./audio/engine.js";
 import { models } from "./models/library.js";
 import { mountSettingsWindow } from "./hud/settings/settings-window.js";
@@ -53,6 +54,8 @@ let activeModelLab: ModelLabScene | null = null;
 
 let activeSculptLab: SculptLabScene | null = null;
 
+let activeSandbox: SandboxScene | null = null;
+
 let modeRequest = 0;
 
 const JOIN_PREFIX = "#join/";
@@ -65,12 +68,37 @@ async function applyMode(): Promise<void> {
   const isEnvironment = location.hash === ENVIRONMENT_HASH || location.hash.startsWith(`${ENVIRONMENT_HASH}/`);
   const isModels = location.hash === MODEL_LAB_HASH || location.hash.startsWith(`${MODEL_LAB_HASH}/`);
   const isSculpt = location.hash === SCULPT_HASH || location.hash.startsWith(`${SCULPT_HASH}/`);
+  const isSandbox = location.hash === SANDBOX_HASH;
 
-  canvasRoot.hidden = isMatch || isEnvironment || isModels || isSculpt;
-  hudRoot.hidden = isMatch || isEnvironment || isModels || isSculpt;
+  canvasRoot.hidden = isMatch || isEnvironment || isModels || isSculpt || isSandbox;
+  hudRoot.hidden = isMatch || isEnvironment || isModels || isSculpt || isSandbox;
   matchRoot.hidden = !isMatch;
   envRoot.hidden = !isEnvironment;
   modelsRoot.hidden = !isModels;
+
+  if (isSandbox) {
+    battleLab?.hide();
+    activeMatchScene?.dispose();
+    activeMatchScene = null;
+    activeEnvironmentLab?.dispose();
+    activeEnvironmentLab = null;
+    activeModelLab?.dispose();
+    activeModelLab = null;
+    activeSculptLab?.dispose();
+    activeSculptLab = null;
+    const { createSandboxScene } = await import("./game/scenes/sandbox-scene.js");
+
+    if (request !== modeRequest) {
+      return;
+    }
+
+    activeSandbox ??= createSandboxScene();
+
+    return;
+  }
+
+  activeSandbox?.dispose();
+  activeSandbox = null;
 
   if (isSculpt) {
     battleLab?.hide();

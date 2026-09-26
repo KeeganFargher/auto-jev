@@ -4,17 +4,21 @@ import { firebolt, gameCatalogue } from "@jev-game/content";
 import { BLESSED_BURST, PLAGUE_BURST } from "@jev-game/game";
 import { Line, Mesh, NormalBlending, Scene, Vector3, type BufferGeometry, type Material, type Object3D } from "three";
 import { createBattleEffects } from "../src/game/views/battle-effects.js";
+import { infectionVisual } from "../src/game/views/blight-visuals.js";
 import { createCycloneEffect } from "../src/game/views/cyclone-effect.js";
 import { clawRake, duskStreak } from "../src/game/views/dusk-visuals.js";
 import { releaseEffectMaterial, warmEffectMaterials } from "../src/game/views/effect-materials.js";
 import { deathKnell } from "../src/game/views/fate-visuals.js";
+import { sanctuaryVisual } from "../src/game/views/shrine-visuals.js";
 import { createParticleSystem, type ParticleSystem } from "../src/game/views/particles.js";
 import {
   castVisual,
   emitterVisual,
   formVisual,
+  hitVisual,
   impactVisual,
   landingVisual,
+  mendVisual,
   passiveVisual,
   projectileVisual,
   risenVisual,
@@ -98,6 +102,8 @@ function everyEffect(particles: ParticleSystem): BuiltEffect[] {
     once("form", formVisual(particles, key, center, 12));
     once("spawn", spawnVisual(particles, key, center, 8));
     once("passive", passiveVisual(particles, key, center, 12));
+    once("hit", hitVisual(particles, key, center, origin));
+    once("mend", mendVisual(particles, key, center, origin));
     const projectile = projectileVisual(particles, key, origin);
 
     if (projectile !== null) {
@@ -109,6 +115,8 @@ function everyEffect(particles: ParticleSystem): BuiltEffect[] {
   once("knell", deathKnell(particles, center, 12));
   once("claw", clawRake(particles, center, 1));
   once("streak", duskStreak(particles, origin, center));
+  once("infection", infectionVisual(particles, center, origin));
+  lasting("sanctuary", sanctuaryVisual(particles, center, 8));
 
   return built;
 }
@@ -317,7 +325,7 @@ test("every spell visual hands its materials back to the pool and disposes none"
 
   assert.deepEqual(
     [...new Set(visuals.map((visual) => visual.kind))].sort(),
-    ["cast", "claw", "emitter", "form", "impact", "knell", "landing", "passive", "projectile", "risen", "spawn", "streak", "zone"],
+    ["cast", "claw", "emitter", "form", "hit", "impact", "infection", "knell", "landing", "mend", "passive", "projectile", "risen", "sanctuary", "spawn", "streak", "zone"],
   );
 
   for (const visual of visuals) {

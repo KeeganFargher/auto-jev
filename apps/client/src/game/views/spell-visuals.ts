@@ -19,6 +19,7 @@ import {
   lichBolt,
   livingBomb,
   mechRocket,
+  oathHammer,
   mechSuit,
   meteor,
   pandemic,
@@ -27,6 +28,7 @@ import {
   sharedFate,
   shieldToss,
   spiteBolt,
+  thornshot,
   turret,
   turretBlast,
   whirlwind,
@@ -44,8 +46,6 @@ import {
   IcosahedronGeometry,
   Mesh,
   OctahedronGeometry,
-  PlaneGeometry,
-  Quaternion,
   RingGeometry,
   SphereGeometry,
   TorusGeometry,
@@ -55,9 +55,21 @@ import {
   type MeshBasicMaterial,
   type MeshStandardMaterial,
 } from "three";
+import { pandemicSurgeVisual, plagueBloomVisual, SURGE_SECONDS, thornVisual } from "./blight-visuals.js";
 import { effectMaterials, releaseEffectMaterial, type MaterialPool } from "./effect-materials.js";
 import { evilEye, fatePulse, fateWeb, hexHop, knellToll, omenEcho, SPITE_WINDUP_SECONDS, spiteNeedle, weaverSurge } from "./fate-visuals.js";
 import { createTrail, type ParticleStyle, type ParticleSystem } from "./particles.js";
+import {
+  bellStrike,
+  bellToll,
+  dawnAscendant,
+  graceBurst,
+  hallowedBoundary,
+  lotusBloom,
+  sealStamp,
+  spiritMallet,
+  toriiRising,
+} from "./shrine-visuals.js";
 
 export interface SpellVisual {
   readonly root: Group;
@@ -139,14 +151,6 @@ interface Spike {
   delay: number;
 }
 
-interface Petal {
-  mesh: Mesh;
-  open: number;
-  closed: number;
-  size: number;
-  phase: number;
-}
-
 type ImpactFactory = (
   particles: ParticleSystem,
   center: Vector3,
@@ -162,6 +166,8 @@ type CastFactory = (particles: ParticleSystem, center: Vector3, radius: number, 
 type ZoneFactory = (particles: ParticleSystem, center: Vector3, radius: number, seed: number, periodTicks: number) => TickedVisual;
 
 type ProjectileFactory = (particles: ParticleSystem, from: Vector3) => ProjectileVisual;
+
+type TouchFactory = (particles: ParticleSystem, center: Vector3, chest: Vector3) => SpellVisual;
 
 type EmitterFactory = (particles: ParticleSystem, motion: EmitterMotion, seed: number) => TickedVisual;
 
@@ -188,6 +194,14 @@ const FALL_FROM = new Vector3(-30, 62, 4);
 const MAX_LEAD_TICKS = 3;
 
 const BLAST_SECONDS = 1.1;
+
+const DOME_HEIGHT = 0.35;
+
+const BLAST_FLAME_HEIGHT = 0.26;
+
+const BLAST_GLOW = 0.35;
+
+const BLAST_FLASH = 0.5;
 
 const WARD_SECONDS = 0.8;
 
@@ -249,12 +263,6 @@ const TOXIC_DEEP = new Color("#3f6212");
 
 const BLIGHT = new Color("#9b5cf6");
 
-const PETAL = "#6b2d7b";
-
-const PETAL_INNER = "#9a4aa8";
-
-const PETAL_SHADE = "#35103f";
-
 const SLUDGE = "#2f4a12";
 
 const ORB_HEIGHT = 5.5;
@@ -285,57 +293,13 @@ const PRISON_SECONDS = 1.15;
 
 const PRISON_RISE_SECONDS = 0.16;
 
-const BLOOM_OPEN_SECONDS = 0.35;
-
-const BLOOM_WILT_SECONDS = 0.5;
-
-const BLOOM_PETALS = 6;
-
-const BLOOM_SPORES_PER_SECOND = 9;
-
 const BURST_SECONDS = 0.85;
 
 const BURST_MIN_RADIUS = 7;
 
 const BURST_HEIGHT = 4.5;
 
-const PANDEMIC_SECONDS = 1.3;
-
-const PANDEMIC_RAYS = 40;
-
 const GLOB_SECONDS = 0.34;
-
-const HOLY = new Color("#ffe39a");
-
-const HOLY_WHITE = new Color("#fffaf0");
-
-const HOLY_DEEP = new Color("#f0a93a");
-
-const HAMMER_STONE = "#b8ab94";
-
-const HAMMER_SPINS = 2.5;
-
-const HAMMER_ARC = 2.4;
-
-const HAMMER_TRAIL_SPACING = 0.8;
-
-const NOVA_SECONDS = 0.65;
-
-const NOVA_MIN_RADIUS = 6;
-
-const PILLAR_SECONDS = 1.25;
-
-const PILLAR_HEIGHT = 32;
-
-const PILLAR_MIN_RADIUS = 8;
-
-const HALLOW_RAYS = 8;
-
-const HALLOW_FADE_IN_SECONDS = 0.2;
-
-const HALLOW_FADE_OUT_SECONDS = 0.4;
-
-const HALLOW_MOTES_PER_PULSE = 6;
 
 const FATE = new Color("#e45cff");
 
@@ -418,7 +382,7 @@ export interface LeapArc {
 
 const LEAPS = new Map<string, LeapArc>([[leapSlam.id, { seconds: 0.36, height: 9 }]]);
 
-const BLAST_EMBERS = 56;
+const BLAST_EMBERS = 24;
 
 const BLAST_SMOKE = 16;
 
@@ -428,13 +392,15 @@ const FIREBALL_EMBER_SPACING = 0.9;
 
 const FIREBALL_SMOKE_SPACING = 2.6;
 
+const FIREBOLT_SIZE = 0.6;
+
 const METEOR_EMBER_SPACING = 1.4;
 
 const METEOR_SMOKE_SPACING = 3.2;
 
-const GROUND_EMBERS_PER_SECOND = 4;
+const GROUND_EMBERS_PER_SECOND = 2;
 
-const GROUND_EMBERS_PER_UNIT = 0.6;
+const GROUND_EMBERS_PER_UNIT = 0.3;
 
 const GROUND_SMOKE_PER_SECOND = 1.2;
 
@@ -558,57 +524,6 @@ const FROST_TRAIL: ParticleStyle = {
   drag: 2,
   stretch: 0,
   softness: 0.5,
-};
-
-const HOLY_TRAIL: ParticleStyle = {
-  blend: "glow",
-  from: HOLY,
-  to: HOLY_DEEP,
-  brightness: 1,
-  opacity: 0.85,
-  size: [2.2, 0.4],
-  life: [0.18, 0.32],
-  speed: [0.4, 1.6],
-  cone: 0.8,
-  spread: 0.25,
-  gravity: 0,
-  drag: 2,
-  stretch: 0,
-  softness: 0.5,
-};
-
-const HOLY_MOTES: ParticleStyle = {
-  blend: "glow",
-  from: HOLY_WHITE,
-  to: HOLY,
-  brightness: 1,
-  opacity: 0.9,
-  size: [1.1, 0.3],
-  life: [0.6, 1.1],
-  speed: [4, 10],
-  cone: 0.35,
-  spread: 1.4,
-  gravity: -6,
-  drag: 1.5,
-  stretch: 0,
-  softness: 0.6,
-};
-
-const HOLY_SPARKS: ParticleStyle = {
-  blend: "glow",
-  from: HOLY_WHITE,
-  to: HOLY_DEEP,
-  brightness: 1,
-  opacity: 1,
-  size: [1.6, 0.4],
-  life: [0.25, 0.45],
-  speed: [20, 40],
-  cone: Math.PI,
-  spread: 0.5,
-  gravity: 6,
-  drag: 4,
-  stretch: 0.03,
-  softness: 0.3,
 };
 
 const FATE_SPARKS: ParticleStyle = {
@@ -908,10 +823,6 @@ export function iceChunkGeometry(): BufferGeometry {
   return geometry;
 }
 
-function petalGeometry(): BufferGeometry {
-  return new SphereGeometry(1, 12, 6).scale(0.5, 0.14, 1).translate(0, 0, 1);
-}
-
 function trailGeometry(): BufferGeometry {
   const geometry = new ConeGeometry(1, 1, 12, 4, true);
   const position = geometry.getAttribute("position");
@@ -1026,7 +937,7 @@ function geometries(): SpellGeometry {
     rock: rockGeometry(),
     shell: new IcosahedronGeometry(1.28, 1),
     trail: trailGeometry(),
-    dome: new SphereGeometry(1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+    dome: new SphereGeometry(1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, DOME_HEIGHT, 1),
     ring: new RingGeometry(0.82, 1, 48),
     flame: flameGeometry(),
     disc: new CircleGeometry(1, 40),
@@ -1233,9 +1144,9 @@ function meteorFall(
 function meteorBlast(particles: ParticleSystem, center: Vector3, radius: number): SpellVisual {
   const kit = geometries();
   const next = random(center.x * 7 + center.z * 13);
-  const domeSurface = glowMaterial(FIRE, 0.9);
-  const flashSurface = glowMaterial(CORE, 1);
-  const ringSurface = glowMaterial(EMBER, 0.9);
+  const domeSurface = veilMaterial(FIRE, BLAST_GLOW);
+  const flashSurface = veilMaterial(GOLD, BLAST_FLASH);
+  const ringSurface = veilMaterial(EMBER, 0.9);
   const tongueSurface = flameMaterial(1);
   const debrisSurface = rockMaterial(0.4);
   const root = new Group();
@@ -1249,7 +1160,7 @@ function meteorBlast(particles: ParticleSystem, center: Vector3, radius: number)
   ring.position.y = 0.25;
   root.add(dome, flash, ring);
   const origin = new Vector3(center.x, 1, center.z);
-  particles.emit({ ...EMBERS, speed: [radius * 0.9, radius * 2.2], cone: 1.1 }, origin, UP, BLAST_EMBERS);
+  particles.emit({ ...EMBERS, speed: [radius * 0.5, radius * 1.1], cone: 1.4, gravity: 6 }, origin, UP, BLAST_EMBERS);
   particles.emit({ ...SMOKE, spread: radius * 0.35, speed: [radius * 0.2, radius * 0.5] }, origin, UP, BLAST_SMOKE);
 
   for (let index = 0; index < BLAST_TONGUES; index += 1) {
@@ -1283,12 +1194,12 @@ function meteorBlast(particles: ParticleSystem, center: Vector3, radius: number)
       age += deltaSeconds;
       const progress = clamp01(age / BLAST_SECONDS);
       dome.scale.setScalar(radius * (0.25 + 0.75 * easeOut(progress)));
-      domeSurface.opacity = 0.9 * (1 - progress) ** 1.4;
+      domeSurface.opacity = BLAST_GLOW * (1 - progress) ** 1.4;
       flash.scale.setScalar(radius * 0.35 * (1 + progress));
-      flashSurface.opacity = clamp01(1 - progress / 0.3);
+      flashSurface.opacity = BLAST_FLASH * clamp01(1 - progress / 0.3);
       ring.scale.setScalar(radius * (0.35 + 1.05 * progress));
       ringSurface.opacity = 0.9 * (1 - progress);
-      const height = radius * 0.42 * Math.sin(Math.PI * clamp01(progress * 1.5));
+      const height = radius * BLAST_FLAME_HEIGHT * Math.sin(Math.PI * clamp01(progress * 1.5));
       tongueSurface.opacity = 1 - clamp01((progress - 0.6) / 0.4);
 
       for (const tongue of tongues) {
@@ -1335,7 +1246,7 @@ function burningGround(particles: ParticleSystem, center: Vector3, radius: numbe
   for (let index = 0; index < count; index += 1) {
     const angle = next() * Math.PI * 2;
     const distance = Math.sqrt(next()) * radius * 0.78;
-    const height = radius * (0.3 + 0.18 * next());
+    const height = radius * (0.16 + 0.1 * next());
     const mesh = new Mesh(kit.flame, fireSurface);
     mesh.position.set(Math.cos(angle) * distance, 0.1, Math.sin(angle) * distance);
     mesh.rotation.y = next() * Math.PI * 2;
@@ -1476,32 +1387,36 @@ function infernoBurst(particles: ParticleSystem, center: Vector3, radius: number
   };
 }
 
-function fireballProjectile(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
-  const kit = geometries();
-  const core = new Mesh(kit.core, coreMaterial(GOLD));
-  const shell = new Mesh(kit.corona, glowMaterial(FIRE, 0.8));
-  const tail = new Mesh(kit.trail, flameMaterial(0.9));
-  const heading = new Vector3();
-  const embers = createTrail(particles, TRAIL_EMBERS, FIREBALL_EMBER_SPACING, launch);
-  const smoke = createTrail(particles, TRAIL_SMOKE, FIREBALL_SMOKE_SPACING, launch);
+function fireballProjectile(size: number): ProjectileFactory {
+  return (particles, launch) => {
+    const kit = geometries();
+    const core = new Mesh(kit.core, coreMaterial(GOLD));
+    const shell = new Mesh(kit.corona, glowMaterial(FIRE, 0.8));
+    const tail = new Mesh(kit.trail, flameMaterial(0.9));
+    const heading = new Vector3();
+    const embers = createTrail(particles, TRAIL_EMBERS, FIREBALL_EMBER_SPACING / size, launch);
+    const smoke = createTrail(particles, TRAIL_SMOKE, FIREBALL_SMOKE_SPACING / size, launch);
+    core.scale.setScalar(size);
+    shell.scale.setScalar(size);
 
-  return {
-    objects: [core, shell, tail],
+    return {
+      objects: [core, shell, tail],
 
-    place(from, to, progress) {
-      core.position.lerpVectors(from, to, progress);
-      shell.position.copy(core.position);
-      heading.subVectors(from, to).normalize();
-      tail.quaternion.setFromUnitVectors(UP, heading);
-      tail.scale.set(1.3, 6, 1.3);
-      tail.position.copy(core.position).addScaledVector(heading, 3);
-      embers.follow(core.position);
-      smoke.follow(core.position);
-    },
+      place(from, to, progress) {
+        core.position.lerpVectors(from, to, progress);
+        shell.position.copy(core.position);
+        heading.subVectors(from, to).normalize();
+        tail.quaternion.setFromUnitVectors(UP, heading);
+        tail.scale.set(1.3 * size, 6 * size, 1.3 * size);
+        tail.position.copy(core.position).addScaledVector(heading, 3 * size);
+        embers.follow(core.position);
+        smoke.follow(core.position);
+      },
 
-    dispose() {
-      retireProjectile([core, shell, tail], []);
-    },
+      dispose() {
+        retireProjectile([core, shell, tail], []);
+      },
+    };
   };
 }
 
@@ -1936,123 +1851,6 @@ function glacialEruption(particles: ParticleSystem, center: Vector3, radius: num
   };
 }
 
-function plagueFlower(particles: ParticleSystem, center: Vector3, radius: number, seed: number, periodTicks: number): TickedVisual {
-  const next = random(seed * 251 + 97);
-  const size = radius * 0.17;
-  const leaf = petalGeometry();
-  const bulbGeometry = new IcosahedronGeometry(1, 1);
-  const stainGeometry = jaggedDisc(radius * 0.8, next);
-  const petalSurface = solidMaterial(effectMaterials.rock, { color: PETAL, emissive: PETAL_SHADE, emissiveIntensity: 0.6, roughness: 0.85 });
-  const innerSurface = solidMaterial(effectMaterials.rock, { color: PETAL_INNER, emissive: PETAL_SHADE, emissiveIntensity: 0.6, roughness: 0.8 });
-  const bulbSurface = glowMaterial(TOXIC, 0);
-  const coreSurface = coreMaterial(TOXIC_PALE);
-  const stainSurface = scorchMaterial(SLUDGE, 0);
-  const root = new Group();
-  const bloom = new Group();
-  const bulb = new Mesh(bulbGeometry, bulbSurface);
-  const core = new Mesh(bulbGeometry, coreSurface);
-  const stain = new Mesh(stainGeometry, stainSurface);
-  const petals: Petal[] = [];
-  root.position.set(center.x, 0, center.z);
-  stain.rotation.x = -Math.PI / 2;
-  stain.position.y = 0.15;
-  bloom.position.y = 0.4;
-  bloom.rotation.y = next() * Math.PI * 2;
-  bulb.position.y = size * 0.45;
-  core.position.y = size * 0.45;
-  bloom.add(bulb, core);
-  root.add(stain, bloom);
-
-  function addPetals(count: number, surface: Material, scale: number, open: number, closed: number, offset: number): void {
-    for (let index = 0; index < count; index += 1) {
-      const pivot = new Group();
-      const mesh = new Mesh(leaf, surface);
-      pivot.rotation.y = ((index + offset) / count) * Math.PI * 2 + (next() - 0.5) * 0.2;
-      pivot.add(mesh);
-      bloom.add(pivot);
-      petals.push({ mesh, open: open + (next() - 0.5) * 0.12, closed, size: size * scale * (0.9 + next() * 0.2), phase: next() * Math.PI * 2 });
-    }
-  }
-
-  addPetals(BLOOM_PETALS, petalSurface, 1, 0.28, 1.35, 0);
-  addPetals(BLOOM_PETALS - 1, innerSurface, 0.62, 0.62, 1.45, 0.5);
-  const heart = new Vector3(center.x, 0.4 + size * 0.45, center.z);
-  const puffStyle: ParticleStyle = { ...SPORES, speed: [radius * 1.2, radius * 1.8], cone: 0.25, drag: 2.2, gravity: -1, life: [0.5, 0.8] };
-  const ray = new Vector3();
-  const period = Math.max(1, periodTicks);
-  let lastPulse: number | null = null;
-  let flare = 0;
-  let strength = 0;
-  let ending = false;
-  let time = 0;
-  let sporeDebt = 0;
-
-  function puff(): void {
-    flare = 1;
-    particles.emit(MIASMA, heart, UP, 5);
-
-    for (let index = 0; index < 12; index += 1) {
-      const angle = (index / 12) * Math.PI * 2 + Math.random() * 0.4;
-      particles.emit(puffStyle, heart, ray.set(Math.cos(angle), 0.15, Math.sin(angle)).normalize(), 1);
-    }
-  }
-
-  return {
-    root,
-
-    sync(tick) {
-      if (ending || (lastPulse !== null && tick - lastPulse < period)) {
-        return;
-      }
-
-      lastPulse = lastPulse === null ? tick : lastPulse + period * Math.floor((tick - lastPulse) / period);
-      puff();
-    },
-
-    update(deltaSeconds) {
-      time += deltaSeconds;
-      strength = ending
-        ? Math.max(0, strength - deltaSeconds / BLOOM_WILT_SECONDS)
-        : Math.min(1, strength + deltaSeconds / BLOOM_OPEN_SECONDS);
-      flare = Math.max(0, flare - deltaSeconds * 3);
-      const openness = easeOut(strength);
-
-      for (const petal of petals) {
-        const sway = 0.04 * Math.sin(time * 2.2 + petal.phase);
-        const tilt = ending ? petal.open - (1 - strength) * 0.6 : petal.closed + (petal.open - petal.closed) * openness;
-        petal.mesh.rotation.x = -(tilt + sway);
-        petal.mesh.scale.setScalar(Math.max(0.001, petal.size * (ending ? strength : 0.35 + 0.65 * openness)));
-      }
-
-      bulb.scale.setScalar(Math.max(0.001, size * (0.3 + 0.05 * Math.sin(time * 5) + 0.14 * flare) * strength));
-      core.scale.setScalar(Math.max(0.001, size * 0.16 * strength));
-      bulbSurface.opacity = (0.5 + 0.4 * flare) * strength;
-      stainSurface.opacity = 0.42 * strength;
-      sporeDebt += deltaSeconds * strength * BLOOM_SPORES_PER_SECOND;
-
-      while (sporeDebt >= 1) {
-        sporeDebt -= 1;
-        particles.emit(SPORES, heart, UP, 1);
-      }
-    },
-
-    end() {
-      ending = true;
-    },
-
-    finished() {
-      return ending && strength <= 0;
-    },
-
-    dispose() {
-      leaf.dispose();
-      bulbGeometry.dispose();
-      stainGeometry.dispose();
-      retire(root, [petalSurface, innerSurface, bulbSurface, coreSurface, stainSurface]);
-    },
-  };
-}
-
 function plagueBurst(particles: ParticleSystem, center: Vector3, radius: number): SpellVisual {
   const reach = Math.max(BURST_MIN_RADIUS, radius);
   const next = random(center.x * 29 + center.z * 7 + 3);
@@ -2117,62 +1915,6 @@ function plagueBurst(particles: ParticleSystem, center: Vector3, radius: number)
   };
 }
 
-function pandemicWave(particles: ParticleSystem, center: Vector3, radius: number): SpellVisual {
-  const reach = Math.max(20, radius);
-  const frontGeometry = new RingGeometry(0.955, 1, 128);
-  const hazeGeometry = new RingGeometry(0.78, 0.955, 128);
-  const frontSurface = glowMaterial(TOXIC, 0.9);
-  const hazeSurface = glowMaterial(BLIGHT, 0.4);
-  const flashSurface = glowMaterial(TOXIC_PALE, 0.8);
-  const root = new Group();
-  const front = new Mesh(frontGeometry, frontSurface);
-  const haze = new Mesh(hazeGeometry, hazeSurface);
-  const flash = new Mesh(geometries().dome, flashSurface);
-  root.position.set(center.x, 0, center.z);
-  front.rotation.x = -Math.PI / 2;
-  front.position.y = 0.3;
-  haze.rotation.x = -Math.PI / 2;
-  haze.position.y = 0.28;
-  root.add(haze, front, flash);
-  const origin = new Vector3(center.x, 1.5, center.z);
-  const ray = new Vector3();
-  const rays: ParticleStyle = { ...SPORES, size: [1.6, 0.6], speed: [48, 70], cone: 0.12, drag: 1.1, gravity: -1, life: [0.7, 1.1] };
-
-  for (let index = 0; index < PANDEMIC_RAYS; index += 1) {
-    const angle = (index / PANDEMIC_RAYS) * Math.PI * 2;
-    particles.emit(rays, origin, ray.set(Math.cos(angle), 0.08, Math.sin(angle)).normalize(), 1);
-  }
-
-  particles.emit({ ...MIASMA, speed: [4, 10], cone: 0.5, spread: 2, gravity: -5, life: [1, 1.6] }, origin, UP, 14);
-  particles.emit({ ...SPORES, speed: [6, 16], cone: 0.35, spread: 1.5, gravity: -3 }, origin, UP, 22);
-  let age = 0;
-
-  return {
-    root,
-
-    update(deltaSeconds) {
-      age += deltaSeconds;
-      const progress = clamp01(age / PANDEMIC_SECONDS);
-      front.scale.setScalar(Math.max(0.01, reach * easeOut(progress)));
-      frontSurface.opacity = 0.9 * (1 - progress) ** 1.3;
-      haze.scale.setScalar(Math.max(0.01, reach * easeOut(clamp01(progress - 0.05))));
-      hazeSurface.opacity = 0.4 * (1 - progress);
-      flash.scale.setScalar(6 * (1 + progress));
-      flashSurface.opacity = clamp01(0.8 - progress * 2.2);
-    },
-
-    finished() {
-      return age >= PANDEMIC_SECONDS;
-    },
-
-    dispose() {
-      frontGeometry.dispose();
-      hazeGeometry.dispose();
-      retire(root, [frontSurface, hazeSurface, flashSurface]);
-    },
-  };
-}
-
 function plagueGlob(particles: ParticleSystem, launch: Vector3): ProjectileVisual {
   const blob = new Mesh(new IcosahedronGeometry(1.1, 1), glowMaterial(TOXIC, 0.9));
   const core = new Mesh(new IcosahedronGeometry(0.55, 0), coreMaterial(TOXIC_DEEP));
@@ -2192,229 +1934,6 @@ function plagueGlob(particles: ParticleSystem, launch: Vector3): ProjectileVisua
 
     dispose() {
       retireProjectile([blob, core], [blob.geometry, core.geometry]);
-    },
-  };
-}
-
-function hammerMissile(size: number): ProjectileFactory {
-  return (particles, launch) => {
-    const stone = solidMaterial(effectMaterials.rock, { color: HAMMER_STONE, emissive: HOLY_DEEP, emissiveIntensity: 0.3, roughness: 0.75 });
-    const gold = solidMaterial(effectMaterials.solid, { color: OATH_GOLD, emissive: OATH_GOLD, emissiveIntensity: 0.55, metalness: 0.4, roughness: 0.4 });
-    const head = new Mesh(new BoxGeometry(1.9 * size, 1.15 * size, 1.15 * size), stone);
-    const band = new Mesh(new BoxGeometry(0.45 * size, 1.3 * size, 1.3 * size), gold);
-    const handle = new Mesh(new CylinderGeometry(0.2 * size, 0.24 * size, 2.8 * size, 6), solidMaterial(effectMaterials.solid, { color: WOOD, roughness: 0.9 }));
-    const halo = new Mesh(new SphereGeometry(1.2 * size, 10, 8), glowMaterial(HOLY_DEEP, 0.3));
-    const trail = createTrail(particles, HOLY_TRAIL, HAMMER_TRAIL_SPACING, launch);
-    const headOffset = new Vector3(0, 0.45 * size, 0);
-    const handleOffset = new Vector3(0, -0.95 * size, 0);
-    const center = new Vector3();
-    const heading = new Vector3();
-    const yaw = new Quaternion();
-    const spin = new Quaternion();
-    const turn = new Quaternion();
-    const spot = new Vector3();
-    const zAxis = new Vector3(0, 0, 1);
-
-    function mount(mesh: Mesh, offset: Vector3): void {
-      mesh.position.copy(spot.copy(offset).applyQuaternion(turn)).add(center);
-      mesh.quaternion.copy(turn);
-    }
-
-    return {
-      objects: [handle, head, band, halo],
-
-      place(from, to, progress) {
-        center.lerpVectors(from, to, progress);
-        center.y += Math.sin(Math.PI * progress) * HAMMER_ARC;
-        heading.subVectors(to, from).setY(0);
-        yaw.setFromAxisAngle(UP, heading.lengthSq() > 0 ? Math.atan2(-heading.z, heading.x) : 0);
-        spin.setFromAxisAngle(zAxis, -progress * Math.PI * 2 * HAMMER_SPINS);
-        turn.copy(yaw).multiply(spin);
-        mount(head, headOffset);
-        mount(band, headOffset);
-        mount(handle, handleOffset);
-        halo.position.copy(head.position);
-        trail.follow(head.position);
-      },
-
-      dispose() {
-        retireProjectile([handle, head, band, halo], [handle.geometry, head.geometry, band.geometry, halo.geometry]);
-      },
-    };
-  };
-}
-
-function holyNova(particles: ParticleSystem, center: Vector3, radius: number): SpellVisual {
-  const reach = Math.max(NOVA_MIN_RADIUS, radius);
-  const kit = geometries();
-  const ringSurface = glowMaterial(HOLY, 0.95);
-  const hazeSurface = glowMaterial(HOLY_DEEP, 0.45);
-  const flashSurface = glowMaterial(HOLY_WHITE, 0.9);
-  const root = new Group();
-  const ring = new Mesh(kit.ring, ringSurface);
-  const haze = new Mesh(kit.disc, hazeSurface);
-  const flash = new Mesh(kit.dome, flashSurface);
-  root.position.set(center.x, 0, center.z);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.3;
-  haze.rotation.x = -Math.PI / 2;
-  haze.position.y = 0.26;
-  root.add(haze, ring, flash);
-  const origin = new Vector3(center.x, 3, center.z);
-  particles.emit({ ...HOLY_SPARKS, speed: [reach * 1.8, reach * 3] }, origin, UP, 24);
-  particles.emit(HOLY_MOTES, origin, UP, 10);
-  let age = 0;
-
-  return {
-    root,
-
-    update(deltaSeconds) {
-      age += deltaSeconds;
-      const progress = clamp01(age / NOVA_SECONDS);
-      const spread = easeOut(progress);
-      ring.scale.setScalar(reach * (0.2 + 0.85 * spread));
-      ringSurface.opacity = 0.95 * (1 - progress);
-      haze.scale.setScalar(reach * (0.15 + 0.8 * spread));
-      hazeSurface.opacity = 0.45 * (1 - progress) ** 1.5;
-      flash.scale.setScalar(3 + reach * 0.3 * spread);
-      flashSurface.opacity = clamp01(0.9 - progress * 2.4);
-    },
-
-    finished() {
-      return age >= NOVA_SECONDS;
-    },
-
-    dispose() {
-      retire(root, [ringSurface, hazeSurface, flashSurface]);
-    },
-  };
-}
-
-function holyPillar(particles: ParticleSystem, center: Vector3, radius: number): SpellVisual {
-  const reach = Math.max(PILLAR_MIN_RADIUS, radius);
-  const beamGeometry = new CylinderGeometry(1, 1, 1, 24, 1, true);
-  const beamSurface = glowMaterial(HOLY_DEEP, 0.35);
-  const coreSurface = glowMaterial(HOLY, 0.5);
-  const ringSurface = glowMaterial(HOLY, 0.55);
-  const root = new Group();
-  const beam = new Mesh(beamGeometry, beamSurface);
-  const core = new Mesh(beamGeometry, coreSurface);
-  const ring = new Mesh(geometries().ring, ringSurface);
-  root.position.set(center.x, 0, center.z);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.3;
-  root.add(ring, beam, core);
-  const foot = new Vector3(center.x, 1, center.z);
-  particles.emit({ ...HOLY_MOTES, from: HOLY, speed: [8, 18], spread: 1.6, life: [0.8, 1.3] }, foot, UP, 16);
-  particles.emit({ ...HOLY_SPARKS, from: HOLY, cone: 0.45, speed: [30, 55], gravity: -4 }, foot, UP, 8);
-  let age = 0;
-
-  return {
-    root,
-
-    update(deltaSeconds) {
-      age += deltaSeconds;
-      const progress = clamp01(age / PILLAR_SECONDS);
-      const rise = easeOut(clamp01(progress * 4));
-      const fade = 1 - clamp01((progress - 0.35) / 0.65);
-      const height = Math.max(0.01, PILLAR_HEIGHT * rise);
-      const girth = 2 * (1 - 0.45 * progress);
-      beam.scale.set(girth, height, girth);
-      beam.position.y = height / 2;
-      core.scale.set(Math.max(0.01, 0.6 * fade), height, Math.max(0.01, 0.6 * fade));
-      core.position.y = height / 2;
-      beamSurface.opacity = 0.35 * fade;
-      coreSurface.opacity = 0.5 * fade;
-      ring.scale.setScalar(reach * (0.3 + 0.7 * easeOut(clamp01(progress * 1.6))));
-      ringSurface.opacity = 0.55 * (1 - clamp01(progress * 1.4));
-    },
-
-    finished() {
-      return age >= PILLAR_SECONDS;
-    },
-
-    dispose() {
-      beamGeometry.dispose();
-      retire(root, [beamSurface, coreSurface, ringSurface]);
-    },
-  };
-}
-
-function hallowedGround(particles: ParticleSystem, center: Vector3, radius: number, seed: number, periodTicks: number): TickedVisual {
-  const rayGeometry = new PlaneGeometry(0.5, 1);
-  const kit = geometries();
-  const glowSurface = glowMaterial(HOLY, 0);
-  const ringSurface = glowMaterial(HOLY_DEEP, 0);
-  const raySurface = glowMaterial(HOLY_WHITE, 0);
-  const root = new Group();
-  const glow = new Mesh(kit.disc, glowSurface);
-  const ring = new Mesh(kit.ring, ringSurface);
-  const sun = new Group();
-  root.position.set(center.x, 0, center.z);
-  glow.rotation.x = -Math.PI / 2;
-  glow.position.y = 0.2;
-  glow.scale.setScalar(radius * 0.55);
-  ring.rotation.x = -Math.PI / 2;
-  ring.position.y = 0.22;
-  ring.scale.setScalar(radius * 0.8);
-  sun.position.y = 0.24;
-  sun.rotation.y = random(seed * 197 + 13)() * Math.PI * 2;
-
-  for (let index = 0; index < HALLOW_RAYS; index += 1) {
-    const ray = new Mesh(rayGeometry, raySurface);
-    const angle = (index / HALLOW_RAYS) * Math.PI * 2;
-    ray.rotation.set(-Math.PI / 2, 0, angle);
-    ray.position.set(Math.sin(angle) * radius * 0.42, 0, Math.cos(angle) * radius * 0.42);
-    ray.scale.set(radius * 0.18, radius * 0.34, 1);
-    sun.add(ray);
-  }
-
-  root.add(glow, ring, sun);
-  const heart = new Vector3(center.x, 0.6, center.z);
-  const period = Math.max(1, periodTicks);
-  let lastPulse: number | null = null;
-  let flare = 0;
-  let strength = 0;
-  let ending = false;
-  let time = 0;
-
-  return {
-    root,
-
-    sync(tick) {
-      if (ending || (lastPulse !== null && tick - lastPulse < period)) {
-        return;
-      }
-
-      lastPulse = lastPulse === null ? tick : lastPulse + period * Math.floor((tick - lastPulse) / period);
-      flare = 1;
-      particles.emit({ ...HOLY_MOTES, spread: radius * 0.35 }, heart, UP, HALLOW_MOTES_PER_PULSE);
-    },
-
-    update(deltaSeconds) {
-      time += deltaSeconds;
-      strength = ending
-        ? Math.max(0, strength - deltaSeconds / HALLOW_FADE_OUT_SECONDS)
-        : Math.min(1, strength + deltaSeconds / HALLOW_FADE_IN_SECONDS);
-      flare = Math.max(0, flare - deltaSeconds * 2.5);
-      glowSurface.opacity = (0.22 + 0.2 * flare) * strength;
-      ringSurface.opacity = (0.5 + 0.3 * flare) * strength;
-      raySurface.opacity = (0.35 + 0.35 * flare) * strength;
-      sun.rotation.y += deltaSeconds * 0.4;
-      sun.scale.setScalar(0.9 + 0.1 * Math.sin(time * 3) + 0.12 * flare);
-    },
-
-    end() {
-      ending = true;
-    },
-
-    finished() {
-      return ending && strength <= 0;
-    },
-
-    dispose() {
-      rayGeometry.dispose();
-      retire(root, [glowSurface, ringSurface, raySurface]);
     },
   };
 }
@@ -2868,8 +2387,8 @@ const LANDINGS = new Map<string, AreaFactory>([
   [leapSlam.id, shockwave(GHOST)],
   [lastStand.id, shockwave(OATH_GOLD)],
   [PLAGUE_BURST, plagueBurst],
-  [BLESSED_BURST, holyNova],
-  [resurrection.id, holyPillar],
+  [BLESSED_BURST, graceBurst],
+  [resurrection.id, toriiRising],
   [hex.id, evilEye],
   [corpseExplosion.id, boneBlast],
   [voidheartBlast.id, curseNova],
@@ -2882,37 +2401,40 @@ const ZONES = new Map<string, ZoneFactory>([
   [meteor.id, burningGround],
   [emberTrail.id, burningGround],
   [whirlwind.id, (_particles, center, radius, seed) => bladeVortex(center, radius, seed)],
-  [plagueBloom.id, plagueFlower],
-  [hallowedPath.id, hallowedGround],
+  [plagueBloom.id, plagueBloomVisual],
+  [hallowedPath.id, hallowedBoundary],
 ]);
 
 const CASTS = new Map<string, CastFactory>([
   [glacialPrison.id, glacialEruption],
-  [pandemic.id, pandemicWave],
-  [resurrection.id, holyNova],
+  [pandemic.id, pandemicSurgeVisual],
+  [resurrection.id, bellToll],
   [sharedFate.id, fateWeb],
   [armyOfTheDead.id, graveNova],
 ]);
 
 const FORMS = new Map<string, AreaFactory>([
   ["inferno", infernoBurst],
-  ["avatar", holyPillar],
+  ["avatar", dawnAscendant],
   ["lich", graveRise],
   ["mech", mechAssemble],
 ]);
 
+const BOUNDED_ZONES = new Set([plagueBloom.id, hallowedPath.id]);
+
 const SPAWNS = new Map<string, AreaFactory>([[turret.id, turretDrop]]);
 
 const PROJECTILES = new Map<string, ProjectileFactory>([
-  [firebolt.id, fireballProjectile],
-  [fireball.id, fireballProjectile],
-  [infernoBolt.id, fireballProjectile],
+  [firebolt.id, fireballProjectile(FIREBOLT_SIZE)],
+  [fireball.id, fireballProjectile(1)],
+  [infernoBolt.id, fireballProjectile(1)],
   [shieldToss.id, shieldDisc],
   [frostBolt.id, iceMissile(2.6, 0.6)],
   [frozenOrb.id, iceMissile(1.5, 0.35)],
+  [thornshot.id, thornVisual],
   [PLAGUE_BURST, plagueGlob],
-  [judgment.id, hammerMissile(1.8)],
-  [avatarJudgment.id, hammerMissile(2.6)],
+  [judgment.id, spiritMallet(1)],
+  [avatarJudgment.id, spiritMallet(1.35)],
   [spiteBolt.id, spiteNeedle],
   [hex.id, hexHop],
   ["ill-omen", omenEcho],
@@ -2927,6 +2449,17 @@ const PROJECTILES = new Map<string, ProjectileFactory>([
 const PASSIVES = new Map<string, AreaFactory>([
   [WEAVER_PASSIVE, weaverSurge],
   [HARVEST_PASSIVE, graveNova],
+]);
+
+const HITS = new Map<string, TouchFactory>([
+  [oathHammer.id, bellStrike],
+  [judgment.id, sealStamp],
+  [avatarJudgment.id, sealStamp],
+]);
+
+const MENDS = new Map<string, TouchFactory>([
+  [judgment.id, lotusBloom],
+  [avatarJudgment.id, lotusBloom],
 ]);
 
 const EMITTERS = new Map<string, EmitterFactory>([
@@ -2960,6 +2493,10 @@ export function zoneVisual(
   return ZONES.get(abilityId)?.(particles, center, radius, seed, periodTicks) ?? null;
 }
 
+export function zoneDrawsBoundary(abilityId: string): boolean {
+  return BOUNDED_ZONES.has(abilityId);
+}
+
 export function emitterVisual(particles: ParticleSystem, abilityId: string, motion: EmitterMotion, seed: number): TickedVisual | null {
   return EMITTERS.get(abilityId)?.(particles, motion, seed) ?? null;
 }
@@ -2967,7 +2504,7 @@ export function emitterVisual(particles: ParticleSystem, abilityId: string, moti
 export function waveArrivalSeconds(distance: number, radius: number): number {
   const reach = Math.max(20, radius);
 
-  return (1 - Math.cbrt(1 - clamp01(distance / reach))) * PANDEMIC_SECONDS;
+  return (1 - Math.cbrt(1 - clamp01(distance / reach))) * SURGE_SECONDS;
 }
 
 export function emitterShotOrigin(abilityId: string, from: Vector3, target: Vector3): Vector3 {
@@ -3000,6 +2537,14 @@ export function spawnVisual(particles: ParticleSystem, heroId: string, center: V
 
 export function passiveVisual(particles: ParticleSystem, passive: string, center: Vector3, radius: number): SpellVisual | null {
   return PASSIVES.get(passive)?.(particles, center, radius) ?? null;
+}
+
+export function hitVisual(particles: ParticleSystem, abilityId: string, center: Vector3, chest: Vector3): SpellVisual | null {
+  return HITS.get(abilityId)?.(particles, center, chest) ?? null;
+}
+
+export function mendVisual(particles: ParticleSystem, abilityId: string, center: Vector3, chest: Vector3): SpellVisual | null {
+  return MENDS.get(abilityId)?.(particles, center, chest) ?? null;
 }
 
 export function projectileVisual(particles: ParticleSystem, abilityId: string, from: Vector3): ProjectileVisual | null {

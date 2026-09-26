@@ -26,7 +26,7 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { ownCellCenter, type BoardCell } from "@jev-game/game";
-import { boardArena, hexbinder } from "@jev-game/content";
+import { boardArena, duskblade, hexbinder } from "@jev-game/content";
 import { createBoardStage, type ViewportInsets } from "../views/board-stage.js";
 import { createHeroFigure, placeholderTraits, type HeroFigure } from "../views/hero-figures.js";
 import { createModelFigure } from "../views/model-figure.js";
@@ -44,7 +44,7 @@ export interface SculptLabScene {
   dispose(): void;
 }
 
-type ViewName = "studio" | "board" | "spells";
+type ViewName = "studio" | "board" | "vesper" | "spells";
 
 type LabAction = "attack" | "cast" | "hit" | "die" | "cheer";
 
@@ -71,6 +71,16 @@ const BOARD_NEIGHBOURS: readonly (readonly ["ravager" | "bulwark", number])[] = 
 ];
 
 const MOIRA_CELL: BoardCell = { column: 3, row: 1 };
+
+const CLOSE_PITCH = 0.3;
+
+const CLOSE_LOOK_HEIGHT = 3.5;
+
+const CLOSE_HALF_WIDTH = 7;
+
+const CLOSE_HALF_DEPTH = 5;
+
+const CLOSE_HEIGHT = 8;
 
 const MAX_FRAME_SECONDS = 0.1;
 
@@ -337,11 +347,11 @@ function createStudioView(host: HTMLElement): View {
   };
 }
 
-function createBoardView(host: HTMLElement): View {
+function createBoardView(host: HTMLElement, heroId: string, caption: string): View {
   const stage = createBoardStage(host);
   stage.showBoard(boardArena, "south", INSETS);
   const environment = mountEnvironment(stage, savedBoardTheme(), boardArena);
-  const moira = createHeroFigure(hexbinder.id);
+  const moira = createHeroFigure(heroId);
   moira.setTeamColor(BOARD_TEAM);
   moira.root.position.copy(stage.toScene(ownCellCenter(boardArena, "south", MOIRA_CELL), 0));
   stage.scene.add(moira.root);
@@ -349,6 +359,7 @@ function createBoardView(host: HTMLElement): View {
   let disposed = false;
   let dead = false;
   let cheering = false;
+  let close = false;
 
   for (const [id, column] of BOARD_NEIGHBOURS) {
     models
@@ -376,11 +387,11 @@ function createBoardView(host: HTMLElement): View {
   });
 
   if (import.meta.env.DEV) {
-    Object.assign(window, { jevSculpt: { scene: stage.scene, moira } });
+    Object.assign(window, { jevSculpt: { scene: stage.scene, hero: moira, stage } });
   }
 
   return {
-    caption: "Moira on the board · beside Gorrak and Anvil",
+    caption,
 
     blink() {
       moira.trigger("hit");
@@ -403,7 +414,22 @@ function createBoardView(host: HTMLElement): View {
     },
 
     focusEye() {},
-    frameBody() {},
+
+    frameBody() {
+      close = !close;
+      stage.frame(
+        close
+          ? {
+              pitch: CLOSE_PITCH,
+              target: moira.root.position.clone().setY(CLOSE_LOOK_HEIGHT),
+              halfWidth: CLOSE_HALF_WIDTH,
+              halfDepth: CLOSE_HALF_DEPTH,
+              height: CLOSE_HEIGHT,
+            }
+          : null,
+      );
+    },
+
     setTurning() {},
 
     dispose() {
@@ -442,7 +468,7 @@ function createSpellsView(bench: SpellBench): View {
 }
 
 function viewName(requested: string | null): ViewName {
-  return requested === "board" || requested === "spells" ? requested : "studio";
+  return requested === "board" || requested === "vesper" || requested === "spells" ? requested : "studio";
 }
 
 export function createSculptLabScene(initialView: string | null): SculptLabScene {
@@ -456,6 +482,7 @@ export function createSculptLabScene(initialView: string | null): SculptLabScene
 
   const studioToggle = button("pill-button env-toggle", () => show("studio"), "Studio");
   const boardToggle = button("pill-button env-toggle", () => show("board"), "Board");
+  const vesperToggle = button("pill-button env-toggle", () => show("vesper"), "Vesper");
   const spellsToggle = button("pill-button env-toggle", () => show("spells"), "Spells");
   let bench: SpellBench | null = null;
 
@@ -480,6 +507,7 @@ export function createSculptLabScene(initialView: string | null): SculptLabScene
     "env-tools",
     studioToggle,
     boardToggle,
+    vesperToggle,
     spellsToggle,
     eyeToggle,
     bodyToggle,
@@ -500,16 +528,17 @@ export function createSculptLabScene(initialView: string | null): SculptLabScene
   function render(): void {
     studioToggle.classList.toggle("is-active", current === "studio");
     boardToggle.classList.toggle("is-active", current === "board");
+    vesperToggle.classList.toggle("is-active", current === "vesper");
     spellsToggle.classList.toggle("is-active", current === "spells");
     turnToggle.classList.toggle("is-active", turning);
     teamToggle.classList.toggle("is-active", team !== 0);
     eyeToggle.hidden = current !== "studio";
-    bodyToggle.hidden = current !== "studio";
+    bodyToggle.hidden = current === "spells";
     turnToggle.hidden = current !== "studio";
     blinkToggle.hidden = current !== "studio";
 
     for (const toggle of actionToggles) {
-      toggle.hidden = current !== "board";
+      toggle.hidden = current !== "board" && current !== "vesper";
     }
 
     for (const toggle of spellToggles) {
@@ -533,7 +562,9 @@ export function createSculptLabScene(initialView: string | null): SculptLabScene
           ? createSpellsView(bench)
           : name === "studio"
             ? createStudioView(canvasHost)
-            : createBoardView(canvasHost);
+            : name === "vesper"
+              ? createBoardView(canvasHost, duskblade.id, "Vesper on the board · beside Gorrak and Anvil")
+              : createBoardView(canvasHost, hexbinder.id, "Moira on the board · beside Gorrak and Anvil");
       view.setTurning(turning);
       view.setTeamColor(TEAM_CYCLE[team] ?? null);
       history.replaceState(null, "", name === "studio" ? SCULPT_HASH : `${SCULPT_HASH}/${name}`);

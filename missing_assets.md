@@ -414,10 +414,7 @@ them.
 
 | File | Model |
 | --- | --- |
-| `apps/client/public/assets/models/heroes/oathkeeper.glb` | Morrow, the Oathkeeper |
-| `apps/client/public/assets/models/heroes/duskblade.glb` | Vesper, the Duskblade |
 | `apps/client/public/assets/models/heroes/frostweaver.glb` | Rime, the Frostweaver |
-| `apps/client/public/assets/models/heroes/blightmother.glb` | Nettle, the Blightmother |
 | `apps/client/public/assets/models/heroes/bonecaller.glb` | Sexton, the Bonecaller |
 | `apps/client/public/assets/models/heroes/clockwright.glb` | Brassjack, the Clockwright |
 | `apps/client/public/assets/models/heroes/thrall.glb` | Thrall (Sexton's summon) |
@@ -443,7 +440,7 @@ them.
   is a drift, a beetle's `death` rolls it onto its back).
 - **Floating and wide bodies:** today `pnpm models:build` wants the
   lowest point on the ground and a 0.5 m reach at 1.8 m tall. Moira
-  floats and Rime, Morrow and Sexton are wide, so each needs a written
+  floats and Rime and Sexton are wide, so each needs a written
   allowance in `scripts/models/contract.ts` (Gorrak's footprint
   allowance is the pattern) before its model can pass.
 - **Read from above:** the board camera looks down at about 55°, from
@@ -496,10 +493,7 @@ neutral pose, full body, clean topology, game-ready, no base, no background.
 
 **Looks:**
 
-- `oathkeeper` (Morrow, the Oathkeeper): an ancient, gentle tortoise carrying her village's little wooden shrine on her shell, a gold sun-disc and a bell on the shrine, moss on the shell rim, warm gold (#f2d27a) accents; four stubby legs, a wide low silhouette.
-- `duskblade` (Vesper, the Duskblade): a lean shadow panther, fur so dark it reads as a silhouette, violet (#b58cff) eyes and a ridge of violet shadow-flame along the spine, claws like curved daggers; four legs, pounce-ready.
 - `frostweaver` (Rime, the Frostweaver): a small, calm ice dragon with pale frosted scales, crystal spines along her back, folded translucent wings and old, patient eyes, ice-blue (#9fe8ff) accents; four legs and wings, long tail.
-- `blightmother` (Nettle, the Blightmother): a walking tree on splayed root legs, bark face with two glowing eyes, a leafy crown studded with sickly flowers, branch arms, sickly green (#8fd14f) accents.
 - `bonecaller` (Sexton, the Bonecaller): a giant black burying beetle (a real "sexton beetle") with the two orange-red wing bands as the team pieces, clubbed antennae glowing pale teal (#9fe0d0), a grave-lantern hanging from his mandible and a spade strapped across his back; six legs.
 - `clockwright` (Brassjack, the Clockwright): a walking clock tower on three brass legs, a big cream clock face for a face, a bell on top, a wrench and a hammer for hands, brass and copper (#e0a458) fittings.
 - `thrall` (Thrall (Sexton's summon)): a small rattling skeleton warrior in rusted scraps of armour with a notched sword and a small round shield.
@@ -816,26 +810,6 @@ at 13px.
 
 **Avoid:** outlines-only styles, gradients, text labels, circular
 button backgrounds (the meter supplies the pill).
-
-## 25. Hero redesign, slice 2: gem icons
-
-**Used in:** the reward disc, the ITEMS panel, tooltips and the hero
-cards. Until these exist each draws its SVG glyph, so nothing is broken.
-Every icon follows `docs/icons.md`. The art session has the prompts;
-they wait on the tablet-or-cut-gem decision in `docs/icons.md`.
-
-**Gem icons** (`art/icons/gems/<id>.png`):
-
-| Id | Glyph |
-| --- | --- |
-| `gem-barrage` | three arrows fanning out |
-| `gem-pierce` | one arrow through three rings |
-| `gem-concentrate` | a big circle squeezed into a small bright one |
-| `gem-vortex` | a tight spiral with inward arrows |
-| `gem-cast-on-dash` | a boot print with a spark burst |
-| `gem-spellblade` | a sword with a small rune at its tip and four notches |
-| `gem-ruthless` | a heavy fist with three stars |
-| `gem-culling-strike` | a scythe over a nearly empty bar |
 
 ## 30. Brassjack's Mech Suit and turrets in 3D
 

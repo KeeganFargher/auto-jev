@@ -16,7 +16,7 @@ import {
   type ColorRepresentation,
 } from "three";
 import { MAX_HERO_LEVEL } from "@jev-game/game";
-import { bulwark, duskblade, frostweaver, hexbinder, pyromancer } from "@jev-game/content";
+import { blightmother, bulwark, duskblade, frostweaver, hexbinder, oathkeeper, pyromancer } from "@jev-game/content";
 import { isModelId, type ModelId } from "../../models/catalogue.js";
 import { models, type LoadedModel } from "../../models/library.js";
 import {
@@ -37,6 +37,9 @@ import {
 import { mergeStaticMeshes } from "./merge-static.js";
 import { createModelFigure } from "./model-figure.js";
 import { createMoiraFigure } from "./moira-figure.js";
+import { createMorrowFigure } from "./morrow-figure.js";
+import { createNettleFigure } from "./nettle-figure.js";
+import { createVesperFigure } from "./vesper-figure.js";
 
 export type FigureAction = "attack" | "cast" | "hit";
 
@@ -55,6 +58,7 @@ export interface HeroFigure {
   setChanneling(channeling: boolean): void;
   setCelebrating(celebrating: boolean): void;
   setCastsShadow(castsShadow: boolean): void;
+  setForm?(key: string | null): void;
   castOrigin(out: Vector3): Vector3;
   update(deltaSeconds: number): void;
   dispose(): void;
@@ -714,7 +718,7 @@ function figureBuilder(heroId: string): (builder: PartBuilder) => FigureParts {
     case pyromancer.id:
       return buildPyromancer;
 
-    case "oathkeeper":
+    case oathkeeper.id:
       return buildOathkeeper;
 
     case "ravager":
@@ -723,7 +727,7 @@ function figureBuilder(heroId: string): (builder: PartBuilder) => FigureParts {
     case hexbinder.id:
       return buildHexbinder;
 
-    case "blightmother":
+    case blightmother.id:
       return buildBlightmother;
 
     case "bonecaller":
@@ -789,6 +793,18 @@ export function levelFigureScale(level: number): number {
 export function createHeroFigure(heroId: string): HeroFigure {
   if (heroId === hexbinder.id) {
     return createMoiraFigure(placeholderTraits(heroId));
+  }
+
+  if (heroId === duskblade.id) {
+    return createVesperFigure(placeholderTraits(heroId));
+  }
+
+  if (heroId === blightmother.id) {
+    return createNettleFigure(placeholderTraits(heroId));
+  }
+
+  if (heroId === oathkeeper.id) {
+    return createMorrowFigure(placeholderTraits(heroId));
   }
 
   const model = models.get(heroId);

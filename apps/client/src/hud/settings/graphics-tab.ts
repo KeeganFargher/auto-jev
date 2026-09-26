@@ -7,7 +7,7 @@ import {
   type ShadowQuality,
 } from "../../graphics/settings.js";
 import { button, el } from "../dom.js";
-import { displayIcon, gaugeIcon, glowIcon, shadowIcon } from "../icons.js";
+import { cameraIcon, displayIcon, gaugeIcon, glowIcon, shadowIcon } from "../icons.js";
 import type { SettingsTab } from "./settings-window.js";
 
 interface Choice<T> {
@@ -78,20 +78,22 @@ export function createGraphicsTab(store: GraphicsSettingsStore): SettingsTab {
 
   const glow = choiceRow(glowIcon(), "Glow", SWITCH_CHOICES, (value) => store.setGlow(value));
   const monitor = choiceRow(gaugeIcon(), "Frame stats", SWITCH_CHOICES, (value) => store.setMonitor(value));
+  const fightCamera = choiceRow(cameraIcon(), "Fight camera", SWITCH_CHOICES, (value) => store.setFightCamera(value));
 
   const note = el(
     "p",
     "settings-note",
-    "On a slower computer, try Balanced or Fast resolution, simple shadows and glow off. Frame stats shows the frame rate and draw calls in the corner.",
+    "On a slower computer, try Balanced or Fast resolution, simple shadows and glow off. Frame stats shows the frame rate and draw calls in the corner. Fight camera moves in closer once the heroes meet.",
   );
 
-  const content = el("div", "settings-graphics", resolution.root, shadows.root, glow.root, monitor.root, note);
+  const content = el("div", "settings-graphics", resolution.root, shadows.root, glow.root, fightCamera.root, monitor.root, note);
 
   function render(settings: GraphicsSettings): void {
     resolution.render(settings.resolution);
     shadows.render(settings.shadows);
     glow.render(settings.glow);
     monitor.render(settings.monitor);
+    fightCamera.render(settings.fightCamera);
   }
 
   render(store.get());
