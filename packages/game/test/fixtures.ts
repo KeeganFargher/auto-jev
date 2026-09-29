@@ -228,6 +228,73 @@ const hooker = hero(
   null,
 );
 
+export const PULL_DAMAGE = 10;
+
+export const FROST_DAMAGE = 10;
+
+export const FREEZE_TICKS = 90;
+
+export const PULL_TICKS = 8;
+
+const puller = hero(
+  "puller",
+  {
+    kind: "collection-day",
+    name: "Test pull",
+    description: "Gathers three enemies.",
+    wants: ["grouped"],
+    groupSize: 3,
+    rangeUnits: 60,
+    castTicks: 5,
+    radiusUnits: 20,
+    pileRadiusUnits: 3,
+    pullTicks: PULL_TICKS,
+    damage: PULL_DAMAGE,
+  },
+  null,
+);
+
+const froster = hero(
+  "froster",
+  {
+    kind: "blizzard",
+    name: "Test blizzard",
+    description: "Freezes a pile.",
+    wants: ["grouped", "downed"],
+    groupSize: 3,
+    rangeUnits: 60,
+    castTicks: 5,
+    radiusUnits: 10,
+    freezeTicks: FREEZE_TICKS,
+    damage: FROST_DAMAGE,
+  },
+  null,
+);
+
+const shatterer = hero(
+  "shatterer",
+  {
+    kind: "hammerfall",
+    name: "Test shatterer",
+    description: "Waits for frozen targets.",
+    wants: ["frozen"],
+    groupSize: 3,
+    reachUnits: 10,
+    radiusUnits: 16,
+    damage: HAMMER_DAMAGE,
+    impactTick: HAMMER_IMPACT_TICKS,
+    durationTicks: 40,
+    launch: {
+      centerRiseUnits: 15,
+      edgeRiseUnits: 9,
+      centerDistanceUnits: 12,
+      edgeDistanceUnits: 12,
+      bowlingDamage: 0,
+    },
+  },
+  null,
+);
+
 const medic = hero("medic", null, {
   kind: "safety-bubble",
   name: "Test safety bubble",
@@ -240,7 +307,20 @@ const medic = hero("medic", null, {
   radiusUnits: 5,
 });
 
-const heroes = [post, brawler, hammer, smasher, bubbler, fuser, thrower, hooker, medic];
+const heroes = [
+  post,
+  brawler,
+  hammer,
+  smasher,
+  bubbler,
+  fuser,
+  thrower,
+  hooker,
+  puller,
+  froster,
+  shatterer,
+  medic,
+];
 
 export const CATALOGUE: Catalogue = {
   heroes: Object.fromEntries(heroes.map((definition) => [definition.id, definition])),

@@ -3,6 +3,8 @@ import { CAST_SLOW } from "../beats.js";
 import { emit, type StepContext } from "../events.js";
 import { READY_WAIT_TICKS } from "../rules.js";
 import type { UnitState } from "../state.js";
+import { advanceBlizzard, planBlizzard, startBlizzard } from "./blizzard.js";
+import { advanceCollectionDay, planCollectionDay, startCollectionDay } from "./collection-day.js";
 import { advanceBigBubble, planBigBubble, startBigBubble } from "./big-bubble.js";
 import { advanceHammerfall, planHammerfall, startHammerfall } from "./hammerfall.js";
 import type { CastPlan } from "./plan.js";
@@ -27,6 +29,10 @@ function planSignature(
       return planBigBubble(ctx, unit, signature, wantedOnly);
     case "yank":
       return planYank(ctx, unit, signature, wantedOnly);
+    case "collection-day":
+      return planCollectionDay(ctx, unit, signature, wantedOnly);
+    case "blizzard":
+      return planBlizzard(ctx, unit, signature, wantedOnly);
   }
 }
 
@@ -55,6 +61,14 @@ function startSignature(
       return;
     case "yank":
       startYank(ctx, unit, signature, plan);
+
+      return;
+    case "collection-day":
+      startCollectionDay(ctx, unit, signature, plan);
+
+      return;
+    case "blizzard":
+      startBlizzard(ctx, unit, signature, plan);
   }
 }
 
@@ -67,6 +81,8 @@ function releaseDelayTicks(signature: SignatureDefinition): number {
     case "short-fuse":
     case "big-bubble":
     case "yank":
+    case "collection-day":
+    case "blizzard":
       return signature.castTicks;
   }
 }
@@ -143,6 +159,14 @@ export function advanceSignatureAction(ctx: StepContext, unit: UnitState): void 
       return;
     case "yank":
       advanceYank(ctx, unit, action);
+
+      return;
+    case "collection-day":
+      advanceCollectionDay(ctx, unit, action);
+
+      return;
+    case "blizzard":
+      advanceBlizzard(ctx, unit, action);
 
       return;
     case "idle":

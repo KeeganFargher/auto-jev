@@ -41,6 +41,8 @@
   --color-role-firebrand: #ff8a3d;
   --color-role-bubble-cleric: #7fd8ff;
   --color-role-harpooner: #3fc1a5;
+  --color-role-mags: #b56cf0;
+  --color-role-burr: #8ed6f5;
   --color-role-training-dummy: #c8a46a;
 
   --color-status-primed: #ff6a3d;
@@ -48,6 +50,7 @@
   --color-status-floating: #9fe8ff;
   --color-status-airborne: #c9d6ff;
   --color-status-downed: #b3add8;
+  --color-status-frozen: #a8e6ff;
   --color-status-stunned: #ffd86b;
   --color-status-rampage: #ff4d57;
   --color-status-safety-bubble: #7ef0c8;
@@ -124,6 +127,14 @@
     --role: var(--color-role-harpooner);
   }
 
+  [data-role="mags"] {
+    --role: var(--color-role-mags);
+  }
+
+  [data-role="burr"] {
+    --role: var(--color-role-burr);
+  }
+
   [data-role="training-dummy"] {
     --role: var(--color-role-training-dummy);
   }
@@ -147,8 +158,14 @@
     --status-color: var(--color-status-airborne);
   }
 
-  [data-status="downed"] {
+  [data-status="downed"],
+  [data-want="downed"] {
     --status-color: var(--color-status-downed);
+  }
+
+  [data-status="frozen"],
+  [data-want="frozen"] {
+    --status-color: var(--color-status-frozen);
   }
 
   [data-status="stunned"] {

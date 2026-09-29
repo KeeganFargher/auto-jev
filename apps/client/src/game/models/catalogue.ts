@@ -1,8 +1,10 @@
 import {
   berserker,
   bubbleCleric,
+  burr,
   firebrand,
   harpooner,
+  mags,
   paladin,
   trainingDummy,
 } from "@jev-game/content";
@@ -316,6 +318,35 @@ export const HERO_MODELS: ReadonlyMap<HeroDefinitionId, HeroModel> = new Map([
       gestures: {
         attack: { clip: "Throw", from: 0.3, strike: 0.7 },
         signature: { clip: "Fishing_Cast", from: 0.4, strike: 1.1 },
+      },
+    },
+  ],
+  [
+    mags.id,
+    {
+      body: "mage",
+      props: [{ prop: "staff", hand: "right", scale: 1 }],
+      tint: [
+        { hues: ROBE_HUES, hue: 285, saturation: 1.1, lightness: 0.05 },
+        { hues: CAPE_HUES, hue: 120, saturation: 1.1, lightness: 0.08 },
+      ],
+      idle: { clip: "Idle_A", speed: 1 },
+      gestures: {
+        attack: { clip: "Throw", from: 0.3, strike: 0.7 },
+        signature: { clip: "Ranged_Magic_Raise", from: 0, strike: 0.6 },
+      },
+    },
+  ],
+  [
+    burr.id,
+    {
+      body: "knight",
+      props: [{ prop: "staff", hand: "right", scale: 1 }],
+      tint: [],
+      idle: { clip: "Idle_A", speed: 1 },
+      gestures: {
+        attack: { clip: "Melee_2H_Attack_Slice", from: 0.1, strike: 0.5 },
+        signature: { clip: "Ranged_Magic_Summon", from: 2.3, strike: 3.1 },
       },
     },
   ],

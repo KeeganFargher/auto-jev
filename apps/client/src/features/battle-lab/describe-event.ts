@@ -49,6 +49,18 @@ export function describeEvent(event: BattleEvent): string {
     case "land":
       return `${event.unitId} landed${event.hard ? " hard" : ""} after ${event.cause}`;
 
+    case "pull":
+      return `${event.makerUnitId} pulled ${event.unitId} into the pile`;
+
+    case "freeze":
+      return `${event.makerUnitId} froze ${event.unitId}`;
+
+    case "thaw":
+      return `${event.unitId} thawed`;
+
+    case "shatter":
+      return `${event.unitId} shattered`;
+
     case "downed":
       return `${event.unitId} is downed`;
 

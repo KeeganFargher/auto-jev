@@ -61,3 +61,5 @@ export const GRAB_HEIGHT_UNITS = 24;
 export const GRAB_RETRY_TICKS = 10;
 
 export const SEPARATION_UNITS_PER_SECOND = 20;
+
+export const SHATTER_DAMAGE_MULTIPLIER = 2;

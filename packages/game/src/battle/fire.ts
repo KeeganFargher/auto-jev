@@ -191,6 +191,19 @@ export function advanceBurning(ctx: StepContext): void {
   }
 }
 
+export function advanceFreezes(ctx: StepContext): void {
+  const state = ctx.state;
+
+  for (const unit of unitsInIdOrder(state)) {
+    const frozen = unit.frozen;
+
+    if (unit.alive && frozen !== null && state.tick >= frozen.untilTick) {
+      unit.frozen = null;
+      emit(ctx, { kind: "thaw", unitId: unit.unitId });
+    }
+  }
+}
+
 export function discardSpentFuses(ctx: StepContext): void {
   const state = ctx.state;
   const burningFuseIds = new Set<number>();

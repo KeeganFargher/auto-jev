@@ -25,8 +25,8 @@ export const paladin: HeroDefinition = {
     kind: "hammerfall",
     name: "Hammerfall",
     description:
-      "Hauls a giant hammer up over the shoulder and slams it into the ground about two cells ahead. Everything within 1.6 cells of the blow is launched; anything already airborne or floating is juggled twice as high.",
-    wants: ["floating", "airborne", "grouped"],
+      "Hauls a giant hammer up over the shoulder and slams it into the ground about two cells ahead. Everything within 1.6 cells of the blow is launched; anything already airborne or floating is juggled twice as high, and anything frozen shatters for double damage.",
+    wants: ["frozen", "floating", "airborne", "grouped"],
     groupSize: 3,
     reachUnits: 18.5,
     radiusUnits: 16,

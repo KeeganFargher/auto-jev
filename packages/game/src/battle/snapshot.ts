@@ -62,6 +62,8 @@ function copyAction(action: UnitAction): UnitAction {
   switch (action.kind) {
     case "hammerfall":
     case "big-bubble":
+    case "collection-day":
+    case "blizzard":
       return { ...action, center: copyVector(action.center) };
     case "idle":
     case "attack":
@@ -82,6 +84,7 @@ function copyUnit(unit: UnitState): UnitState {
     motion: copyMotion(unit.motion),
     burning: unit.burning === null ? null : { ...unit.burning },
     primed: unit.primed === null ? null : { ...unit.primed },
+    frozen: unit.frozen === null ? null : { ...unit.frozen },
     rampage: unit.rampage === null ? null : { ...unit.rampage },
   };
 }

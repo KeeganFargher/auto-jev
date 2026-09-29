@@ -19,6 +19,8 @@ export const CAUSE_HIT_SOUNDS: Readonly<Record<Exclude<DamageCause, "attack">, S
   blast: null,
   burn: null,
   yank: "hit-blunt",
+  pull: null,
+  frost: null,
 };
 
 export const HERO_DEATH_SOUND: SoundId = "death";

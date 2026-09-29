@@ -359,6 +359,8 @@ const CAUSE_SPRAY: Readonly<Record<Exclude<DamageCause, "attack">, HitKind | nul
   blast: "strike",
   burn: null,
   yank: "blunt",
+  pull: null,
+  frost: "strike",
 };
 
 export function snapshotGrid(snapshot: BattleSnapshot): BoardGrid {
@@ -1382,8 +1384,23 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
         return;
       }
 
-      case "stun": {
+      case "stun":
+      case "freeze": {
         playStun(panOf(recordOf(event.unitId)));
+
+        return;
+      }
+
+      case "pull": {
+        effects.dust(stage.toScene(event.to, 0), LANDING_DUST_RADIUS);
+
+        return;
+      }
+
+      case "shatter": {
+        const record = recordOf(event.unitId);
+        effects.dust(stage.toScene(record.unit.position, 0), LANDING_DUST_RADIUS);
+        playImpact(panOf(record));
 
         return;
       }
@@ -1427,6 +1444,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       case "bubble-launch":
       case "prime":
       case "burn-end":
+      case "thaw":
       case "beat":
       case "battle-ended": {
         return;

@@ -40,17 +40,19 @@ test("the shipped catalogue is valid", () => {
   validateCatalogue(gameCatalogue);
 });
 
-test("five heroes are draftable, one of each signature, and the dummy is not", () => {
+test("seven heroes are draftable, one of each signature, and the dummy is not", () => {
   assert.deepEqual(DRAFTABLE_HERO_IDS, [
     "paladin",
     "berserker",
     "firebrand",
     "bubble-cleric",
     "harpooner",
+    "mags",
+    "burr",
   ]);
   assert.deepEqual(
     DRAFTABLE_HERO_IDS.map((heroId) => gameCatalogue.heroes[heroId]?.signature?.kind),
-    ["hammerfall", "rampage", "short-fuse", "big-bubble", "yank"],
+    ["hammerfall", "rampage", "short-fuse", "big-bubble", "yank", "collection-day", "blizzard"],
   );
   assert.equal(trainingDummy.draftable, false);
   assert.equal(gameCatalogue.heroes[trainingDummy.id], trainingDummy);

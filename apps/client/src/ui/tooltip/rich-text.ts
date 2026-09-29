@@ -11,11 +11,12 @@ const STATUS_WORDS: ReadonlyMap<string, UnitStatusKind> = new Map<string, UnitSt
   ["floating", "floating"],
   ["airborne", "airborne"],
   ["downed", "downed"],
+  ["frozen", "frozen"],
   ["stunned", "stunned"],
 ]);
 
 const TOKEN_PATTERN =
-  /([+\-−×]?\d+(?:\.\d+)?(?:%|×| s\b| cells?\b| HP\b| mana\b)?|\b(?:primed|burning|floating|airborne|downed|stunned)\b)/gi;
+  /([+\-−×]?\d+(?:\.\d+)?(?:%|×| s\b| cells?\b| HP\b| mana\b)?|\b(?:primed|burning|floating|airborne|downed|frozen|stunned)\b)/gi;
 
 export function parseRichText(text: string): RichPart[] {
   const parts: RichPart[] = [];

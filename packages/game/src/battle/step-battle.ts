@@ -3,7 +3,7 @@ import { canStartAttack, resolveAttackHit, startAttack } from "./attacks.js";
 import { advanceBubbleMotion, checkSafetyBubbles, resolveBubbles } from "./bubbles.js";
 import { expireChains } from "./chain.js";
 import { emit, type BattleEvent, type StepContext } from "./events.js";
-import { advanceBurning, advanceFuses, discardSpentFuses, spreadFire } from "./fire.js";
+import { advanceBurning, advanceFreezes, advanceFuses, discardSpentFuses, spreadFire } from "./fire.js";
 import { resolveLandings } from "./landing.js";
 import { advanceUnitMotion } from "./motion.js";
 import { moveUnits } from "./movement.js";
@@ -140,6 +140,7 @@ export function stepBattle(state: BattleState): BattleStep {
   expireChains(state);
   advanceRampages(ctx);
   advanceBurning(ctx);
+  advanceFreezes(ctx);
   advanceUnitMotion(ctx);
   advanceBubbleMotion(ctx);
   resolveLandings(ctx);

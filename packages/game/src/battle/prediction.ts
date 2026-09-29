@@ -52,6 +52,17 @@ export function lastsUntil(
     return motion.kind === "float" && bubbleById(state, motion.bubbleId).endTick > tick;
   }
 
+  if (want === "frozen") {
+    return unit.frozen !== null && unit.frozen.untilTick > tick;
+  }
+
+  if (want === "downed") {
+    return (
+      (motion.kind === "downed" && motion.endTick > tick) ||
+      (motion.kind === "skid" && motion.endTick + DOWNED_TICKS > tick)
+    );
+  }
+
   if (want === "burning") {
     return unit.burning !== null && unit.burning.untilTick > tick;
   }
@@ -73,7 +84,7 @@ export function isSetUpAt(state: BattleState, unit: UnitState, tick: number): bo
   const primed = unit.primed;
 
   return (
-    hasWantedState(state, unit, ["airborne", "floating", "burning"], tick) ||
+    hasWantedState(state, unit, ["airborne", "floating", "burning", "frozen"], tick) ||
     (primed !== null && primed.explodeTick > tick) ||
     (motion.kind === "skid" && motion.endTick + DOWNED_TICKS > tick) ||
     (motion.kind === "downed" && motion.endTick > tick)
