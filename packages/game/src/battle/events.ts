@@ -1,234 +1,279 @@
-import type { AbilityDefinitionId, UnitId } from "../ids.js";
-import type { ComboKind, ConditionKind, ControlKind, DotKind } from "../definitions.js";
+import type { TeamId, UnitId } from "../ids.js";
+import type { SetupState, SignatureKind } from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
 import type { BattleResult } from "./result.js";
-import type { RepeatKind } from "./state.js";
+import type {
+  BattleState,
+  BubbleFlight,
+  BubbleKind,
+  FlightMotion,
+  LaunchCause,
+  ProjectilePayload,
+} from "./state.js";
 
-export type AppliedStatusKind = ControlKind | DotKind | "taunted" | "invulnerable" | "untargetable" | "linked" | "puppeted" | "channeling" | "form" | "chill" | "pandemic" | "grave-marked";
+export type DamageCause =
+  | "attack"
+  | "splash"
+  | "hammer"
+  | "throw"
+  | "bowling"
+  | "blast"
+  | "burn"
+  | "yank";
 
-export type ExpiredStatusKind =
-  | "shield"
-  | "slow"
-  | "condition"
-  | "control"
-  | "taunt"
-  | "invulnerable"
-  | "untargetable"
-  | "link"
-  | "puppet"
-  | "channel"
-  | DotKind
-  | "form"
-  | "chill"
-  | "pandemic"
-  | "grave-mark";
+export type HealCause = "attack" | "safety-bubble";
 
-export type HpPaymentReason = "overcharge" | "blood-pact" | "soulbound" | "martyr" | "unstable-core";
+export type IgniteCause = "fuse" | "touch" | "comet" | "bubble";
 
-export interface CastEvent {
-  kind: "cast";
+export type Beat =
+  | { kind: "slow"; rate: number; ticks: number }
+  | { kind: "freeze"; seconds: number };
+
+interface EventBase {
   tick: number;
   sequence: number;
-  sourceUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  targetUnitId: UnitId;
-  isBasicAttack: boolean;
-  ultimate?: true;
-  triggered?: true;
-  repeat?: RepeatKind;
-  trigger?: string;
-  chainRoot?: number;
-  chainLink?: number;
 }
 
-export interface DamageDealtEvent {
-  kind: "damage-dealt";
-  tick: number;
-  sequence: number;
-  causeSequence: number;
+export interface AttackEvent extends EventBase {
+  kind: "attack";
   sourceUnitId: UnitId;
   targetUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
+  delivery: "melee" | "projectile";
+  hitTick: number;
+}
+
+export interface ProjectileEvent extends EventBase {
+  kind: "projectile";
+  projectileId: number;
+  sourceUnitId: UnitId;
+  targetUnitId: UnitId;
+  payload: ProjectilePayload["kind"];
+  arrivalTick: number;
+}
+
+export interface DamageEvent extends EventBase {
+  kind: "damage";
+  sourceUnitId: UnitId;
+  targetUnitId: UnitId;
   amount: number;
-  shieldAbsorbed: number;
-  crit?: true;
-  combo?: ComboKind;
-  dot?: DotKind;
-  reaction?: true;
-  redirectedFrom?: UnitId;
+  crit: boolean;
+  cause: DamageCause;
+  hpAfter: number;
+}
+
+export interface HealEvent extends EventBase {
+  kind: "heal";
+  sourceUnitId: UnitId;
+  targetUnitId: UnitId;
+  amount: number;
+  cause: HealCause;
+  hpAfter: number;
+}
+
+export interface SignatureEvent extends EventBase {
+  kind: "signature";
+  unitId: UnitId;
+  signature: SignatureKind;
+  targetUnitId: UnitId | null;
+  point: Vector2;
+  releaseTick: number;
+  wanted: boolean;
+}
+
+export interface HammerImpactEvent extends EventBase {
+  kind: "hammer-impact";
+  unitId: UnitId;
+  center: Vector2;
+  radius: number;
+  hitUnitIds: UnitId[];
+}
+
+export interface RampageEvent extends EventBase {
+  kind: "rampage";
+  unitId: UnitId;
+  phase: "grow" | "big" | "shrink" | "end";
+  size: number;
+}
+
+export interface GrabEvent extends EventBase {
+  kind: "grab";
+  unitId: UnitId;
+  targetUnitId: UnitId;
+  throwTick: number;
+}
+
+export interface ThrowEvent extends EventBase {
+  kind: "throw";
+  unitId: UnitId;
+  targetUnitId: UnitId;
+  destination: Vector2;
+}
+
+export interface YankEvent extends EventBase {
+  kind: "yank";
+  unitId: UnitId;
+  targetUnitId: UnitId;
+  destination: Vector2;
+}
+
+export interface LaunchEvent extends EventBase {
+  kind: "launch";
+  unitId: UnitId;
+  motion: FlightMotion;
+  juggle: boolean;
+}
+
+export interface LandEvent extends EventBase {
+  kind: "land";
+  unitId: UnitId;
+  position: Vector2;
+  hard: boolean;
+  cause: LaunchCause;
+}
+
+export interface DownedEvent extends EventBase {
+  kind: "downed";
+  unitId: UnitId;
+  untilTick: number;
+}
+
+export interface GetUpEvent extends EventBase {
+  kind: "get-up";
+  unitId: UnitId;
+}
+
+export interface StunEvent extends EventBase {
+  kind: "stun";
+  unitId: UnitId;
+  untilTick: number;
+}
+
+export interface BubbleEvent extends EventBase {
+  kind: "bubble";
+  bubbleId: number;
+  bubbleKind: BubbleKind;
+  ownerUnitId: UnitId;
+  memberUnitIds: UnitId[];
+  center: Vector2;
+  radius: number;
+  floatHeight: number;
+  endTick: number;
+}
+
+export interface BubbleLaunchEvent extends EventBase {
+  kind: "bubble-launch";
+  bubbleId: number;
+  flight: BubbleFlight;
+}
+
+export interface PopEvent extends EventBase {
+  kind: "pop";
+  bubbleId: number;
+  center: Vector2;
+  elevation: number;
+  memberUnitIds: UnitId[];
+}
+
+export interface PrimeEvent extends EventBase {
+  kind: "prime";
+  unitId: UnitId;
+  makerUnitId: UnitId;
+  fuseId: number;
+  explodeTick: number;
+}
+
+export interface IgniteEvent extends EventBase {
+  kind: "ignite";
+  unitId: UnitId;
+  sourceUnitId: UnitId;
+  fuseId: number;
+  hop: number;
+  cause: IgniteCause;
+}
+
+export interface BurnEndEvent extends EventBase {
+  kind: "burn-end";
+  unitId: UnitId;
+}
+
+export interface ExplodeEvent extends EventBase {
+  kind: "explode";
+  unitId: UnitId;
+  makerUnitId: UnitId;
+  center: Vector2;
+  elevation: number;
+  radius: number;
+  hotPotato: boolean;
+}
+
+export interface ComboLinkEvent extends EventBase {
+  kind: "combo-link";
+  teamId: TeamId;
+  count: number;
+  setupUnitId: UnitId;
+  payoffUnitId: UnitId;
+  targetUnitId: UnitId;
+  state: SetupState;
+  unitIds: UnitId[];
+}
+
+export interface BeatEvent extends EventBase {
+  kind: "beat";
+  beat: Beat;
+}
+
+export interface DeathEvent extends EventBase {
+  kind: "death";
+  unitId: UnitId;
+  killerUnitId: UnitId;
+}
+
+export interface BattleEndedEvent extends EventBase {
+  kind: "battle-ended";
+  result: BattleResult;
 }
 
 export type BattleEvent =
-  | CastEvent
-  | DamageDealtEvent
-  | {
-      kind: "healing-done";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      targetUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      amount: number;
-    }
-  | {
-      kind: "shield-applied";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      targetUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      amount: number;
-      expiresAtTick: number;
-    }
-  | {
-      kind: "slow-applied";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      targetUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      speedMultiplier: number;
-      expiresAtTick: number;
-    }
-  | {
-      kind: "condition-applied";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      targetUnitId: UnitId;
-      condition: ConditionKind;
-      expiresAtTick: number;
-    }
-  | {
-      kind: "combo-detonated";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      targetUnitId: UnitId;
-      condition: ConditionKind;
-      combo: ComboKind;
-      tier: number;
-      bonusDamage: number;
-      echo?: true;
-    }
-  | {
-      kind: "status-applied";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      targetUnitId: UnitId;
-      status: AppliedStatusKind;
-      expiresAtTick: number;
-      stacks?: number;
-    }
-  | {
-      kind: "unit-moved";
-      tick: number;
-      sequence: number;
-      unitId: UnitId;
-      from: Vector2;
-      to: Vector2;
-      reason: "blink" | "dash" | "knockback" | "pull";
-    }
-  | {
-      kind: "impact-scheduled";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      center: Vector2;
-      radiusUnits: number;
-      landsAtTick: number;
-    }
-  | {
-      kind: "impact-landed";
-      tick: number;
-      sequence: number;
-      sourceUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      center: Vector2;
-      radiusUnits: number;
-    }
-  | {
-      kind: "emitter-started";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      emitterId: number;
-      sourceUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      from: Vector2;
-      endsAtTick: number;
-    }
-  | {
-      kind: "emitter-fired";
-      tick: number;
-      sequence: number;
-      emitterId: number;
-      sourceUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      from: Vector2;
-      targetUnitId: UnitId;
-    }
-  | {
-      kind: "zone-created";
-      tick: number;
-      sequence: number;
-      zoneId: number;
-      sourceUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      center: Vector2;
-      radiusUnits: number;
-      expiresAtTick: number;
-    }
-  | { kind: "zone-expired"; tick: number; sequence: number; zoneId: number }
-  | {
-      kind: "attack-evaded";
-      tick: number;
-      sequence: number;
-      causeSequence: number;
-      sourceUnitId: UnitId;
-      targetUnitId: UnitId;
-    }
-  | { kind: "revived"; tick: number; sequence: number; unitId: UnitId; sourceUnitId: UnitId; hp: number }
-  | {
-      kind: "unit-spawned";
-      tick: number;
-      sequence: number;
-      unitId: UnitId;
-      heroId: string;
-      teamId: string;
-      summonerUnitId: UnitId;
-      position: Vector2;
-      corpseUnitId?: UnitId;
-      expiresAtTick?: number;
-    }
-  | { kind: "unit-dismissed"; tick: number; sequence: number; unitId: UnitId }
-  | { kind: "corpse-spent"; tick: number; sequence: number; unitId: UnitId }
-  | { kind: "passive-triggered"; tick: number; sequence: number; unitId: UnitId; passive: string; targetUnitId?: UnitId }
-  | { kind: "hp-paid"; tick: number; sequence: number; unitId: UnitId; amount: number; reason: HpPaymentReason }
-  | {
-      kind: "cast-fizzled";
-      tick: number;
-      sequence: number;
-      sourceUnitId: UnitId;
-      abilityId: AbilityDefinitionId;
-      targetUnitId: UnitId;
-    }
-  | {
-      kind: "reaction-budget-exceeded";
-      tick: number;
-      sequence: number;
-      rootActionSequence: number;
-      depthReached: number;
-    }
-  | { kind: "status-expired"; tick: number; sequence: number; unitId: UnitId; status: ExpiredStatusKind }
-  | { kind: "death"; tick: number; sequence: number; unitId: UnitId }
-  | { kind: "battle-ended"; tick: number; sequence: number; result: BattleResult };
+  | AttackEvent
+  | ProjectileEvent
+  | DamageEvent
+  | HealEvent
+  | SignatureEvent
+  | HammerImpactEvent
+  | RampageEvent
+  | GrabEvent
+  | ThrowEvent
+  | YankEvent
+  | LaunchEvent
+  | LandEvent
+  | DownedEvent
+  | GetUpEvent
+  | StunEvent
+  | BubbleEvent
+  | BubbleLaunchEvent
+  | PopEvent
+  | PrimeEvent
+  | IgniteEvent
+  | BurnEndEvent
+  | ExplodeEvent
+  | ComboLinkEvent
+  | BeatEvent
+  | DeathEvent
+  | BattleEndedEvent;
+
+export type BattleEventKind = BattleEvent["kind"];
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+export type BattleEventInput = DistributiveOmit<BattleEvent, "tick" | "sequence">;
+
+export interface StepContext {
+  state: BattleState;
+  events: BattleEvent[];
+}
+
+export function emit(ctx: StepContext, event: BattleEventInput): void {
+  const sequence = ctx.state.sequence;
+  ctx.state.sequence += 1;
+  ctx.events.push({ ...event, tick: ctx.state.tick, sequence });
+}

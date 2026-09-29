@@ -1,7 +1,11 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { AdditiveBlending, Color, DoubleSide, Line, Mesh, Scene, type Material } from "three";
-import { effectMaterials, releaseEffectMaterial, warmEffectMaterials } from "../src/game/views/effect-materials.js";
+import {
+  effectMaterials,
+  releaseEffectMaterial,
+  warmEffectMaterials,
+} from "../src/game/views/effect-materials.js";
 
 function watchDisposal(materials: readonly Material[]): () => string[] {
   const disposed: string[] = [];

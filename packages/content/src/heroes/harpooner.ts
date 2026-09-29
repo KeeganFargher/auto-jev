@@ -1,0 +1,47 @@
+import type { HeroDefinition } from "@jev-game/game";
+
+export const harpooner: HeroDefinition = {
+  id: "harpooner",
+  name: "Harpooner",
+  title: "The hook",
+  description:
+    "A midline skirmisher who hooks the farthest enemy and yanks it over everyone's heads to land at her feet.",
+  role: "midline",
+  draftable: true,
+  maxHp: 500,
+  moveUnitsPerSecond: 13,
+  bodyRadiusUnits: 3,
+  maxMana: 70,
+  startingMana: 0,
+  attack: {
+    kind: "projectile",
+    name: "Thrown knife",
+    damage: 50,
+    rangeUnits: 20,
+    intervalTicks: 33,
+    windupTicks: 10,
+    unitsPerSecond: 90,
+    splashRadiusUnits: 0,
+    splashFraction: 0,
+    allyHeal: 0,
+  },
+  signature: {
+    kind: "yank",
+    name: "Yank",
+    description:
+      "Hurls a chain hook at the farthest enemy within five cells and yanks it over everyone in a high arc. It lands at her feet, knocking down whoever is near, and is stunned for a second.",
+    wants: ["airborne", "floating"],
+    groupSize: 3,
+    rangeUnits: 50,
+    minRangeUnits: 12,
+    castTicks: 12,
+    hookUnitsPerSecond: 150,
+    landingOffsetUnits: 10,
+    riseUnits: 20,
+    damage: 90,
+    bowlingDamage: 40,
+    stunTicks: 30,
+    recoverTicks: 15,
+  },
+  passive: null,
+};

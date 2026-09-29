@@ -1,16 +1,15 @@
-import type { Catalogue } from "@jev-game/game";
 import {
   applyCommand,
-  decideBotCommand,
   deriveControllerSeed,
   getPlayerView,
+  requireSeat,
   type PlayerId,
+  type PlayerView,
   type RunCommand,
   type RunState,
 } from "@jev-game/run";
 import type { JevProvider } from "./provider/types.js";
-import { decideForSeat, needsJevDecision, SUPERSEDED } from "./controller.js";
-import { roundOutcomeFrom, type RoundOutcome } from "./observations/build-observation.js";
+import { decideDraft, needsJevDecision, SUPERSEDED } from "./controller.js";
 import type { DecisionRecord } from "./decision-record.js";
 
 export type SeatActivity = "idle" | "thinking";
@@ -20,14 +19,13 @@ export interface DriverOutcome {
   playerId: PlayerId;
   phaseEpoch: number;
   decisionRevision: number;
-  command: RunCommand | null;
+  command: RunCommand;
   records: DecisionRecord[];
   superseded: boolean;
 }
 
 export interface JevDriverOptions {
   provider: JevProvider;
-  catalogue: Catalogue;
   playerIds: readonly PlayerId[];
   onOutcome: (outcome: DriverOutcome) => void;
   now: () => number;
@@ -36,7 +34,6 @@ export interface JevDriverOptions {
 export interface JevDriver {
   sync(state: RunState, deadlineAt: number | null): void;
   activity(playerId: PlayerId): SeatActivity;
-  history(playerId: PlayerId): readonly RoundOutcome[];
   stop(): void;
 }
 
@@ -45,15 +42,7 @@ interface Job {
   controller: AbortController;
 }
 
-export type ApplyVerdict =
-  | "applied"
-  | "superseded"
-  | "no-command"
-  | "stale-run"
-  | "stale-epoch"
-  | "stale-revision"
-  | "eliminated"
-  | "rejected";
+export type ApplyVerdict = "applied" | "superseded" | "stale-epoch" | "stale-revision";
 
 export interface AppliedOutcome {
   state: RunState;
@@ -61,45 +50,40 @@ export interface AppliedOutcome {
 }
 
 function jobKey(state: RunState, playerId: PlayerId): string {
-  return `${state.runId}:${state.phaseEpoch}:${playerId}:${state.players[playerId]?.decisionRevision ?? -1}`;
+  return `${state.runId}:${state.phaseEpoch}:${playerId}:${requireSeat(state, playerId).decisionRevision}`;
 }
 
-export function applyJevOutcome(state: RunState, outcome: DriverOutcome, catalogue: Catalogue): AppliedOutcome {
-  const seat = state.players[outcome.playerId];
+export function applyJevOutcome(state: RunState, outcome: DriverOutcome): AppliedOutcome {
+  if (state.runId !== outcome.runId) {
+    throw new Error(`Jev answered for run ${outcome.runId} inside run ${state.runId}`);
+  }
 
   if (outcome.superseded) {
     return { state, verdict: "superseded" };
-  }
-
-  if (state.runId !== outcome.runId) {
-    return { state, verdict: "stale-run" };
   }
 
   if (state.phaseEpoch !== outcome.phaseEpoch) {
     return { state, verdict: "stale-epoch" };
   }
 
-  if (seat === undefined || seat.eliminated) {
-    return { state, verdict: "eliminated" };
-  }
-
-  if (seat.decisionRevision !== outcome.decisionRevision) {
+  if (requireSeat(state, outcome.playerId).decisionRevision !== outcome.decisionRevision) {
     return { state, verdict: "stale-revision" };
   }
 
-  if (outcome.command === null) {
-    return { state, verdict: "no-command" };
+  const result = applyCommand(state, outcome.command);
+
+  if (!result.accepted) {
+    throw new Error(
+      `Jev's ${outcome.command.kind} for ${outcome.playerId} was refused: ${result.reason}`,
+    );
   }
 
-  const result = applyCommand(state, outcome.command, catalogue);
-
-  return result.accepted ? { state: result.state, verdict: "applied" } : { state, verdict: "rejected" };
+  return { state: result.state, verdict: "applied" };
 }
 
 export function createJevDriver(options: JevDriverOptions): JevDriver {
   const jobs = new Map<PlayerId, Job>();
   const delivered = new Map<PlayerId, string>();
-  const histories = new Map<PlayerId, RoundOutcome[]>();
   let stopped = false;
 
   function cancel(playerId: PlayerId): void {
@@ -107,68 +91,47 @@ export function createJevDriver(options: JevDriverOptions): JevDriver {
     jobs.delete(playerId);
   }
 
-  function remember(state: RunState, playerId: PlayerId): void {
-    const view = getPlayerView(state, playerId);
-    const outcome = view === null || (view.phase !== "reward" && view.phase !== "round-result") ? null : roundOutcomeFrom(view);
-    const history = histories.get(playerId) ?? [];
-
-    if (outcome !== null && !history.some((entry) => entry.round === outcome.round)) {
-      histories.set(playerId, [...history, outcome]);
-    }
-  }
-
-  function start(state: RunState, playerId: PlayerId, key: string, deadlineAt: number | null): void {
-    const view = getPlayerView(state, playerId);
-
-    if (view === null) {
-      return;
-    }
-
+  function start(state: RunState, view: PlayerView, key: string, deadlineAt: number | null): void {
+    const playerId = view.you.playerId;
     const controller = new AbortController();
     const remaining = deadlineAt === null ? null : Math.max(0, deadlineAt - options.now());
-    const signal = remaining === null ? controller.signal : AbortSignal.any([controller.signal, AbortSignal.timeout(remaining)]);
-    const controllerSeed = deriveControllerSeed(state.runSeed, state.currentRound?.round ?? 0, playerId);
+
+    const signal =
+      remaining === null
+        ? controller.signal
+        : AbortSignal.any([controller.signal, AbortSignal.timeout(remaining)]);
+
     jobs.set(playerId, { key, controller });
 
-    const preview = (command: RunCommand) => {
-      const result = applyCommand(state, command, options.catalogue);
-
-      return result.accepted ? (result.state.players[playerId] ?? null) : null;
-    };
-
-    decideForSeat({
+    void decideDraft({
       view,
-      catalogue: options.catalogue,
       provider: options.provider,
-      history: histories.get(playerId) ?? [],
-      controllerSeed,
+      controllerSeed: deriveControllerSeed(state.runSeed, state.phaseEpoch, playerId),
       signal,
-      preview,
+      isLegal: (command) => applyCommand(state, command).accepted,
       now: options.now,
-    })
-      .catch(() => ({ command: decideBotCommand(view, controllerSeed, options.catalogue), records: [] }))
-      .then((decision) => {
-        if (stopped) {
-          return;
-        }
+    }).then((decision) => {
+      if (stopped) {
+        return;
+      }
 
-        const current = jobs.get(playerId)?.key === key;
+      const current = jobs.get(playerId)?.key === key;
 
-        if (current) {
-          jobs.delete(playerId);
-          delivered.set(playerId, key);
-        }
+      if (current) {
+        jobs.delete(playerId);
+        delivered.set(playerId, key);
+      }
 
-        options.onOutcome({
-          runId: view.runId,
-          playerId,
-          phaseEpoch: view.phaseEpoch,
-          decisionRevision: view.you.decisionRevision,
-          command: decision.command,
-          records: decision.records,
-          superseded: !current,
-        });
+      options.onOutcome({
+        runId: view.runId,
+        playerId,
+        phaseEpoch: view.phaseEpoch,
+        decisionRevision: view.you.decisionRevision,
+        command: decision.command,
+        records: decision.records,
+        superseded: !current,
       });
+    });
   }
 
   return {
@@ -178,12 +141,10 @@ export function createJevDriver(options: JevDriverOptions): JevDriver {
       }
 
       for (const playerId of options.playerIds) {
-        remember(state, playerId);
-
         const view = getPlayerView(state, playerId);
         const key = jobKey(state, playerId);
 
-        if (view === null || !needsJevDecision(view)) {
+        if (!needsJevDecision(view)) {
           cancel(playerId);
           continue;
         }
@@ -193,16 +154,12 @@ export function createJevDriver(options: JevDriverOptions): JevDriver {
         }
 
         cancel(playerId);
-        start(state, playerId, key, deadlineAt);
+        start(state, view, key, deadlineAt);
       }
     },
 
     activity(playerId) {
       return jobs.has(playerId) ? "thinking" : "idle";
-    },
-
-    history(playerId) {
-      return histories.get(playerId) ?? [];
     },
 
     stop() {

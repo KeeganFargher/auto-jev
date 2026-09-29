@@ -36,7 +36,13 @@ const PINE_GREENS = ["#2f6b4f", "#3a7a58", "#2a5f47"];
 
 function pine(kit: PropKit, height: number): Group {
   const tree = kit.group(
-    kit.solid(new CylinderGeometry(height * 0.03, height * 0.045, height * 0.28, 6), kit.surface("#6b4a2e"), 0, height * 0.14, 0),
+    kit.solid(
+      new CylinderGeometry(height * 0.03, height * 0.045, height * 0.28, 6),
+      kit.surface("#6b4a2e"),
+      0,
+      height * 0.14,
+      0,
+    ),
   );
 
   const snow = kit.surface("#f4f8fc");
@@ -45,8 +51,18 @@ function pine(kit: PropKit, height: number): Group {
     const radius = height * 0.25 * (1 - tier * 0.2);
     const tall = height * 0.34;
     const base = height * 0.16 + tier * height * 0.19;
-    tree.add(kit.solid(new ConeGeometry(radius, tall, 7), kit.surface(PINE_GREENS[tier % PINE_GREENS.length]!), 0, base + tall / 2, 0));
-    tree.add(kit.solid(new ConeGeometry(radius * 0.7, tall * 0.42, 7), snow, 0, base + tall * 0.78, 0));
+    tree.add(
+      kit.solid(
+        new ConeGeometry(radius, tall, 7),
+        kit.surface(PINE_GREENS[tier % PINE_GREENS.length]!),
+        0,
+        base + tall / 2,
+        0,
+      ),
+    );
+    tree.add(
+      kit.solid(new ConeGeometry(radius * 0.7, tall * 0.42, 7), snow, 0, base + tall * 0.78, 0),
+    );
   }
 
   return tree;
@@ -68,10 +84,24 @@ function ridgeTentGeometry(length: number, width: number, height: number): Buffe
     "position",
     new Float32BufferAttribute(
       [
-        ...backLeft, ...backRight, ...ridgeRight, ...backLeft, ...ridgeRight, ...ridgeLeft,
-        ...frontLeft, ...ridgeLeft, ...ridgeRight, ...frontLeft, ...ridgeRight, ...frontRight,
-        ...backRight, ...frontRight, ...ridgeRight,
-        ...backLeft, ...ridgeLeft, ...frontLeft,
+        ...backLeft,
+        ...backRight,
+        ...ridgeRight,
+        ...backLeft,
+        ...ridgeRight,
+        ...ridgeLeft,
+        ...frontLeft,
+        ...ridgeLeft,
+        ...ridgeRight,
+        ...frontLeft,
+        ...ridgeRight,
+        ...frontRight,
+        ...backRight,
+        ...frontRight,
+        ...ridgeRight,
+        ...backLeft,
+        ...ridgeLeft,
+        ...frontLeft,
       ],
       3,
     ),
@@ -93,10 +123,19 @@ function ridgeTent(kit: PropKit, canvas: string, flap: string): Group {
   );
 
   for (const x of [-length / 2 - 0.2, length / 2 + 0.2]) {
-    tent.add(kit.solid(new CylinderGeometry(0.25, 0.25, height + 2, 5), pole, x, (height + 2) / 2, 0));
+    tent.add(
+      kit.solid(new CylinderGeometry(0.25, 0.25, height + 2, 5), pole, x, (height + 2) / 2, 0),
+    );
   }
 
-  const door = kit.solid(ridgeTentGeometry(0.2, 5, height * 0.7), kit.surface(flap, { twoSided: true }), length / 2 + 0.05, 0, 0);
+  const door = kit.solid(
+    ridgeTentGeometry(0.2, 5, height * 0.7),
+    kit.surface(flap, { twoSided: true }),
+    length / 2 + 0.05,
+    0,
+    0,
+  );
+
   tent.add(door);
 
   return tent;
@@ -109,8 +148,28 @@ function watchtower(kit: PropKit): Group {
 
   for (const x of [-1, 1]) {
     for (const z of [-1, 1]) {
-      tower.add(strut(kit, new Vector3(x * 5.5, 0, z * 5.5), new Vector3(x * 4, deck, z * 4), 0.6, 0.5, wood, 6));
-      tower.add(strut(kit, new Vector3(x * 4, deck, z * 4), new Vector3(x * 4, deck + 6.5, z * 4), 0.35, 0.35, wood, 5));
+      tower.add(
+        strut(
+          kit,
+          new Vector3(x * 5.5, 0, z * 5.5),
+          new Vector3(x * 4, deck, z * 4),
+          0.6,
+          0.5,
+          wood,
+          6,
+        ),
+      );
+      tower.add(
+        strut(
+          kit,
+          new Vector3(x * 4, deck, z * 4),
+          new Vector3(x * 4, deck + 6.5, z * 4),
+          0.35,
+          0.35,
+          wood,
+          5,
+        ),
+      );
     }
   }
 
@@ -161,13 +220,27 @@ function sled(kit: PropKit): Group {
 }
 
 function iceCrystals(kit: PropKit, size: number): Group {
-  const surface = kit.surface("#aeeaff", { emissive: "#4fc3ec", glow: 0.55, roughness: 0.18, metalness: 0.1 });
+  const surface = kit.surface("#aeeaff", {
+    emissive: "#4fc3ec",
+    glow: 0.55,
+    roughness: 0.18,
+    metalness: 0.1,
+  });
+
   const cluster = kit.group();
   const shard = new OctahedronGeometry(1, 0);
 
   for (let index = 0; index < 5; index += 1) {
     const tall = size * kit.between(0.55, 1);
-    const piece = kit.solid(shard, surface, kit.between(-1.6, 1.6) * size * 0.3, tall * 0.9, kit.between(-1.6, 1.6) * size * 0.3);
+
+    const piece = kit.solid(
+      shard,
+      surface,
+      kit.between(-1.6, 1.6) * size * 0.3,
+      tall * 0.9,
+      kit.between(-1.6, 1.6) * size * 0.3,
+    );
+
     piece.scale.set(size * 0.22, tall, size * 0.22);
     piece.rotation.set(kit.between(-0.35, 0.35), kit.between(0, Math.PI), kit.between(-0.35, 0.35));
     cluster.add(piece);
@@ -205,21 +278,45 @@ function snowman(kit: PropKit): Group {
   }
 
   for (const side of [-1, 1]) {
-    figure.add(strut(kit, new Vector3(side * 2.1, 8.2, 0), new Vector3(side * 5.4, 10.6, 0.4), 0.18, 0.12, stick, 5));
+    figure.add(
+      strut(
+        kit,
+        new Vector3(side * 2.1, 8.2, 0),
+        new Vector3(side * 5.4, 10.6, 0.4),
+        0.18,
+        0.12,
+        stick,
+        5,
+      ),
+    );
   }
 
   return figure;
 }
 
 function frozenPond(kit: PropKit, radius: number): Group {
-  const ice = kit.solid(new CircleGeometry(radius, 32), kit.surface("#8fd3ee", { roughness: 0.1, metalness: 0.08, emissive: "#3fa9d6", glow: 0.25 }), 0, 0.6, 0);
+  const ice = kit.solid(
+    new CircleGeometry(radius, 32),
+    kit.surface("#8fd3ee", { roughness: 0.1, metalness: 0.08, emissive: "#3fa9d6", glow: 0.25 }),
+    0,
+    0.6,
+    0,
+  );
+
   ice.rotation.x = -Math.PI / 2;
   ice.castShadow = false;
   const pond = kit.group(ice);
 
   for (let index = 0; index < 14; index += 1) {
     const angle = (index / 14) * Math.PI * 2;
-    pond.add(place(rock(kit, kit.between(2.2, 3.4), "#e9f1f8", 0.5), Math.cos(angle) * radius, 0.4, Math.sin(angle) * radius));
+    pond.add(
+      place(
+        rock(kit, kit.between(2.2, 3.4), "#e9f1f8", 0.5),
+        Math.cos(angle) * radius,
+        0.4,
+        Math.sin(angle) * radius,
+      ),
+    );
   }
 
   return pond;
@@ -296,7 +393,17 @@ export const frostTheme: EnvironmentTheme = {
 
     return kit.group(
       snowfield,
-      drift(kit, { count: 520, spread: 150, floor: -4, ceiling: 70, fall: 6, sway: 2.2, size: 1.9, tone: "#ffffff", glowing: false }),
+      drift(kit, {
+        count: 520,
+        spread: 150,
+        floor: -4,
+        ceiling: 70,
+        fall: 6,
+        sway: 2.2,
+        size: 1.9,
+        tone: "#ffffff",
+        glowing: false,
+      }),
       place(pine(kit, 22), -54, SNOW_TOP, -40),
       place(pine(kit, 18), 54, SNOW_TOP, 44),
       place(pine(kit, 20), 58, SNOW_TOP, -46),

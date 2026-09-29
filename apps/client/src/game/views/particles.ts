@@ -34,6 +34,7 @@ export interface ParticleStyle {
 
 export interface ParticleSystem {
   emit(style: ParticleStyle, origin: Vector3, direction: Vector3, count: number): void;
+  ring(style: ParticleStyle, origin: Vector3, count: number): void;
   clear(): void;
   update(deltaSeconds: number): void;
   alive(): number;
@@ -166,7 +167,13 @@ export function claimSlots(next: number, count: number, capacity: number): SlotC
   return { ranges, next: (next + count) % capacity };
 }
 
-export function coneDirection(axis: Vector3, cone: number, u: number, v: number, out: Vector3): Vector3 {
+export function coneDirection(
+  axis: Vector3,
+  cone: number,
+  u: number,
+  v: number,
+  out: Vector3,
+): Vector3 {
   const cosine = 1 - u * (1 - Math.cos(cone));
   const sine = Math.sqrt(Math.max(0, 1 - cosine * cosine));
   const turn = v * Math.PI * 2;
@@ -185,7 +192,12 @@ function lerp(range: readonly [number, number], amount: number): number {
   return range[0] + (range[1] - range[0]) * amount;
 }
 
-function createLayer(scene: Scene, capacity: number, blend: ParticleBlend, uniforms: ShaderMaterial["uniforms"]): ParticleLayer {
+function createLayer(
+  scene: Scene,
+  capacity: number,
+  blend: ParticleBlend,
+  uniforms: ShaderMaterial["uniforms"],
+): ParticleLayer {
   const quad = new PlaneGeometry(1, 1);
   const geometry = new InstancedBufferGeometry();
   geometry.setIndex(quad.getIndex());
@@ -230,22 +242,29 @@ export function createParticleSystem(scene: Scene): ParticleSystem {
   let now = 0;
   let epoch = 0;
 
-  function write(layer: ParticleLayer, slot: number, style: ParticleStyle, origin: Vector3, direction: Vector3): void {
+  function write(
+    layer: ParticleLayer,
+    slot: number,
+    style: ParticleStyle,
+    origin: Vector3,
+    aimed: Vector3,
+  ): void {
     const data = layer.buffer.array;
     const base = slot * STRIDE;
     const life = lerp(style.life, Math.random());
     const speed = lerp(style.speed, Math.random());
     const scale = 1 - SIZE_JITTER / 2 + Math.random() * SIZE_JITTER;
-    coneDirection(direction, style.cone, Math.random(), Math.random(), heading);
-    coneDirection(UP, Math.PI, Math.random(), Math.random(), offset).multiplyScalar(style.spread * Math.cbrt(Math.random()));
+    coneDirection(UP, Math.PI, Math.random(), Math.random(), offset).multiplyScalar(
+      style.spread * Math.cbrt(Math.random()),
+    );
 
     data[base] = origin.x + offset.x;
     data[base + 1] = origin.y + offset.y;
     data[base + 2] = origin.z + offset.z;
     data[base + 3] = now;
-    data[base + 4] = heading.x * speed;
-    data[base + 5] = heading.y * speed;
-    data[base + 6] = heading.z * speed;
+    data[base + 4] = aimed.x * speed;
+    data[base + 5] = aimed.y * speed;
+    data[base + 6] = aimed.z * speed;
     data[base + 7] = life;
     data[base + 8] = from.r;
     data[base + 9] = from.g;
@@ -276,31 +295,52 @@ export function createParticleSystem(scene: Scene): ParticleSystem {
     return count;
   }
 
+  function spawn(
+    style: ParticleStyle,
+    origin: Vector3,
+    count: number,
+    aim: (index: number, out: Vector3) => Vector3,
+  ): void {
+    if (style.drag <= 0) {
+      throw new Error(`particle drag must be positive, got ${style.drag}`);
+    }
+
+    if (count <= 0) {
+      return;
+    }
+
+    const layer = style.blend === "glow" ? glow : solid;
+    const claim = claimSlots(layer.next, count, layer.capacity);
+    from.copy(style.from).multiplyScalar(style.brightness);
+    to.copy(style.to).multiplyScalar(style.brightness);
+    let index = 0;
+
+    for (const range of claim.ranges) {
+      for (let slot = range.start; slot < range.start + range.count; slot += 1) {
+        write(layer, slot, style, origin, aim(index, heading));
+        index += 1;
+      }
+
+      layer.buffer.addUpdateRange(range.start * STRIDE, range.count * STRIDE);
+    }
+
+    layer.next = claim.next;
+    layer.buffer.needsUpdate = true;
+  }
+
   return {
     emit(style, origin, direction, count) {
-      if (style.drag <= 0) {
-        throw new Error(`particle drag must be positive, got ${style.drag}`);
-      }
+      spawn(style, origin, count, (_, out) =>
+        coneDirection(direction, style.cone, Math.random(), Math.random(), out),
+      );
+    },
 
-      if (count <= 0) {
-        return;
-      }
+    ring(style, origin, count) {
+      spawn(style, origin, count, (index, out) => {
+        const angle = (index / count) * Math.PI * 2;
 
-      const layer = style.blend === "glow" ? glow : solid;
-      const claim = claimSlots(layer.next, count, layer.capacity);
-      from.copy(style.from).multiplyScalar(style.brightness);
-      to.copy(style.to).multiplyScalar(style.brightness);
-
-      for (const range of claim.ranges) {
-        for (let slot = range.start; slot < range.start + range.count; slot += 1) {
-          write(layer, slot, style, origin, direction);
-        }
-
-        layer.buffer.addUpdateRange(range.start * STRIDE, range.count * STRIDE);
-      }
-
-      layer.next = claim.next;
-      layer.buffer.needsUpdate = true;
+        return out.set(Math.cos(angle), 0, Math.sin(angle));
+      });
     },
 
     clear() {
@@ -329,7 +369,12 @@ export function createParticleSystem(scene: Scene): ParticleSystem {
   };
 }
 
-export function createTrail(particles: ParticleSystem, style: ParticleStyle, spacing: number, start: Vector3): ParticleTrail {
+export function createTrail(
+  particles: ParticleSystem,
+  style: ParticleStyle,
+  spacing: number,
+  start: Vector3,
+): ParticleTrail {
   const last = start.clone();
   const backward = new Vector3();
   const spot = new Vector3();

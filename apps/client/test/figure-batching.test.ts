@@ -1,23 +1,13 @@
 import { strict as assert } from "node:assert";
-import { test } from "node:test";
+import { before, test } from "node:test";
+import { gameCatalogue } from "@jev-game/content";
 import { Mesh, type Material, type Object3D } from "three";
-import { createPlaceholderFigure } from "../src/game/views/hero-figures.js";
+import { createHeroFigure } from "../src/game/views/hero-figures.js";
+import { installHeroModels } from "./hero-models.js";
 
-const HEROES = [
-  "bulwark",
-  "frostweaver",
-  "duskblade",
-  "pyromancer",
-  "oathkeeper",
-  "ravager",
-  "hexbinder",
-  "blightmother",
-  "bonecaller",
-  "clockwright",
-  "thrall",
-  "bone-golem",
-  "turret",
-];
+const HEROES = Object.keys(gameCatalogue.heroes);
+
+before(installHeroModels);
 
 interface SolidPart {
   mesh: Mesh;
@@ -56,18 +46,22 @@ function repeatedMaterials(root: Object3D): string[] {
   return repeated;
 }
 
-test("every placeholder hero draws each of its materials once per moving part", () => {
+test("every hero draws each of its materials once per moving part", () => {
   for (const heroId of HEROES) {
-    const figure = createPlaceholderFigure(heroId);
+    const figure = createHeroFigure(heroId);
 
-    assert.deepEqual(repeatedMaterials(figure.root), [], `${heroId} draws a material more than once`);
+    assert.deepEqual(
+      repeatedMaterials(figure.root),
+      [],
+      `${heroId} draws a material more than once`,
+    );
     figure.dispose();
   }
 });
 
 test("a merged hero still casts a shadow from every solid part", () => {
   for (const heroId of HEROES) {
-    const figure = createPlaceholderFigure(heroId);
+    const figure = createHeroFigure(heroId);
     const solid = solidParts(figure.root);
 
     assert.ok(solid.length > 0, `${heroId} has no solid parts`);

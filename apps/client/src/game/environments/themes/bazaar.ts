@@ -94,13 +94,22 @@ function rugTexture(kit: PropKit, field: string, border: string, motif: string):
 }
 
 function rug(kit: PropKit, field: string, border: string, motif: string): Object3D {
-  return kit.solid(new BoxGeometry(9, 0.25, 13), kit.surface("#ffffff", { map: rugTexture(kit, field, border, motif) }), 0, 0.13, 0);
+  return kit.solid(
+    new BoxGeometry(9, 0.25, 13),
+    kit.surface("#ffffff", { map: rugTexture(kit, field, border, motif) }),
+    0,
+    0.13,
+    0,
+  );
 }
 
 function stall(kit: PropKit, stripes: readonly string[]): Group {
   const post = new CylinderGeometry(0.4, 0.45, 11, 6);
   const wood = kit.surface(WOOD_DARK);
-  const booth = kit.group(kit.solid(new BoxGeometry(14, 3.6, 5), kit.surface("#a8743f"), 0, 1.8, 2));
+
+  const booth = kit.group(
+    kit.solid(new BoxGeometry(14, 3.6, 5), kit.surface("#a8743f"), 0, 1.8, 2),
+  );
 
   for (const x of [-7, 7]) {
     for (const z of [-4, 4.6]) {
@@ -108,7 +117,14 @@ function stall(kit: PropKit, stripes: readonly string[]): Group {
     }
   }
 
-  const awning = kit.solid(new PlaneGeometry(16, 11, 1, 1), kit.surface("#ffffff", { map: stripeTexture(kit, stripes, 12), twoSided: true }), 0, 10.6, 0.4);
+  const awning = kit.solid(
+    new PlaneGeometry(16, 11, 1, 1),
+    kit.surface("#ffffff", { map: stripeTexture(kit, stripes, 12), twoSided: true }),
+    0,
+    10.6,
+    0.4,
+  );
+
   awning.rotation.x = -Math.PI / 2 + 0.32;
 
   const valance = kit.solid(new BoxGeometry(16, 1.2, 0.3), kit.surface(stripes[0]!), 0, 8.8, 5.6);
@@ -116,27 +132,66 @@ function stall(kit: PropKit, stripes: readonly string[]): Group {
   booth.add(awning, valance);
 
   for (let index = 0; index < 9; index += 1) {
-    booth.add(kit.solid(new SphereGeometry(0.75, 7, 5), kit.surface(kit.pick(FRUIT)), kit.between(-5.5, 5.5), 3.9, kit.between(0.6, 3.4)));
+    booth.add(
+      kit.solid(
+        new SphereGeometry(0.75, 7, 5),
+        kit.surface(kit.pick(FRUIT)),
+        kit.between(-5.5, 5.5),
+        3.9,
+        kit.between(0.6, 3.4),
+      ),
+    );
   }
 
-  booth.add(place(pot(kit, "#2f9fa0", 3), -4.5, 3.6, 1.5), place(pot(kit, "#c9653a", 2.6), 4.8, 3.6, 2.8));
+  booth.add(
+    place(pot(kit, "#2f9fa0", 3), -4.5, 3.6, 1.5),
+    place(pot(kit, "#c9653a", 2.6), 4.8, 3.6, 2.8),
+  );
 
   return booth;
 }
 
 function cactus(kit: PropKit, height: number): Group {
   const green = kit.surface("#5a9a4a");
-  const trunk = kit.solid(new CapsuleGeometry(height * 0.1, height * 0.8, 3, 8), green, 0, height * 0.5, 0);
+
+  const trunk = kit.solid(
+    new CapsuleGeometry(height * 0.1, height * 0.8, 3, 8),
+    green,
+    0,
+    height * 0.5,
+    0,
+  );
+
   const plant = kit.group(trunk);
 
   for (const side of [-1, 1]) {
     const elbowY = height * kit.between(0.35, 0.55);
     const reach = height * 0.22;
-    plant.add(strut(kit, new Vector3(0, elbowY, 0), new Vector3(side * reach, elbowY + height * 0.04, 0), height * 0.07, height * 0.07, green, 7));
-    plant.add(kit.solid(new CapsuleGeometry(height * 0.07, height * 0.26, 3, 8), green, side * reach, elbowY + height * 0.17, 0));
+    plant.add(
+      strut(
+        kit,
+        new Vector3(0, elbowY, 0),
+        new Vector3(side * reach, elbowY + height * 0.04, 0),
+        height * 0.07,
+        height * 0.07,
+        green,
+        7,
+      ),
+    );
+    plant.add(
+      kit.solid(
+        new CapsuleGeometry(height * 0.07, height * 0.26, 3, 8),
+        green,
+        side * reach,
+        elbowY + height * 0.17,
+        0,
+      ),
+    );
   }
 
-  plant.add(kit.solid(new SphereGeometry(height * 0.07, 6, 4), kit.surface("#ff7eb6"), 0, height * 1.02, 0));
+  plant.add(
+    kit.solid(new SphereGeometry(height * 0.07, 6, 4), kit.surface("#ff7eb6"), 0, height * 1.02, 0),
+  );
 
   return plant;
 }
@@ -147,7 +202,10 @@ function archway(kit: PropKit): Group {
   const gate = kit.group();
 
   for (const x of [-9, 9]) {
-    gate.add(kit.solid(new BoxGeometry(5, 20, 5), stone, x, 10, 0), kit.solid(new BoxGeometry(6, 1.4, 6), tile, x, 20.4, 0));
+    gate.add(
+      kit.solid(new BoxGeometry(5, 20, 5), stone, x, 10, 0),
+      kit.solid(new BoxGeometry(6, 1.4, 6), tile, x, 20.4, 0),
+    );
   }
 
   const arch = kit.solid(new TorusGeometry(9, 2.5, 6, 14, Math.PI), stone, 0, 20.4, 0);
@@ -172,7 +230,15 @@ function lanternString(kit: PropKit, span: number, sag: number): Group {
 
     if (index < steps) {
       const tone = kit.pick(glows);
-      line.add(kit.solid(new BoxGeometry(1.1, 1.5, 1.1), kit.surface(tone, { emissive: tone, glow: 1.3 }), point.x, point.y - 1.3, 0));
+      line.add(
+        kit.solid(
+          new BoxGeometry(1.1, 1.5, 1.1),
+          kit.surface(tone, { emissive: tone, glow: 1.3 }),
+          point.x,
+          point.y - 1.3,
+          0,
+        ),
+      );
     }
 
     previous = point;
@@ -190,18 +256,48 @@ function lanternString(kit: PropKit, span: number, sag: number): Group {
 
 function well(kit: PropKit): Group {
   const wood = kit.surface(WOOD_DARK);
-  const water = kit.solid(new CylinderGeometry(3.6, 3.6, 0.3, 12), kit.surface("#1f6f78", { roughness: 0.2 }), 0, 1.2, 0);
+
+  const water = kit.solid(
+    new CylinderGeometry(3.6, 3.6, 0.3, 12),
+    kit.surface("#1f6f78", { roughness: 0.2 }),
+    0,
+    1.2,
+    0,
+  );
+
   water.castShadow = false;
-  const rim = kit.solid(new TorusGeometry(4.2, 0.7, 5, 14), kit.surface("#2fb3ad", { roughness: 0.4 }), 0, 4.2, 0);
+
+  const rim = kit.solid(
+    new TorusGeometry(4.2, 0.7, 5, 14),
+    kit.surface("#2fb3ad", { roughness: 0.4 }),
+    0,
+    4.2,
+    0,
+  );
+
   rim.rotation.x = Math.PI / 2;
 
   const shaft = kit.group(
-    kit.solid(new CylinderGeometry(4.2, 4.6, 4.2, 12, 1, true), kit.surface(SANDSTONE, { twoSided: true }), 0, 2.1, 0),
+    kit.solid(
+      new CylinderGeometry(4.2, 4.6, 4.2, 12, 1, true),
+      kit.surface(SANDSTONE, { twoSided: true }),
+      0,
+      2.1,
+      0,
+    ),
     rim,
     water,
     kit.solid(new BoxGeometry(10.5, 0.7, 0.7), wood, 0, 10.4, 0),
     kit.solid(new CylinderGeometry(0.9, 0.7, 1.6, 8), kit.surface("#8a5a33"), 1.4, 6.6, 0),
-    strut(kit, new Vector3(1.4, 10.1, 0), new Vector3(1.4, 7.4, 0), 0.08, 0.08, kit.surface("#5b3a1f"), 4),
+    strut(
+      kit,
+      new Vector3(1.4, 10.1, 0),
+      new Vector3(1.4, 7.4, 0),
+      0.08,
+      0.08,
+      kit.surface("#5b3a1f"),
+      4,
+    ),
   );
 
   for (const x of [-5, 5]) {
@@ -216,7 +312,14 @@ function rolledCarpets(kit: PropKit): Group {
   const pile = kit.group();
 
   tones.forEach((tone, index) => {
-    const roll = kit.solid(new CylinderGeometry(0.9, 0.9, 8, 8), kit.surface(tone), 0, 0.9 + (index >= 3 ? 1.6 : 0), (index % 3) * 1.9 - 1.9 + (index >= 3 ? 0.95 : 0));
+    const roll = kit.solid(
+      new CylinderGeometry(0.9, 0.9, 8, 8),
+      kit.surface(tone),
+      0,
+      0.9 + (index >= 3 ? 1.6 : 0),
+      (index % 3) * 1.9 - 1.9 + (index >= 3 ? 0.95 : 0),
+    );
+
     roll.rotation.z = Math.PI / 2;
     pile.add(roll);
   });
@@ -228,7 +331,15 @@ function fruitCrate(kit: PropKit): Group {
   const box = crate(kit, 5);
 
   for (let index = 0; index < 6; index += 1) {
-    box.add(kit.solid(new SphereGeometry(0.85, 7, 5), kit.surface(kit.pick(FRUIT)), kit.between(-1.5, 1.5), 5.4, kit.between(-1.5, 1.5)));
+    box.add(
+      kit.solid(
+        new SphereGeometry(0.85, 7, 5),
+        kit.surface(kit.pick(FRUIT)),
+        kit.between(-1.5, 1.5),
+        5.4,
+        kit.between(-1.5, 1.5),
+      ),
+    );
   }
 
   return box;
@@ -288,7 +399,17 @@ export const bazaarTheme: EnvironmentTheme = {
 
     return kit.group(
       dunes,
-      drift(kit, { count: 90, spread: 140, floor: 0, ceiling: 20, fall: -1.5, sway: 8, size: 0.9, tone: "#f7d9a8", glowing: false }),
+      drift(kit, {
+        count: 90,
+        spread: 140,
+        floor: 0,
+        ceiling: 20,
+        fall: -1.5,
+        sway: 8,
+        size: 0.9,
+        tone: "#f7d9a8",
+        glowing: false,
+      }),
       place(stall(kit, ["#2a9d8f", "#f4efe1"]), -64, SAND_TOP, -8, 1.35),
       place(stall(kit, ["#e76f51", "#f4efe1"]), -70, SAND_TOP, 32, 1.75),
       place(stall(kit, ["#7b5ea7", "#f4efe1"]), 18, SAND_TOP, -66, 0.1),

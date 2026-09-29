@@ -3,6 +3,12 @@
 Short entries, only for things actually decided. See `docs/experiments.md`
 (from Phase 8 onward) for gameplay experiments.
 
+Entries before "Pivot: little guys, big physics, hero combos" predate the
+2026-09-28 pivot. Docs and scripts they name that the
+pivot removed (`docs/icons.md`, `docs/models.md`, `docs/lore.md`,
+`docs/hero-redesign.md`, `docs/heroes-and-builds-design.md`, and the
+`icons:*` and `models:*` scripts) are at the `pre-pivot` tag.
+
 ## Phase 1
 
 **Renamed `packages/colyseus-contract` to `packages/server-runtime`, and
@@ -144,14 +150,14 @@ schema.
 the HUD as an absolutely-positioned overlay on top, not a DOM arena box
 sitting next to an HTML sidebar.** The user caught this after the first
 pass — "html with elements and a canvas inside" is exactly what section 4's
-"ordinary HTML and CSS... alongside the canvas" does *not* mean. Rebuilt
+"ordinary HTML and CSS... alongside the canvas" does _not_ mean. Rebuilt
 `game/views/arena-view.ts` to own a canvas sized to `window.innerWidth/
 innerHeight` (with devicePixelRatio scaling) instead of a bounded DOM box;
 `unit-view.ts` became pure `CanvasRenderingContext2D` draw functions instead
 of persistent DOM nodes; `battle-view.ts` does hit-testing for unit
 selection from canvas click coordinates instead of per-unit click
 listeners. The real bug this surfaced: centering the arena across the
-*entire* viewport put units directly underneath the opaque HUD sidebar.
+_entire_ viewport put units directly underneath the opaque HUD sidebar.
 Fixed with `SafeAreaInsets` — `arena-view.ts` fits the arena into
 `viewport minus insets`, and `battle-lab-scene.ts` computes those insets
 from the actual HUD panels' `getBoundingClientRect()` (recomputed on window
@@ -169,7 +175,7 @@ carving out full-width/full-height strips for the top, side, and bottom HUD
 panels, with dead unused canvas in the strips the panels didn't actually
 fill. The user caught this from a screenshot — "I see a clear border around
 the game and the HUD is outside it" — the opposite of a real overlay.
-`computeTransform` in `arena-view.ts` now fits the arena into the *entire*
+`computeTransform` in `arena-view.ts` now fits the arena into the _entire_
 viewport (minus a small cosmetic `PADDING_PIXELS` on all sides, not
 HUD-shaped insets); `createArenaView`, `createBattleView`, and
 `createBattleLabScene` no longer take or compute a `getSafeAreaInsets`
@@ -187,7 +193,7 @@ CSS, and it was false: two things still broke the overlay. (1)
 around the arena bounds — literally "a clear border around the game," the
 user's exact words, untouched by the insets work. (2) The canvas painted
 nothing but two dots on transparent black, so there was no game surface for a
-panel to sit *on top of*; a translucent panel over a void is
+panel to sit _on top of_; a translucent panel over a void is
 indistinguishable from a panel beside a void. Fixed by deleting
 `drawBoundary()` outright (not softening it) and replacing it with
 `drawFloor()`, which fills the **entire canvas** — `(0,0)` to
@@ -283,7 +289,7 @@ comes back.
 
 **§6 contract gaps, each closed:**
 
-- *No seeded resolution-priority order.* Attack proposals were sorted
+- _No seeded resolution-priority order._ Attack proposals were sorted
   lexicographically by `sourceUnitId`, so `A-1` always resolved before `B-1`
   — invisible at 2 units (both damage totals land regardless of order) but a
   real systematic bias once Phase 5's multi-unit battles share targets. §6
@@ -296,7 +302,7 @@ comes back.
   `createBattle` calls; the duel's result, tick count and per-unit damage are
   unchanged (297 ticks, 100/100, mutual elimination) but the event digest
   changed, as expected, because event order is no longer ID-derived.
-- *HP/damage weren't required to be integers.* `validateCatalogue` now
+- _HP/damage weren't required to be integers._ `validateCatalogue` now
   requires `maxHp`, `attackDamage` and `attackIntervalTicks` to be positive
   integers (range and move speed stay continuous — they're world units and
   units/second, not counts). `applyDamage` now rounds its input, per §6's
@@ -305,19 +311,19 @@ comes back.
   before calling `session.reset()`, so a typed `10.5` can't reach
   `validateCatalogue` and throw out of an unguarded click handler — the
   Reset button had no try/catch, unlike Import.
-- *Spawns weren't bounds-checked.* `createBattle` validated finiteness but
+- _Spawns weren't bounds-checked._ `createBattle` validated finiteness but
   not that a spawn lies inside the arena. Added a bounds check; an
   out-of-arena spawn now throws at creation instead of silently clamping on
   the unit's first move.
-- *`BattleResult` had no per-unit contribution, and `BattleSnapshot` carried
-  no RNG state* — both named as required concepts in §6. Added
+- _`BattleResult` had no per-unit contribution, and `BattleSnapshot` carried
+  no RNG state_ — both named as required concepts in §6. Added
   `UnitState.damageDealt`, accumulated in `stepBattle` on every resolved hit;
   each `BattleResult` variant now carries `damageDealt: Record<UnitId,
-  number>`, built once when the result is decided. `BattleSnapshot.rng` is a
+number>`, built once when the result is decided. `BattleSnapshot.rng` is a
   `cloneRng`'d copy, never the live reference. `scripts/simulate.ts` now
   prints `state.result.damageDealt` instead of re-deriving it from the event
   log — one source of truth instead of two.
-- *`kind: "failure"` was declared but unreachable.* Added the one check §6
+- _`kind: "failure"` was declared but unreachable._ Added the one check §6
   actually asks for — corrupt state, not a missing feature: if any unit's HP
   or position is non-finite when a result is evaluated, the battle ends in
   `failure` with a reason, not a fabricated draw or win. Deliberately not a
@@ -325,8 +331,8 @@ comes back.
   budget (draw on timeout), and no path in the current engine can actually
   produce non-finite state — this is a backstop, verified to compile and
   type-check, not exercised by a real failure yet.
-- *Scenario import silently overwrote the version field it claimed to
-  check.* `parseScenario` set `version: 1` on its return value regardless of
+- _Scenario import silently overwrote the version field it claimed to
+  check._ `parseScenario` set `version: 1` on its return value regardless of
   what was in the imported JSON. Now it reads `parsed.version` and throws on
   anything other than `1`, so a future format change fails loudly on import
   instead of being silently reinterpreted as the current format.
@@ -353,22 +359,22 @@ list; abilities are tried first, the basic attack is the fallback.** The
 plan's own phrase — "abilities resolve before its basic attack; by default
 it does one of these per tick" — is the spec for this. `bruiser` has no
 extra abilities (`abilityIds: []`), so it behaves exactly as it did in
-Phase 2. `ranger`'s *basic attack itself* is `bolt` — there's no separate
-"ranged ability," the ranged behaviour just *is* what the hero's basic
+Phase 2. `ranger`'s _basic attack itself_ is `bolt` — there's no separate
+"ranged ability," the ranged behaviour just _is_ what the hero's basic
 attack does. `support` has `abilityIds: ["mend"]` with `basicAttackId:
 "strike"` as a fallback, so a support with nothing to heal still fights
 instead of standing idle — and, just as importantly, still has a
-well-defined *engagement range* for movement purposes (see next entry).
+well-defined _engagement range_ for movement purposes (see next entry).
 
 **Movement's stop-distance is the unit's basic attack's range, not a flat
 per-unit field.** Phase 2's `UnitState.attackRangeUnits` is gone — abilities
 can have different ranges from each other (`strike` 10, `bolt` 30, `mend`
 8), so "how close does this unit walk before it starts doing anything" had
 to become a lookup (`abilities/getEngageRange`) instead of a stored number.
-This is also why `ranger` needed *a* basic attack (`bolt` itself) rather
+This is also why `ranger` needed _a_ basic attack (`bolt` itself) rather
 than none: movement always needs an engagement range to approach to.
 
-**`mend` grants a heal *and* a shield in one `AbilityDefinition` (two
+**`mend` grants a heal _and_ a shield in one `AbilityDefinition` (two
 effects on the same ability), instead of a fourth ability file.** The plan
 lists shield as its own implementation step (10.6) but the starter content
 list in section 4 is fixed at three named ability files —
@@ -382,7 +388,7 @@ array was already there.
 
 **The lab's hero-stat override inputs (Phase 2) are removed, not extended
 to the new fields.** They don't generalise: overriding "max HP" applied to
-*every* hero in the catalogue at once defeats the reason three different
+_every_ hero in the catalogue at once defeats the reason three different
 heroes exist. Replaced with a scenario `<select>` (`duel` / `three-vs-three`)
 in the same tuning drawer. `LabScenario`'s export/import format changed
 shape to match (`{version: 2, seed, scenario}`, dropping `heroOverrides`
@@ -406,7 +412,7 @@ no-op rather than replaying a partial fight.
 **Playback is a second, separate `BattleLabSession` implementation
 (`createPlaybackSession`), not a mode flag on the live session.** It steps
 an index into the recording's frame list instead of calling `stepBattle`,
-but exposes the *exact* same interface, so `battle-lab-scene.ts`,
+but exposes the _exact_ same interface, so `battle-lab-scene.ts`,
 `battle-view.ts` and every HUD panel render it with zero changes. `main.ts`
 owns swapping between the two — a `mount()` helper disposes whichever scene
 is active and creates a fresh one over the new session. Verified at the
@@ -447,7 +453,7 @@ silently — the point of asking for a cold review was to catch exactly this.
 `UnitState.targetUnitId`, which drove movement and everything the HUD reads.
 `resolveAbilityTarget`'s `"nearest-enemy"` branch called `findNearestEnemy`
 independently — freshly, with no retention — so an ability could fire on
-whichever enemy was nearest *this tick*, not the one the unit was shown
+whichever enemy was nearest _this tick_, not the one the unit was shown
 approaching. Measured on `three-vs-three` seed 1 before the fix: 18 of 90
 casts (20%) hit a different unit than `targetUnitId` named. Fixed by making
 `resolveAbilityTarget`'s enemy branch call `resolveTarget` itself, so
@@ -538,7 +544,7 @@ from this for the Phase 4 gate.
 unable to ever attack.** Found while chasing down why `three-bruisers` (a
 same-hero mirror — this project's own established way to catch order/bias
 bugs, see `docs/decisions.md`'s earlier entries from the previous game) was
-producing a *deterministic win* instead of a draw, on every seed tried.
+producing a _deterministic win_ instead of a draw, on every seed tried.
 Traced with a throwaway probe script (written, run, deleted — not left in
 the repo): `A-2`'s distance to its target settled at
 `10.000000000000004`, `B-2`'s mirror-symmetric distance to its own target
@@ -547,9 +553,9 @@ about 6e-15 due to ordinary floating-point rounding in the movement math,
 landing on opposite sides of the `> ability.range` check used by
 `abilities.ts`'s range test. `movement.ts`'s stop condition
 (`distanceToTarget <= engageRangeUnits`) uses the complementary comparison,
-so a unit that rounds a hair *over* range stops advancing (it believes
+so a unit that rounds a hair _over_ range stops advancing (it believes
 it's arrived) while `proposeAction`'s strict `>` check keeps rejecting it
-(it isn't *quite* there) — a self-consistent trap with no way out: the
+(it isn't _quite_ there) — a self-consistent trap with no way out: the
 remaining true distance is sub-ULP, so further movement steps round to no
 movement at all. `A-2` sat frozen 10 units from its target for 150 ticks,
 unable to land a single hit, while its mirror `B-2` fought normally.
@@ -574,7 +580,7 @@ visible here.
 they're trying to heal.** `getEngageRange` derives a unit's stopping
 distance from its basic attack's range only (`strike`, 10 for support), but
 `mend` targets an ally at range 8, and movement only ever chases the
-nearest *enemy* — there is no notion of "move toward the ally I'm about to
+nearest _enemy_ — there is no notion of "move toward the ally I'm about to
 heal" anywhere in `movement.ts`. Measured (re-verified after the two fixes
 above, since both changed simulated behaviour — this is the current
 figure): in `three-vs-three` seed 1, 8 of the support's 12 `mend` casts
@@ -624,7 +630,7 @@ result, so any future zero-base stat (a stat with no hero-intrinsic
 value to scale) must use `flat`, never `percent`. This is exactly the
 "don't let '10% faster' have two meanings" trap the plan warned about,
 just one level removed: same formula, but two structurally different
-*uses* of "percent" that looked interchangeable and weren't.
+_uses_ of "percent" that looked interchangeable and weren't.
 
 **Chain lightning (`bolt` → `chain-damage`) reused the exact ULP-boundary
 bug class from the Phase 3 range fix, deliberately guarded against up
@@ -687,7 +693,7 @@ comes back through a real reaction (`mend-shield`, trigger
 `after-heal-effect`), granted by the `healing-that-also-shields` upgrade,
 whose own flat stat-modifier (`value: 15`) supplies the reaction's base
 shield amount — there is no bare "15" living in the reaction definition
-itself, so the granting upgrade's flat contribution *is* the base, and
+itself, so the granting upgrade's flat contribution _is_ the base, and
 `stronger-shield`'s percent modifier (gated behind
 `healing-that-also-shields` as a prerequisite) multiplies onto exactly
 that, giving `15 * 1.5 = 22.5 → 23` at one stack. This is a genuine
@@ -708,7 +714,7 @@ mechanics. `extra-lightning-bounce` (ranger only, +1 `bolt` bounce,
 stacks 2) and `bonus-damage-vs-slowed` (bruiser only, +50% `strike`
 damage vs. a currently-slowed target) are restricted to one hero each —
 deliberately, not by omission. `bonus-damage-vs-slowed` reads
-`isBasicAttack` plus the *single-target* `damage` effect path in
+`isBasicAttack` plus the _single-target_ `damage` effect path in
 `applyEffect`; `bolt`'s damage goes through the separate `chain-damage`
 path in `chain.ts`, which never consults the bonus. Offering this upgrade
 to a ranger would be a "never-useful choice" — checked, never do
@@ -723,7 +729,7 @@ overlay.** `apps/client/src/hud/upgrade-picker.ts` renders one checkbox
 section per hero present on **team A only** for the current scenario;
 team B always stays at its stock, zero-upgrade build. This is a
 deliberate asymmetry, not a limitation: the plan's Phase 4 deliverable is
-"compare a build with its previous version" against a *fixed* opponent,
+"compare a build with its previous version" against a _fixed_ opponent,
 which a mirrored symmetric toggle can't give you as directly. Eligibility
 (`isUpgradeEligible`) re-runs on every checkbox change, so
 `stronger-shield` starts disabled and greys back in the instant
@@ -743,6 +749,7 @@ behaviour for a synergy upgrade with no partner present, not a bug.
 
 **Known, deliberate gaps, left for a human to weigh in on rather than
 guessed at:**
+
 - The picker only offers each upgrade as a single toggle (0 or 1 stack),
   even though the engine and `compileBuild` fully support higher stacks
   (`more-max-hp` at 3 stacks and `stronger-shield` at 2 were both verified
@@ -760,7 +767,7 @@ guessed at:**
   applies.
 - Support-unit positioning (documented above, still open from Phase 3)
   now has a second consequence: `healing-that-also-shields` only pays off
-  when `mend` lands on an *ally*, and the support's own self-heal rate
+  when `mend` lands on an _ally_, and the support's own self-heal rate
   was last measured at 8 of 12 casts. Whether that upgrade reads as
   strong or weak in practice is entangled with the unresolved positioning
   question, not a separate finding — worth re-measuring together in the
@@ -770,8 +777,7 @@ guessed at:**
 
 An independent Opus review of the Phase 4 diff found one real blocking bug
 and several worth a decision. All fixed and re-verified; the zero-upgrade
-baselines (`duel` 297, `three-vs-three` 379/`50,170,90`, `three-bruisers`
-392) were re-run after every fix in this pass and are unchanged except
+baselines (`duel` 297, `three-vs-three` 379/`50,170,90`, `three-bruisers` 392) were re-run after every fix in this pass and are unchanged except
 where a fix specifically changes an event count (noted below).
 
 **Blocking: `createHeroBuild` enforced nothing, and it was the only build
@@ -797,6 +803,7 @@ selection in the first place, but a UI shouldn't hard-crash on bad state
 regardless of how confident the code around it is.
 
 **Validator hardening, three new checks in `validateCatalogue`:**
+
 - `slowFraction` must now be in `(0, 1)`, not `(0, 1]` — a full root
   (`1.0`) is rejected. No shipped content used it, but it's a direct route
   to the same "a unit can structurally never act again" failure class the
@@ -810,7 +817,7 @@ regardless of how confident the code around it is.
   Verified against four synthetic broken catalogues (clone +
   mutate, never touching shipped content): self-reference, a 2-cycle,
   and a cross-hero prerequisite each correctly throw before this pass;
-  a fourth was the confirmation that the *legal* prerequisite order
+  a fourth was the confirmation that the _legal_ prerequisite order
   (`healing-that-also-shields` → `stronger-shield`) still compiles fine.
 - The self-referencing case doubled as a real client-side bug: before
   this pass, `upgrade-picker.ts`'s deselect cascade recursed over
@@ -858,12 +865,13 @@ only the spurious post-mortem events are gone.
 **Confirmed as intentional, documented rather than changed (the plan's
 own "document and inspect this ordering rather than hiding it" guidance,
 item 10):**
-- A reaction-granted shield *overwrites* rather than stacks with an
+
+- A reaction-granted shield _overwrites_ rather than stacks with an
   existing shield (matches `applyEffect`'s plain shield case — reapplying
   always replaces amount and refreshes duration, documented back in the
   Phase 3 review pass). Consistent behaviour, not a special case for
   reactions.
-- A source unit that dies later in the *same tick* after its heal already
+- A source unit that dies later in the _same tick_ after its heal already
   resolved still lands its reaction-granted shield — the heal (and the
   reaction it queues) is already complete by the time a later action in
   the same tick's resolution order kills the source; the reaction doesn't
@@ -893,7 +901,7 @@ item 10):**
 this type-checks; it's inert today because `event-log.ts`'s
 `shield-applied` case doesn't look the field up in
 `catalogue.abilities`. Left as-is — flagged here so a future change that
-*does* do a catalogue lookup on a `shield-applied` event's `abilityId`
+_does_ do a catalogue lookup on a `shield-applied` event's `abilityId`
 knows to check for this case first.
 
 ## Phase 5 (engine slice): the run state machine
@@ -932,7 +940,7 @@ perfectly even 2-each bye distribution with zero consecutive repeats.
 `(activePlayerIds, history, pairingSeed)` — no separate `round` or
 `initialPlayerIds` parameters — because both live inside `PairingHistory`
 (`nextRound`, `initialPlayerIds`) instead. This was a deliberate reading:
-the circle method needs a *stable* shuffled seat order across all rounds
+the circle method needs a _stable_ shuffled seat order across all rounds
 of one cycle (reshuffling every round would break the "rotate by one
 step" invariant), so the seed used for that shuffle has to be constant
 for the whole run, derived once (`derivePairingSeed(runSeed)`), not
@@ -957,7 +965,7 @@ them.
 separate counters on purpose, per the plan's own explicit reason** ("
 another seat picking an upgrade must not invalidate your outstanding
 choice"). `RunState.phaseEpoch` increments on every phase transition;
-each `PlayerSeat.decisionRevision` increments only when *that* seat's own
+each `PlayerSeat.decisionRevision` increments only when _that_ seat's own
 command is accepted. Readiness for the current phase is
 `decisionRevision > readyThresholdByPlayer[playerId]`, where the
 threshold is snapshotted per seat at the moment the phase is entered —
@@ -993,7 +1001,7 @@ inside the state machine at all — the whole round's results exist
 atomically the instant `battle` phase is entered, and `settleRound`
 (the very next transition) applies every result together in one pure
 step. A future client can still show duels finishing at different
-*visual* paces by replaying each `RoundBattle.setup` through
+_visual_ paces by replaying each `RoundBattle.setup` through
 `recordBattle` independently for playback — exactly how the existing lab
 already turns a `BattleSetup` into a frame-by-frame recording — without
 the run's own domain state needing to track "still ticking." `RoundBattle`
@@ -1005,7 +1013,7 @@ reproduces it exactly.
 
 **A simulation failure aborts the whole match, not just that battle** —
 `settleRound` checks every battle in the round for a `failure` result
-*before* applying any health changes; if any battle failed, the round
+_before_ applying any health changes; if any battle failed, the round
 transitions straight to `finished` with `abortReason` set and `players`
 left untouched, matching "abort the whole lobby match with diagnostics
 and no round-health settlement" exactly. `abortReason: string | null`
@@ -1035,7 +1043,7 @@ exactly 4 battles covering all 8 players in round 1 with no bye; runs to
 a single-winner `finished` state; and reproduces bit-for-bit identical
 winners and health distributions when re-run with the same run seed. A
 round-cap of 2 forces a `finished` state after exactly 2 rounds with a
-*shared* win among every seat still at full health (three-way tie),
+_shared_ win among every seat still at full health (three-way tie),
 matching "equal highest health gives a shared win." A 5-player roster
 (odd, exercises byes every round) and a 2-player roster (final duel, no
 pairing algorithm needed at all) both complete correctly to a single
@@ -1057,7 +1065,7 @@ winner.
   forces a phase forward on a timer.
 - **Recording/replay/export-to-lab (step 8).** `RunState` is already
   plain, serializable data with no functions or classes, so replaying a
-  saved run is *architecturally* just re-applying the same recorded
+  saved run is _architecturally_ just re-applying the same recorded
   `RunCommand` sequence through `applyCommand` — but nothing currently
   records that sequence, and "export any battle to the laboratory" (wiring
   a `RoundBattle.setup` into the existing `createPlaybackSession`) isn't
@@ -1076,8 +1084,8 @@ winner.
 ## Phase 5 (client slice): a playable match UI, and two real bugs it found
 
 Building the client UI immediately surfaced two bugs the headless
-probe scripts never hit, because both are specifically about *replaying
-the same phase twice against a live, reactive session* — something a
+probe scripts never hit, because both are specifically about _replaying
+the same phase twice against a live, reactive session_ — something a
 one-shot `driveToCompletion` script never does, but a real UI naturally
 does (every `subscribe` callback re-renders from current state, and nothing
 stops the driver from being invoked again while still "in" a phase).
@@ -1088,12 +1096,12 @@ calls `pumpRun` then `runBotCommands` in a loop until nothing changes.
 Once bots have already submitted for the current phase but a human
 hasn't, `pumpRun` returns the state unchanged (correctly blocked) — but
 the old `runBotCommands` had no notion of "already decided," so it asked
-*every* non-human seat to decide again, including ones that had already
+_every_ non-human seat to decide again, including ones that had already
 committed. For `commit-draft`/`confirm-ready` this was wasteful but
 harmless (the same choice, re-submitted, is accepted again against the
-seat's *new* `decisionRevision` and just overwrites itself). For
+seat's _new_ `decisionRevision` and just overwrites itself). For
 `commit-upgrade` it was a real bug: a bot's second, redundant pick could
-land on an upgrade its *own first pick* had just made ineligible (e.g. a
+land on an upgrade its _own first pick_ had just made ineligible (e.g. a
 `maxStacks: 1` upgrade it already has), and `applyUpgrade` throws on an
 illegal choice rather than returning one — an uncaught exception that
 killed the whole session, reproduced live in the browser the first time
@@ -1145,7 +1153,7 @@ which stays populated through `round-result` and `upgrade` even after the
 live phase has moved past it) on the very next screen the human actually
 sees (`upgrade`, or `finished`), with an on-demand "Watch battle" button
 that reconstructs the full tick-by-tick recording from the stored
-`BattleSetup` via `recordBattle` and plays it through the *same*
+`BattleSetup` via `recordBattle` and plays it through the _same_
 `createBattleView`/`createUnitInspectorView`/`createEventLogView`
 components the lab itself uses — battle rendering was built once, for the
 lab, and is reused here unchanged rather than rebuilt.
@@ -1184,7 +1192,7 @@ with an escape hatch, not the other way around.** `render()` now checks,
 on every re-render, whether `state.currentRound` holds a human battle
 with a settled `result` that hasn't been shown yet
 (`watchedBattleIds: Set<BattleId>`), and if so opens the full-screen
-battle watch *automatically* instead of rendering the upgrade/finished
+battle watch _automatically_ instead of rendering the upgrade/finished
 panel — the player sees "Ready" turn directly into their battle playing
 out, not a button they have to remember to press. The overlay gained a
 "Skip to end" button (`MatchBattlePlayer.skipToEnd`, which already
@@ -1199,11 +1207,11 @@ screen**, closing the "you see if you won or lost → timer → next round"
 loop the user asked for and the plan's own "provisional 30-second choice
 window" / "labelled deterministic fallback" language. `createCountdown`
 (`apps/client/src/hud/countdown.ts`) is a 15-second visible countdown; on
-expiry it deterministically picks the *first* offered upgrade (not
+expiry it deterministically picks the _first_ offered upgrade (not
 random — matches "deterministic fallback," and the offer list order
 itself is already seeded, so "first" is reproducible) or calls the new
 `skip-upgrade` command if there are none. This is a client-side
-convenience for a *local, human-plus-bots* match, not the engine-level,
+convenience for a _local, human-plus-bots_ match, not the engine-level,
 server-authoritative deadline system the plan describes for online play
 — that's still deferred (see the engine-slice entry above); this timer
 only ever acts on the human's own seat, in the browser, and has no
@@ -1211,6 +1219,7 @@ concept of a shared clock across other sessions.
 
 **Two more real bugs, both found by actually playing the rebuilt loop,
 neither reachable from the old text-summary flow:**
+
 - **The "no eligible upgrades" screen's "Continue" button was silently
   dead.** It called `session.confirmReady()`, but `applyConfirmReady`
   only accepts that command during `preparing` — during `upgrade` it was
@@ -1227,7 +1236,7 @@ neither reachable from the old text-summary flow:**
   branch returned `null` when a bot had no offers, and `runBotCommands`
   treats `null` as "nothing to submit" — meaning that bot's
   `decisionRevision` never advances, it never reads as "ready," and
-  since `upgrade → preparing` requires *every* active seat ready, the
+  since `upgrade → preparing` requires _every_ active seat ready, the
   whole run would hang indefinitely the first time any bot maxed out its
   eligible upgrades. Not hit in the engine-only probe scripts (8-bot
   matches there happened to end via elimination before any single bot
@@ -1252,7 +1261,7 @@ opponent) entirely on its own.
 wrong position, I see 1 character for a second but they go off screen."**
 Root cause: `#lab-canvas-root canvas` has a CSS rule
 (`display: block; width: 100%; height: 100%`) that locks the `<canvas>`
-element's *displayed* box to its container regardless of the backing
+element's _displayed_ box to its container regardless of the backing
 pixel-buffer size `arena-view.ts` sets (`canvas.width = clientWidth *
 devicePixelRatio`, for crisp rendering on Retina screens). The match
 view's `.match-battle-watch-canvas` never got the equivalent rule. On a
@@ -1333,7 +1342,7 @@ which is what let `decideBotCommand` stop taking `RunState` at all.
 
 **One decision per seat per phase, enforced by the engine.** Before,
 nothing stopped a second `commit-upgrade` once a seat was ready: the
-revision check passes because the command carries the *new* revision.
+revision check passes because the command carries the _new_ revision.
 The earlier bot-crash fix (`runBotCommands` skipping ready seats) had
 patched this in the bot controller rather than in the engine. Now
 `applyCommand` rejects any command from an already-ready seat as
@@ -1439,6 +1448,7 @@ short-viewport spacing tweak. Checked at 800×600, 1024×768 and
 
 **Old names in earlier entries.** The dated entries above describe the
 UI as it was at the time. After this restyle:
+
 - `.match-battle-watch-canvas canvas` (the Retina camera fix) is now
   `.watch-canvas canvas`, same rule.
 - The `.match-root[hidden]` override is retired in favour of Tailwind's
@@ -1466,7 +1476,7 @@ has all duels run simultaneously. Battles still resolve instantly in the
 engine, so the client re-simulates any battle from its public `setup`
 (`recordBattle`, lazily and cached per battle) and shows each at the
 same round tick (`round-playback.ts`, replacing `match-battle-player.ts`).
-Switching players therefore means seeing their fight *now*, not
+Switching players therefore means seeing their fight _now_, not
 restarting it, and your battle ending early leaves the others still live
 to click into. "Skip" jumps the whole round to its end.
 
@@ -1476,7 +1486,7 @@ recorded in the review pass.
 
 **Guarding against spoilers is the main rule.** Seats are only clickable
 inside the round view, after results exist. During `preparing` the
-*next* round's setups already exist, so a click there could simulate and
+_next_ round's setups already exist, so a click there could simulate and
 reveal an unplayed result. Inside the round view, a seat's hearts and
 eliminated state show pre-round values (post-settlement health plus one
 if they lost this round) until that seat's own battle ends on the
@@ -1492,7 +1502,7 @@ red pixels (the surviving winner) and 0 blue.
 
 **`MatchSession` keeps the latest round the human took part in, not just
 their battle.** When the human is eliminated, `settle()` finishes the
-match in one call, and `currentRound` ends up holding only the *final*
+match in one call, and `currentRound` ends up holding only the _final_
 round. `ResolvedRound` snapshots that round's battles, its bye, and the
 public seats as they stood right after it settled, so the elimination
 round stays fully browsable.
@@ -1514,7 +1524,7 @@ round should have a timer and it's a draw if no one dies, I don't like
 having to hit Continue all the time"). No engine change: a battle still
 ending with both teams alive at its 45-second `tickLimit` was already a
 `draw` with reason `timeout`. What changed is how the HUD presents it.
-During a battle the round plate shows *real* seconds left
+During a battle the round plate shows _real_ seconds left
 (`RoundPlayback.secondsLeft`, the time limit divided by the 2× playback
 speed, so about 23), where it used to show game seconds falling at
 double speed, and it pulses for the last 3. Once every battle in the
@@ -1570,7 +1580,7 @@ every setup from the seats as they stand, then records the battles.
 **Placing heroes is not a decision.** Readiness is
 `decisionRevision > threshold`, so a command that bumped the revision
 would mark the seat ready. `place-heroes` checks the revision but
-doesn't bump it, and it always carries the *whole* formation, so the
+doesn't bump it, and it always carries the _whole_ formation, so the
 last one received wins even if messages arrive out of order (a
 move-or-swap delta wouldn't be safe that way). It is rejected once the
 seat is ready (`already-decided`), which is what locks the formation.
@@ -1601,14 +1611,14 @@ sensible one.
 Before and after the board, same probe (300 seeds per matchup, plus 100
 all-bot 8-seat runs):
 
-| Measure | Before (100×60 strip) | After (8×8 board) |
-| --- | --- | --- |
-| mixed vs mixed | 300 mutual wipeouts, mean 379 ticks | 300 mutual wipeouts, mean 413 ticks |
-| mixed vs three bruisers (either side) | mixed 300/300, 303 ticks | mixed 300/300, 412 ticks |
-| three bruisers mirror | 300 mutual wipeouts, 392 ticks | 300 mutual wipeouts, 484 ticks |
-| three rangers vs three bruisers | rangers 300/300, 425 ticks | rangers 300/300, 320 ticks |
-| all-bot runs: draws | 68 of 2124 battles (3.2%) | 32 of 2146 (1.5%) |
-| all-bot runs: mean fight length | 345 ticks | 337 ticks |
+| Measure                               | Before (100×60 strip)               | After (8×8 board)                   |
+| ------------------------------------- | ----------------------------------- | ----------------------------------- |
+| mixed vs mixed                        | 300 mutual wipeouts, mean 379 ticks | 300 mutual wipeouts, mean 413 ticks |
+| mixed vs three bruisers (either side) | mixed 300/300, 303 ticks            | mixed 300/300, 412 ticks            |
+| three bruisers mirror                 | 300 mutual wipeouts, 392 ticks      | 300 mutual wipeouts, 484 ticks      |
+| three rangers vs three bruisers       | rangers 300/300, 425 ticks          | rangers 300/300, 320 ticks          |
+| all-bot runs: draws                   | 68 of 2124 battles (3.2%)           | 32 of 2146 (1.5%)                   |
+| all-bot runs: mean fight length       | 345 ticks                           | 337 ticks                           |
 
 No hero numbers were retuned. Mirror matches still end symmetrically,
 so the south/north rotation adds no side bias.
@@ -1672,7 +1682,8 @@ in the same phase keeps the running one. Verified by dragging at 15 s
 and seeing 5 s left ten seconds later.
 
 **Two bugs found while testing, both fixed:**
-- *A pre-existing crash in the round view.* The first animation frame's
+
+- _A pre-existing crash in the round view._ The first animation frame's
   timestamp can be earlier than the `performance.now()` read just
   before it, so the playback clock could go below zero and read frame
   −1, which threw and stopped that round's animation loop. It showed as
@@ -1682,7 +1693,7 @@ and seeing 5 s left ten seconds later.
   so returning to a backgrounded tab resumes a local battle instead of
   skipping to its end. (Online, the replay deliberately jumps forward
   to the server's clock instead; see Phase 6.)
-- *Stray damage numbers over the player rail.* While the battle layer is
+- _Stray damage numbers over the player rail._ While the battle layer is
   hidden its size is 0, and the stage recorded a 1×1 viewport; with the
   HUD insets, a 1×1 fit centres everything at (232, 100), where the stray
   numbers appeared on the first frame after the layer came back. The
@@ -1713,6 +1724,7 @@ exactly the replay length plus the 3-second end pause
 and client) before moving on. Every browser replays in step, starting
 from the server's phase start time so a late joiner or reconnect lands
 at the right moment. Consequences, accepted for the prototype:
+
 - A modified client could compute a result before its replay ends. That
   is a spoiler only: every choice for the round is already locked.
 - "Simulation time" is measured as resolve time per round, not cost per
@@ -1747,8 +1759,8 @@ gets its original result instead of being applied twice.
 
 **Joining and starting.** Eight seats start as bots; a joining human
 takes the lowest bot seat (synchronously, so two joins can't share one),
-and the first human is host. At start the room goes *private*, not
-*locked*: Colyseus refuses `joinById` on locked rooms, which would also
+and the first human is host. At start the room goes _private_, not
+_locked_: Colyseus refuses `joinById` on locked rooms, which would also
 block reconnects, while private rooms simply drop out of matchmaking.
 Any fresh join after start is rejected in `onJoin`.
 
@@ -1771,16 +1783,16 @@ once, instead of blocking Start for the 30 s grace.
 game still has no draft timer, still awaiting a decision), preparing
 15 s, upgrade 15 s. When one passes, every human who hasn't decided gets
 `decideFallbackCommand`: the baseline bot's choice for draft and
-upgrade, but only *Ready* for preparing, since the bot's placement
+upgrade, but only _Ready_ for preparing, since the bot's placement
 policy would rearrange a human's heroes. The client shows the server's
 deadline instead of its own countdown.
 
 **Reconnects and forfeits.** A dropped connection keeps its seat for
 30 s via Colyseus `allowReconnection`; the page keeps its reconnection
 token in `sessionStorage` and resumes on load. Two tabs opened
-separately are two players; a tab *duplicated* from another copies its
+separately are two players; a tab _duplicated_ from another copies its
 `sessionStorage`, resumes the same seat and takes it over. Navigating
-away inside the page (Back to the lab, say) now *suspends* the
+away inside the page (Back to the lab, say) now _suspends_ the
 connection instead of leaving, so the same grace applies and coming
 back resumes; only Leave or Menu leave for real. An invite link for the
 room you're already in does nothing; one for another room asks first. When the grace runs out, or a player leaves after
@@ -1888,8 +1900,7 @@ built, the tuned numbers and the survey snapshot.
   `gameCatalogue` (currently the first slice). The legacy ranger, support
   and bruiser content still backs the battle lab. Every engine change is
   additive and switched on by content, so the 15 legacy event digests
-  (duel, three-vs-three and three-bruisers, over seeds 1, 2, 3, 7 and
-  42) are byte-identical. They were checked again after the last engine
+  (duel, three-vs-three and three-bruisers, over seeds 1, 2, 3, 7 and 42) are byte-identical. They were checked again after the last engine
   change.
 - **Numbers are ×10** (hits of 40–60 on 1500–2200 HP), so damage ranges
   are whole numbers and crits read as big.
@@ -2133,7 +2144,6 @@ tempo to 13.3"), so the code runs it again. The median run reaches the
 15-round cap, and 59% of eliminated seats last to round 9. This is the
 decision now, no longer an override.
 
-
 ## Teleport beat before each fight (2026-09-23)
 
 The user asked for a short phase after the placement timer runs out:
@@ -2226,6 +2236,7 @@ together and a bit of a story"), and the other six heroes. They also
 asked to wait for the full roster before any serious balance work.
 
 **Names and lore:**
+
 - `docs/lore.md` covers the world, the three currents behind the
   combos, how the rules read in fiction, ten heroes with stories and
   voice notes, rivalries, and summons.
@@ -2279,6 +2290,7 @@ pair replayed identically after they landed):
   waste themselves on thralls and turrets.
 
 **One of each hero per team:**
+
 - Draft offers are distinct.
 - Recruit offers skip heroes you have.
 - The survey builds teams from combinations of different heroes.
@@ -2290,6 +2302,7 @@ the design doc's §18.
 
 **Numbers:** the §14 first pass, scaled like the first four heroes, with
 no tuning.
+
 - A 400-fight stress probe with random different-hero teams and random
   talent paths: 0 crashes, every new mechanic firing.
 - Median fight 25.8 s, 2.25% timeouts.
@@ -2316,7 +2329,6 @@ no tuning.
   talents, against Gorrak, Nettle and Morrow) replays byte-identically
   across processes. Online clients re-simulate from setups, so this is
   what keeps them in sync.
-
 
 ## Phase 7, first slice: the Jev package (2026-09-23)
 
@@ -2786,7 +2798,6 @@ The recipe is `art/generators/build_ravager.py`, described in
     the arms-out pose spinning inside the cyclone.
   - The `#models` leak test with 32 Gorraks, cyclones included, reported
     no leak (geometries 210 → 210, textures 36 → 36).
-
 
 ## Hero portraits (2026-09-24)
 
@@ -3796,7 +3807,6 @@ stood in for key art.
   - Lint, typecheck and the client build pass. The main chunk grew by
     0.3 KB gzipped, and the hero models were already preloaded.
 
-
 ## Draft picks survive the timer (2026-09-24)
 
 A player who picked three heroes but didn't press Confirm got a random
@@ -4761,3 +4771,448 @@ next cast.
   vs Gorrak and Cinder. Both Resurrection branches fired, with no
   console errors. Lint, both typechecks and all 95 client tests pass.
 - Nothing was committed.
+
+## Pivot: little guys, big physics, hero combos (2026-09-28)
+
+The user played their prototype, "Bone & Banner — an autochess you
+watch", and decided to pivot the game towards it. The plan is in
+`docs/pivot-plan.md`. This entry records only what the user decided.
+
+- **Direction:**
+  - small chibi characters;
+  - very exaggerated effects with physics;
+  - combos, where one hero's spell sets up another's.
+- **Assets:** we use free third-party assets for characters, environments
+  and props instead of making our own. Sources are itch.io and similar;
+  the prototype used KayKit. Spells and their effects are still made
+  in-house.
+- **Roster:** the whole current roster goes. The user's words: "dont try
+  reuse anything from any existing hero in our game atm".
+- **Gems and items:** scrapped for now. Some kind of upgrades, spells and
+  combos will probably return later, in a shape not decided yet.
+- **Five heroes to start with:**
+  1. the hammer: the prototype's Paladin and his Hammer of Judgement;
+  2. a berserker, from the prototype's Barbarian and his Berserk. The
+     user's words: he "needs some work, but I think he's decent". How
+     much work is still open.
+  3. a mage whose Living Bomb makes the target run around and set others
+     on fire;
+  4. a support with exaggerated physics effects;
+  5. one slot still open.
+
+**Superseded.** These entries now stand only as history:
+
+- **The roster goes:**
+  - All ten heroes, names and lore;
+  - Gorrak's game model;
+  - hero portraits;
+  - Cinder's game model and spell visuals;
+  - creature portraits and slice 1's icons;
+  - hero redesign slices 1, 2, 4a, 4b and 4c;
+  - the per-hero HUD entries (Chill, Pandemic and Burst; Morrow; Moira;
+    Sexton; Brassjack);
+  - Moira built in three.js;
+  - Vesper is code-built, and Vesper's plate hides;
+  - Nettle and Morrow are code-built;
+  - the hero sounds and voice lines in "The stone-arena sound set and
+    hero voice lines";
+  - the three heroes in "Main menu: your arena and three heroes behind
+    it";
+  - the level-pick icons in "Level-pick and item icons", since every
+    level belongs to an old hero.
+- **Gems and items go:**
+  - Heroes, combos and builds: the first slice;
+  - The rest of the runes and items;
+  - the combo and item parts of "Right-hand HUD";
+  - Items overhaul;
+  - Voidheart callout;
+  - the item icons in "Level-pick and item icons";
+  - Gems restyled as cut gemstones.
+
+**Partly superseded:**
+
+- **Tempo and the reward screen.** The tuning for the old heroes goes.
+  Replays at 1× stay. The reward screen loses its gem and item offers,
+  and whether it stays at all waits on levels and recruit (§11 of the
+  plan).
+- **Delayed hit visuals stay near the 0.16 s projectile.** Moira's
+  timings go. The 0.2 s rule and the advice for long, showy flights
+  stay.
+- **Hero visuals on the effect pool.** The hero visuals go, and so do
+  the 53 visuals the warm-up test covers. The four material kinds
+  (`veil`, `solid`, `fadingSolid` and `fadingRock`), self-disposing
+  projectiles, the battle-effects additions and the warm-up test's
+  checks stay.
+
+The plan also proposed dropping levels and recruit, deleting the build
+layer from "Phase 4: upgrades that change how builds play", and retiring
+the custom model and icon pipelines, the board themes and the teleport
+beat. The next entry records what happened: all of it went except the
+board themes and the teleport beat.
+
+## Bone & Banner, first build: what went and what stayed (2026-09-28)
+
+The first build of `docs/pivot-plan.md`, on the user's "just start
+building man, make sure you purge old code as u go". Everything removed
+is at the `pre-pivot` tag (ba88bb6), including the user's 17 uncommitted
+files from the Rime and frost-bench work.
+
+**Five heroes and a dummy, none reused.** Paladin (Hammerfall),
+Berserker (Rampage), Firebrand (Short Fuse), Bubble Cleric (Big Bubble,
+plus the Safety Bubble passive) and Harpooner (Yank), with a
+non-draftable Training Dummy for the lab.
+Why: the user asked for five or fewer ("try stay 5 or under atm"),
+named the hammer, the Berserker and a Living Bomb mage, asked for a
+physics support, and wanted nothing from the old heroes. The Bubble
+Cleric and the Harpooner are the plan's picks for slots 4 and 5 (§11, Q1
+and Q2). They were built when the user said to start, and the user
+hasn't confirmed them yet.
+
+**Teams of three from all five, mirrors allowed.** No levels, recruit,
+gems or items. The online match and Jev stay, with only the draft and
+formation phases.
+Why: the user scrapped gems and items. Dropping levels and recruit,
+keeping the match and Jev, and picking three of five are the plan's
+recommendations (§11, Q4 and Q7 to Q9). They were built when the user
+said to start, and the user hasn't confirmed them yet.
+
+**A new engine that still runs headless.** `packages/game` has no
+dependencies and runs at 30 ticks a second on seeded random numbers. It
+owns launches, flights, landings and bowling, bubbles, fuses and fire,
+and the combo chain. The client only plays back its recording.
+Why: the user asked that the game "still can run headless". The server,
+Jev and `pnpm simulate` all run battles with no browser.
+
+**Purged, not kept for later:**
+
+- the old heroes' content, abilities, visuals, figures and tests;
+- the voice lines, the voice director, and the dialogue bus and its
+  volume slider. Nothing speaks now;
+- every sound only the old abilities used (22 of 97 remain);
+- the icon pipeline (`scripts/icons` and the masters under `art/icons`),
+  the Blender model build and check (`scripts/models`,
+  `art/models/heroes`) and the balance survey (`scripts/survey`);
+- rewards, offers and inventory in `packages/run`, and Jev's reward
+  decisions;
+- `packages/shared`, which only the old Arena room used, with that room,
+  its test and the load test;
+- the docs that only described the old game: `docs/icons.md`,
+  `docs/models.md`, `docs/lore.md`, `docs/hero-redesign.md`,
+  `docs/heroes-and-builds-design.md` and the new-hero skill;
+- 242 CSS rules no markup used any more.
+
+Why: the user asked for old code to go as the build went, and the tag
+keeps all of it recoverable.
+
+**Rewritten rather than trimmed:** the HUD, the battle view and the
+match scene.
+Why: each was built around items, gems, levels and the old abilities.
+
+**Stayed:**
+
+- the board themes, the environments and the teleport beat. They don't
+  depend on the old heroes, and the arena is still an open question
+  (plan §11, Q3);
+- lighting, effects, the graphics settings and the frame-drop fixes;
+- the audio engine, the planning music and the 22 sounds that still fit.
+
+**Removed after review:** the model loader (`models/`), `model-figure.ts`,
+the placeholder upgrade in `hero-figures.ts`, the `#models` lab and the
+crate and barrel GLBs. The plan's §8.2 had kept them for the KayKit
+bodies, but nothing used them: no hero had a model, and the props only
+loaded in `#models`. Keeping them was keeping code for later. The KayKit
+import needs a different loader anyway (shared clip files, hand slots),
+and the old one is at `pre-pivot`.
+
+**Fixed on the way:**
+
+- The main menu and the `#env` lab crashed on load. They still placed
+  old hero ids, and the figure builder throws on an id it doesn't know.
+  They now place the new heroes.
+- `pnpm audio:check` imported the deleted voice lines and failed. It now
+  checks only that every sound's file exists and every file is used.
+- The online session's `send` and `markWatched` returned quietly when no
+  view had arrived yet. They now throw.
+- Four state rules broke plan §4.1–4.2. A melee crit's hop didn't make
+  its target Airborne, so it set nothing up. A body dropped by a popping
+  bubble counted as launched, so it could Comet, set off Hot Potato and
+  count as Airborne. A hammer or blast that caught one member of a
+  bubble flung only the members inside its radius. Hammerfall's aim
+  counted only the setups it waits for, so it passed over a burning or
+  primed group. Each now follows the plan and has a test in
+  `packages/game/test/combos.test.ts`.
+
+**Tuned:** the Firebrand starts with 30 mana instead of 10.
+Why: against grouped dummies the Paladin has his "3+ grouped" setup at
+once, so he slammed as soon as his mana filled, usually before any fuse
+was lit. Only 27 of 100 seeds of Paladin and Firebrand against five
+dummies had a link, and the Phase 5 exit asks for 60. With the Firebrand
+opening, as in the plan's §4.5 fight, 99 of 100 link. Hot Potato fell
+from 100 to 92 of 100, and the three-hero mirror from 28 to 12. At 40
+mana the fuse burns out before the slam more often and Comet falls to 89.
+After the state-rule fixes above, Comet links in 97 of 100.
+
+## KayKit heroes (2026-09-28)
+
+The heroes are KayKit models now, replacing the stand-ins built in
+code. The user asked "thee heroes dont look like they are from kaykit?"
+and approved downloading the four free packs.
+
+**Four free packs, vendored.** Adventurers 2.0, Character Animations
+1.1, Skeletons 1.1 and Fantasy Weapons Bits 1.0, all CC0, sit in
+`art/vendor` (LFS) with their licence files and are listed in
+`CREDITS.md`. Only their glTF files were kept.
+Why: they are the plan's picks (§7.2), and the user approved them. The
+$7.95 EXTRA tier with the Druid wasn't bought: the user chose "Tinted
+Mage for now" for the Cleric (plan §11, Q5).
+
+**Every hero got its body at once.** Phase 3 had planned only the
+Knight and the Skeleton Minion, with each later hero slice bringing its
+own body (Pillar 5).
+Why: all five heroes already fight, and the user's complaint covered
+all of them.
+
+**Our own glTF reader and writer, not glTF-Transform.**
+`scripts/models/gltf.ts` reads the packs. `scripts/models/import.ts`
+merges each body into one skinned mesh per material and packs the 20
+mapped clips into one shared file.
+Why: glTF-Transform is a new dependency, and the user had approved only
+the four downloads. The packs are simple (one rig, one texture per
+file), so a small reader covers them. Nothing is quantised yet; the
+output is 2.55 MB.
+
+**One shared clip file, bound by bone name.** The loader
+(`apps/client/src/game/models/library.ts`) loads it once, and each
+figure plays it on its own clone of a body (`SkeletonUtils.clone`).
+Why: KayKit ships clips apart from the bodies, and every free body uses
+Rig_Medium.
+
+**Gestures land on the sim's tick.** The battle view passes each
+attack, signature and grab the seconds left until the sim resolves it.
+`gestureTiming` starts the clip part-way in and plays it at 0.6× to 3×
+so its strike frame lands on that tick. An event that arrives late
+starts on the strike frame.
+Why: the recording says when a hit lands, and a swing that finishes
+after its damage number looks broken.
+
+**Stances come from the motion kind.** Flight and float play
+`Jump_Idle`, skid and downed play `Death_A` fast, and ground is
+standing. Coming back to the ground plays `Jump_Land` or `Lie_StandUp`.
+Why: the engine already knows each body's state. Tumbling needs no clip
+because the view spins the whole figure.
+
+**The two Mages are told apart by tint and props.** A tint remaps hue
+ranges in the texture. The Firebrand gets a red robe with an orange
+cape and staff orb, and the Cleric a pale blue robe with a gold cape.
+Each tinted hero gets its own copy of the texture.
+Why: the user chose the tinted Mage for the Cleric.
+
+**Props.** The Paladin carries a warhammer (`hammer_A`), not the plan's
+two-handed sword, and the Cleric a crystal staff (`staff_B`) and an open
+spellbook, not a wand. The Harpooner has `spear_A`, the Berserker the
+two-handed axe and the Firebrand the Mage's staff.
+Why: Hammerfall is a hammer, so a hammer marks the Paladin on the
+board. The first picks were wrong when seen in the browser: `hammer_B`
+is a spiked mace and `staff_A` a plain stick.
+
+**Size.** Bodies are scaled 3.2×, so the heroes stand 9.8 to 11.5 units
+tall.
+Why: at 4.2× they stood 12 to 15 units tall, too big for the board.
+
+**The game waits for the models.** `main.ts` loads the library once at
+boot, and every mode waits for it before it builds a scene.
+Why: figures are built synchronously from the library, and a missing
+model throws.
+
+**Measured.** In Edge on the user's GPU at 1600×900, the lab fight holds
+60 fps at 190 to 220 draw calls and about 135k triangles, and the worst
+frame is 17 ms. The in-app preview pane renders WebGL in software, which
+is where the 12 fps the user saw came from.
+
+**Fixed on the way:**
+
+- After `pnpm models:import`, the running dev server served
+  `index.html` for three of the rewritten files, and GLTFLoader failed
+  with `Unexpected token '<'`. The importer deleted its whole output
+  folder first, and Vite's public-file index lost some files as they
+  came back. It now overwrites files in place and removes only the ones
+  it no longer writes.
+- `figure-sockets.test.ts` passed or failed by chance. It wanted the
+  cast hand above a fifth of the figure's height. The Mage's resting
+  hand sits at 19.9 to 20.2% (the hat makes the figure tall), and the
+  idle clip starts at a random time. It now wants the hand between a
+  tenth and half of the height, and checks every hero.
+
+## Hammerfall as the prototype's swing (2026-09-29)
+
+The user said the hammer animation was "not right at all". In the
+prototype the Paladin pulls a huge hammer from behind his head, throws
+it over his shoulder and slams it into the ground, and the camera
+shakes. Ours was, in their words, "just this top-down thing that
+appears". They also asked for everything to be physical, exaggerated
+and comical, which the next three entries cover.
+
+**A hammer built in code, swung on the prototype's curve.**
+`giant-hammer.ts` builds the prototype's hammer: a wooden handle with
+gold bands and a pommel, and a steel head with gold plates, a collar
+and a spike. It takes the place of the warhammer in the Paladin's right
+hand. It pops in past full size, held out in front of him, swings up
+over his head and tips back to 46° behind upright at the hang (0.95 s).
+Then it falls forward on a cubic curve until its head meets the ground
+at 1.12 s, shudders, and shrinks away from 1.75 s. The gold glows from
+0.6 s until the impact.
+Why: these are the prototype's shapes, angles and times. The angle at
+which the head meets the ground is worked out every frame from the
+height of his hand, so the head lands on the floor whatever his body
+does.
+
+**His body plays `Hammer_Slam`, a clip posed when the models load.**
+The prototype builds this clip from two frames of
+`Melee_2H_Attack_Chop`, the wind-up at 0.55 s and the blow at 0.9 s,
+with extra turns of the chest, spine and head and shifts of the hips.
+`POSED_CLIPS` in `catalogue.ts` is a port of it, and `library.ts` bakes
+it into a clip at load. The library throws if a posed clip shares a
+name with a packed one. The old signature clip,
+`Melee_1H_Attack_Jump_Chop`, is no longer imported.
+Why: it is the prototype's own animation, and it needs no new download.
+Nothing else used the jump chop.
+
+**The slam lands 18.5 units ahead, where the hammer's head hits.** Each
+enemy gives him a spot at his reach, on the line toward where that
+enemy will be at the impact. He turns and slams the spot that hits the
+most enemies, counting set-up ones double. Before, he picked the best
+spot within `aimReachUnits` of himself, his own included, and the
+hammer came down there. `giant-hammer.test.ts` swings the hammer on the
+real model and checks that its head lands within tolerance of the
+reach.
+Why: a hammer swung from the hand can only land where its head reaches.
+This replaces plan §3.1's "the best spot within 1 cell of himself".
+
+**The slow motion starts 0.8 s into the swing, as in the prototype.**
+`HAMMER_SLOW_LEAD_TICKS` went from 4 to 10, so the raise into the hang
+plays at a quarter speed and the fall at full speed. The slow covers 4
+ticks, 0.53 s, against the prototype's 0.55 s. The impact freezes for
+0.1 s.
+Why: with the old lead the slow fell on the fall, and the blow looked
+soft.
+
+**The impact uses the prototype's numbers:** a shake of 1.1, a
+field-of-view punch of 1, a crater with 0.85 of the strike's radius,
+shockwave rings out to 1.3 and 0.8 of it, a ring of 64 dust motes, 30
+bits of rubble, 40 holy sparks and 14 chunks of debris.
+
+**The flash is a point light that is always in the scene.** It has the
+prototype's colour, reach and falloff, and it stays at zero until a
+slam turns it up. The slam lights the ground under it at three times
+the key light, and the flash fades out over half a second, as the
+prototype's does.
+Why: adding a light to the scene recompiles every lit shader, which
+stalls a frame. The prototype's intensity of 90 washed out our brighter
+arena tiles, so the flash is set against the stage's key light instead.
+
+**Bursts read their last argument as a size.** The prototype's `burst`
+takes a particle size last. Our port read it as a lifetime, so the holy
+sparks came out about twice too big. Bursts now live 0.35 to 0.7 s, as
+the prototype's do.
+
+**The white-out ring is gone.** `impactFlash` drew a flat additive disc
+that whited out the screen on every slam and blast. Nothing calls it
+now, so it was removed. Plan §8.2 had kept it.
+
+## Blasts follow the prototype's meteor (2026-09-29)
+
+**Fire and soot from the carrier's chest.** A Short Fuse blast throws
+70 fire sparks and 20 bits of soot. It marks the ground only where its
+sphere cuts the floor, in a circle of radius √(r² − h²): a shockwave, a
+crater and 10 chunks of debris. A blast high in the air marks nothing.
+The scorch disc is gone.
+Why: the fire and soot are the prototype's meteor. The footprint is
+ours: a carrier can blow up in the air, and a blast there shouldn't mark
+the floor.
+
+**At most 8 craters.** The oldest goes when a ninth lands.
+Why: each crater is its own mesh and draw call, and they would pile up
+over a long fight.
+
+**Debris is our own chunks, not a physics engine.** The prototype drops
+its debris into a rigid-body physics world. Ours moves each chunk
+itself: it flies out spinning and falls. Each time it hits the floor it
+bounces back up at a quarter of its falling speed and loses 45% of its
+sliding speed and spin. It shrinks away at the end of its 2.5 to 4 s
+life.
+Why: a physics engine would be a new dependency, and the chunks only
+ever touch the floor.
+
+## Bodies tumble, bounce and squash (2026-09-29)
+
+These are the prototype's body physics. They are all in the client
+(`body-motion.ts`), so the engine, the headless sim and the golden
+digests don't change.
+
+**A launched hero tumbles whole turns about a random axis.** The axis
+and speed come from a seed of the unit and the launch tick, so every
+client and every replay spins it the same way. The spin slows by a
+quarter each second, and it turns a whole number of times, so the body
+lands upright. Longer flights spin more turns. Hammered, blasted,
+thrown and bowled heroes tumble; yanks, crit hops and drops don't.
+Why: the prototype spins launched bodies at random. The seed keeps two
+screens of the same fight alike, and `hashSeed` is now exported from
+`@jev-game/run` for it.
+
+**A hard landing bounces the body 0.6 KayKit units, under the engine's
+gravity, and getting up is a 0.7-unit hop over 0.45 s.**
+Why: these are the prototype's heights, and the engine's gravity makes
+the bounce fall as fast as the flight did.
+
+**Hits and landings squash the body like jelly.** A hit squashes 0.35
+plus a 250th of its damage, 1.3 times as much on a crit, up to 1. Burns
+squash 0.15, the prototype's value for quiet damage, and landings 0.8
+when hard and 0.35 when soft. The squash springs back and forth (38
+radians a second, damped by 7) and stops after 1 s. At full strength it
+widens the body by 0.14 and flattens it by 0.22. A weaker hit doesn't
+cut a bigger squash short.
+Why: these are the prototype's `hitSquash` numbers. The prototype lets
+the spring fade forever; ours stops at 1 s so the body settles exactly.
+
+**A yanked hero lands with a shake of 0.7 and a punch of 0.6.**
+Why: these are the landing numbers of the prototype's Death Grip slam.
+
+## Rampage as the prototype's Berserk (2026-09-29)
+
+**The Berserker swells in five heaves.** They come at the prototype's
+times (0.15, 0.35, 0.55, 0.75 and 0.95 s), squeezed into our half-second
+grow, and take him 14, 32, 52, 74 and 100% of the way to full size.
+After each heave his body rushes up to the new size and settles before
+the next. Each heave squashes him, shakes the camera a little more than
+the last, and throws out a ring of dust and a burst of red.
+Why: these are the prototype's steps and numbers. The engine grows him
+evenly, so his drawn size runs a little behind the engine's during the
+grow. They agree while he is big. Only the drawing changes.
+
+**The last heave lands like a blow.** It adds a field-of-view punch, a
+crater, 12 chunks of debris and the impact sound, and the engine
+freezes for 0.08 s (`RAMPAGE_FREEZE`) on the tick he is fully grown.
+Why: the prototype does the same. The freeze is an engine beat, so the
+golden digests were re-recorded.
+
+**While big he is tinted red, gives off embers and fumes, and stomps up
+dust as he walks.** The tint is the prototype's, 0.1 pulsing by 0.06,
+and a hit flash overrides it. He stomps every 2 KayKit units he walks.
+The fumes and smoke are solid particles.
+Why: additive grey reads as a glow, not smoke.
+
+**When he shrinks he squashes flat and throws out a ring of pale
+dust.** This is plan §3.2's "stomp and a puff of steam as he shrinks".
+The prototype's Berserk ends in a whirlwind instead, which the plan
+drops. Its `berserkSwing` isn't ported either: the grown Berserker only
+grabs and throws (§3.2).
+
+**No new sounds.** The prototype has none. The last heave borrows
+`crit-heavy`, and `missing_assets.md` entry 31 asks for
+`rampage-stomp` and `rampage-deflate`.
+
+## The formatter skips the vendored packs (2026-09-29)
+
+`.prettierignore` lists `art/vendor/`, and oxfmt reads it.
+Why: oxfmt formats `.gltf` files as JSON, so a whole-repo check flagged
+the KayKit packs. They should stay as they were downloaded.

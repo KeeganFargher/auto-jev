@@ -9,3 +9,4 @@ art/**/*.kra filter=lfs diff=lfs merge=lfs -text
 art/**/*.fbx filter=lfs diff=lfs merge=lfs -text
 art/**/*.glb filter=lfs diff=lfs merge=lfs -text
 art/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+art/**/*.bin filter=lfs diff=lfs merge=lfs -text

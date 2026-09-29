@@ -1,26 +1,32 @@
-import type { Catalogue } from "@jev-game/game";
+import type { HeroDefinitionId } from "@jev-game/game";
 import { decideBotCommand, type PlayerView, type RunCommand } from "@jev-game/run";
-import { JevProviderFailure, type ChoiceAnswer, type ChoiceQuestionInput, type JevProvider } from "./provider/types.js";
-import { OBSERVATION_VERSION, type RoundOutcome } from "./observations/build-observation.js";
-import { draftQuestion } from "./decisions/choose-hero.js";
-import { rewardQuestion, type PreviewLoadout } from "./decisions/choose-reward.js";
-import type { DecisionRecord, JevDecisionKind } from "./decision-record.js";
+import {
+  JevProviderFailure,
+  type ChoiceAnswer,
+  type ChoiceQuestionInput,
+  type JevProvider,
+} from "./provider/types.js";
+import { OBSERVATION_VERSION } from "./observations/build-observation.js";
+import { chosenHero, draftQuestion } from "./decisions/choose-hero.js";
+import type { DecisionRecord } from "./decision-record.js";
 
 export const SUPERSEDED = "superseded";
 
+export const DEADLINE = "deadline";
+
+export const EARLIER_PICK_FAILED = "earlier-pick-failed";
+
 export interface SeatDecisionContext {
   view: PlayerView;
-  catalogue: Catalogue;
   provider: JevProvider;
-  history: readonly RoundOutcome[];
   controllerSeed: number;
   signal: AbortSignal;
-  preview: PreviewLoadout;
+  isLegal: (command: RunCommand) => boolean;
   now: () => number;
 }
 
 export interface SeatDecision {
-  command: RunCommand | null;
+  command: RunCommand;
   records: DecisionRecord[];
 }
 
@@ -30,28 +36,16 @@ interface Asked {
 }
 
 export function needsJevDecision(view: PlayerView): boolean {
-  if (view.you.eliminated) {
-    return false;
-  }
-
-  if (view.phase === "draft") {
-    return !view.you.ready;
-  }
-
-  return view.phase === "reward" && view.pendingDecisions.length > 0;
+  return view.phase === "draft" && !view.you.eliminated && !view.you.ready;
 }
 
-function baseRecord(context: SeatDecisionContext, kind: JevDecisionKind, options: string[]): DecisionRecord {
-  const { view } = context;
-
+function baseRecord(view: PlayerView, pick: number, options: string[]): DecisionRecord {
   return {
     runId: view.runId,
     playerId: view.you.playerId,
-    phase: view.phase,
     phaseEpoch: view.phaseEpoch,
     decisionRevision: view.you.decisionRevision,
-    round: view.currentRound?.round ?? 0,
-    kind,
+    pick,
     observationVersion: OBSERVATION_VERSION,
     model: null,
     source: "fallback",
@@ -65,8 +59,12 @@ function baseRecord(context: SeatDecisionContext, kind: JevDecisionKind, options
   };
 }
 
-async function ask(context: SeatDecisionContext, kind: JevDecisionKind, question: ChoiceQuestionInput): Promise<Asked> {
-  const record = baseRecord(context, kind, Object.keys(question.options));
+async function ask(
+  context: SeatDecisionContext,
+  pick: number,
+  question: ChoiceQuestionInput,
+): Promise<Asked> {
+  const record = baseRecord(context.view, pick, Object.keys(question.options));
   const startedAt = context.now();
 
   try {
@@ -86,106 +84,94 @@ async function ask(context: SeatDecisionContext, kind: JevDecisionKind, question
       },
     };
   } catch (error) {
-    let reason: string = error instanceof JevProviderFailure ? error.reason : "provider-error";
-
-    if (context.signal.aborted) {
-      reason = context.signal.reason === SUPERSEDED ? SUPERSEDED : "deadline";
+    if (!(error instanceof JevProviderFailure)) {
+      throw error;
     }
+
+    const abortedBy = context.signal.reason === SUPERSEDED ? SUPERSEDED : DEADLINE;
+    const reason = context.signal.aborted ? abortedBy : error.reason;
 
     return {
       answer: null,
-      record: { ...record, model: context.provider.model, durationMilliseconds: context.now() - startedAt, fallbackReason: reason },
+      record: {
+        ...record,
+        model: context.provider.model,
+        durationMilliseconds: context.now() - startedAt,
+        fallbackReason: reason,
+      },
     };
   }
 }
 
-function fallbackRecord(context: SeatDecisionContext, kind: JevDecisionKind, reason: string): DecisionRecord {
-  return { ...baseRecord(context, kind, []), fallbackReason: reason };
+function botDraft(view: PlayerView, controllerSeed: number): readonly HeroDefinitionId[] {
+  const command = decideBotCommand(view, controllerSeed);
+
+  if (command === null || command.kind !== "commit-draft") {
+    throw new Error(`The baseline bot has no draft for ${view.you.playerId}`);
+  }
+
+  return command.heroIds;
 }
 
-function isLegal(context: SeatDecisionContext, command: RunCommand | null): boolean {
-  return command !== null && context.preview(command) !== null;
+function nextBotPick(
+  botPicks: readonly HeroDefinitionId[],
+  picked: readonly HeroDefinitionId[],
+): HeroDefinitionId {
+  const heroId = botPicks.find((candidate) => !picked.includes(candidate));
+
+  if (heroId === undefined) {
+    throw new Error(`The baseline draft ${botPicks.join(", ")} has nothing left to add`);
+  }
+
+  return heroId;
 }
 
-async function decideDraft(context: SeatDecisionContext): Promise<SeatDecision> {
-  const { view, catalogue } = context;
-  const fallback = decideBotCommand(view, context.controllerSeed, catalogue);
-  const fallbackOrder = fallback?.kind === "commit-draft" ? fallback.offerIds : [];
-  const picked: string[] = [];
+export async function decideDraft(context: SeatDecisionContext): Promise<SeatDecision> {
+  const { view } = context;
+
+  if (!needsJevDecision(view)) {
+    throw new Error(`${view.you.playerId} has no draft to decide in ${view.phase}`);
+  }
+
+  const botPicks = botDraft(view, context.controllerSeed);
+  const picked: HeroDefinitionId[] = [];
   const records: DecisionRecord[] = [];
   let failed = false;
 
-  for (let pick = 0; pick < view.rules.draftPicks; pick += 1) {
-    const step = draftQuestion(view, catalogue, picked, context.history);
+  for (let pick = 1; pick <= view.rules.draftPicks; pick += 1) {
+    const step = draftQuestion(view, picked);
 
-    if (step === null) {
-      break;
+    if (failed) {
+      records.push({
+        ...baseRecord(view, pick, step.heroIds),
+        fallbackReason: EARLIER_PICK_FAILED,
+      });
+      picked.push(nextBotPick(botPicks, picked));
+      continue;
     }
 
-    let offerId: string | undefined;
+    const asked = await ask(context, pick, step.question);
+    records.push(asked.record);
 
-    if (!failed) {
-      const asked = await ask(context, "draft-pick", step.question);
-      offerId = asked.answer === null ? undefined : step.offerIdByOption.get(asked.answer.choice);
-      records.push(asked.record);
-      failed = offerId === undefined;
+    if (asked.answer === null) {
+      failed = true;
+      picked.push(nextBotPick(botPicks, picked));
+      continue;
     }
 
-    if (offerId === undefined) {
-      offerId = fallbackOrder.find((candidate) => !picked.includes(candidate)) ?? [...step.offerIdByOption.values()][0];
-
-      if (records.length < pick + 1) {
-        records.push(fallbackRecord(context, "draft-pick", "earlier-pick-failed"));
-      }
-    }
-
-    if (offerId === undefined) {
-      break;
-    }
-
-    picked.push(offerId);
+    picked.push(chosenHero(step, asked.answer));
   }
 
   const command: RunCommand = {
     kind: "commit-draft",
     playerId: view.you.playerId,
-    offerIds: picked,
+    heroIds: picked,
     expectedRevision: view.you.decisionRevision,
   };
 
-  if (isLegal(context, command)) {
-    return { command, records };
+  if (!context.isLegal(command)) {
+    throw new Error(`Jev drafted a team the run refuses: ${picked.join(", ")}`);
   }
 
-  return { command: fallback, records: [...records, fallbackRecord(context, "draft-pick", "illegal-command")] };
-}
-
-async function decideReward(context: SeatDecisionContext): Promise<SeatDecision> {
-  const { view, catalogue } = context;
-  const decision = view.pendingDecisions[0];
-  const fallback = decideBotCommand(view, context.controllerSeed, catalogue);
-  const step = decision === undefined ? null : rewardQuestion(view, catalogue, decision, context.history, context.preview);
-
-  if (step === null) {
-    return { command: fallback, records: [fallbackRecord(context, "reward", "no-legal-option")] };
-  }
-
-  const asked = await ask(context, "reward", step.question);
-  const chosen = asked.answer === null ? undefined : step.commandByOption.get(asked.answer.choice);
-
-  if (chosen !== undefined && isLegal(context, chosen)) {
-    return { command: chosen, records: [asked.record] };
-  }
-
-  const reason = asked.record.fallbackReason ?? "illegal-command";
-
-  return { command: fallback, records: [{ ...asked.record, source: "fallback", fallbackReason: reason }] };
-}
-
-export function decideForSeat(context: SeatDecisionContext): Promise<SeatDecision> {
-  if (context.view.phase === "draft") {
-    return decideDraft(context);
-  }
-
-  return decideReward(context);
+  return { command, records };
 }

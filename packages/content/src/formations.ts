@@ -1,8 +1,14 @@
-import { cellSize, sideRows, type BoardCell, type HeroDefinitionId } from "@jev-game/game";
+import {
+  heroDefinition,
+  sideRows,
+  type BoardCell,
+  type HeroDefinitionId,
+  type HeroRole,
+} from "@jev-game/game";
 import { boardArena } from "./arenas/board-arena.js";
 import { gameCatalogue } from "./catalogue.js";
 
-const FRONTLINE_MAX_RANGE_CELLS = 1.5;
+const MIDLINE_ROW = 1;
 
 export function centreOutColumns(columns: number): number[] {
   const order: number[] = [];
@@ -24,31 +30,35 @@ export function centreOutColumns(columns: number): number[] {
   return order;
 }
 
-export function isFrontlineHero(heroId: HeroDefinitionId): boolean {
-  const hero = gameCatalogue.heroes[heroId];
+function rowOrder(role: HeroRole, rows: number): number[] {
+  const frontToBack = Array.from({ length: rows }, (_, row) => row);
 
-  if (hero === undefined) {
-    return true;
+  switch (role) {
+    case "frontline":
+      return frontToBack;
+    case "midline":
+      return frontToBack.sort(
+        (first, second) =>
+          Math.abs(first - MIDLINE_ROW) - Math.abs(second - MIDLINE_ROW) || second - first,
+      );
+    case "backline":
+      return frontToBack.reverse();
   }
+}
 
-  const basicAttackRange = gameCatalogue.abilities[hero.basicAttackId]?.range ?? 0;
-
-  return basicAttackRange <= cellSize(boardArena) * FRONTLINE_MAX_RANGE_CELLS;
+export function heroRole(heroId: HeroDefinitionId): HeroRole {
+  return heroDefinition(gameCatalogue, heroId).role;
 }
 
 export function defaultFormation(
   heroIds: readonly HeroDefinitionId[],
   columnOrder: readonly number[] = centreOutColumns(boardArena.columns),
 ): BoardCell[] {
-  const rowsPerSide = sideRows(boardArena);
-  const frontToBack = Array.from({ length: rowsPerSide }, (_, row) => row);
-  const backToFront = [...frontToBack].reverse();
+  const rows = sideRows(boardArena);
   const taken = new Set<string>();
 
   return heroIds.map((heroId) => {
-    const rowOrder = isFrontlineHero(heroId) ? frontToBack : backToFront;
-
-    for (const row of rowOrder) {
+    for (const row of rowOrder(heroRole(heroId), rows)) {
       for (const column of columnOrder) {
         const key = `${column}:${row}`;
 
@@ -60,6 +70,6 @@ export function defaultFormation(
       }
     }
 
-    throw new Error(`no free cell left for hero "${heroId}"`);
+    throw new Error(`No free cell left for hero "${heroId}"`);
   });
 }

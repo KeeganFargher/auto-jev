@@ -1,0 +1,46 @@
+import type { HeroDefinition } from "@jev-game/game";
+
+export const berserker: HeroDefinition = {
+  id: "berserker",
+  name: "Berserker",
+  title: "The thrower",
+  description:
+    "A frontline brute who swells to three times his size and hurls whoever he is fighting into the thickest crowd of its friends.",
+  role: "frontline",
+  draftable: true,
+  maxHp: 820,
+  moveUnitsPerSecond: 15,
+  bodyRadiusUnits: 3.5,
+  maxMana: 80,
+  startingMana: 0,
+  attack: {
+    kind: "melee",
+    name: "Axe swing",
+    damage: 70,
+    rangeUnits: 2,
+    intervalTicks: 38,
+    windupTicks: 12,
+  },
+  signature: {
+    kind: "rampage",
+    name: "Rampage",
+    description:
+      "Roars and grows to three times his size for five seconds. While big he can't be moved or stunned, and instead of swinging he grabs enemies and throws them into their friends.",
+    wants: ["burning", "airborne", "floating"],
+    groupSize: 3,
+    triggerRangeUnits: 6,
+    size: 3,
+    growTicks: 15,
+    bigTicks: 150,
+    shrinkTicks: 15,
+    moveMultiplier: 1.25,
+    grabReachUnits: 3,
+    grabWindupTicks: 10,
+    throwIntervalTicks: 30,
+    throwSearchUnits: 40,
+    throwRiseUnits: 18,
+    thrownDamage: 80,
+    bowlingDamage: 50,
+  },
+  passive: null,
+};

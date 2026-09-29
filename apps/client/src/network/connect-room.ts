@@ -1,6 +1,12 @@
 import { ColyseusSDK, MatchMakeError, ServerError, type Room } from "@colyseus/sdk";
 import type { GameServer } from "@jev-game/server-runtime/contract";
-import { JOIN_REFUSAL_CODES, MATCH_ROOM_NAME, PROTOCOL_VERSION } from "@jev-game/protocol";
+import {
+  JOIN_REFUSAL_CODES,
+  MATCH_ROOM_NAME,
+  PROTOCOL_VERSION,
+  SIM_HASH,
+  type JoinOptions,
+} from "@jev-game/protocol";
 
 const DEFAULT_SERVER_PORT = 2567;
 
@@ -31,7 +37,7 @@ type MatchRoomType = GameServer["~rooms"]["match"]["~room"];
 export type MatchRoomConnection = Room<MatchRoomType>;
 
 export async function connectMatchRoom(target: MatchConnectTarget): Promise<MatchRoomConnection> {
-  const options = { protocolVersion: PROTOCOL_VERSION };
+  const options: JoinOptions = { protocolVersion: PROTOCOL_VERSION, simHash: SIM_HASH };
 
   if (target.kind === "resume") {
     return sdk.reconnect<typeof MATCH_ROOM_NAME>(target.token);
@@ -69,7 +75,8 @@ export function saveResumeToken(token: string | null): void {
 }
 
 export function joinFailureMessage(reason: Error): string {
-  const code = reason instanceof ServerError || reason instanceof MatchMakeError ? reason.code : null;
+  const code =
+    reason instanceof ServerError || reason instanceof MatchMakeError ? reason.code : null;
 
   if (code === JOIN_REFUSAL_CODES.started) {
     return "That match has already started";
@@ -83,5 +90,7 @@ export function joinFailureMessage(reason: Error): string {
     return "The game was updated · reload the page";
   }
 
-  return code !== null && Number.isInteger(code) ? "Couldn't join that match" : "Couldn't reach the game server · is it running?";
+  return code !== null && Number.isInteger(code)
+    ? "Couldn't join that match"
+    : "Couldn't reach the game server · is it running?";
 }

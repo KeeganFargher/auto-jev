@@ -1,6 +1,16 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { Box3, BoxGeometry, ConeGeometry, CylinderGeometry, IcosahedronGeometry, Mesh, Triangle, Vector3, type Object3D } from "three";
+import {
+  Box3,
+  BoxGeometry,
+  ConeGeometry,
+  CylinderGeometry,
+  IcosahedronGeometry,
+  Mesh,
+  Triangle,
+  Vector3,
+  type Object3D,
+} from "three";
 import { createPropKit } from "../src/game/environments/prop-kit.js";
 
 function meshes(root: Object3D): Mesh[] {
@@ -47,7 +57,12 @@ test("merging leaves every prop exactly where it stood", () => {
   const leaning = kit.solid(new BoxGeometry(2, 6, 1), stone, 10, 3, -4);
   leaning.rotation.set(0.3, 1.1, -0.4);
   leaning.scale.set(1.5, 0.8, 2);
-  const cluster = kit.group(kit.solid(new ConeGeometry(2, 5, 6), stone, 0, 2.5, 0), kit.solid(new BoxGeometry(1, 1, 1), stone, 3, 0.5, 1));
+
+  const cluster = kit.group(
+    kit.solid(new ConeGeometry(2, 5, 6), stone, 0, 2.5, 0),
+    kit.solid(new BoxGeometry(1, 1, 1), stone, 3, 0.5, 1),
+  );
+
   cluster.position.set(-20, 0, 12);
   cluster.rotation.y = 2.4;
   cluster.scale.setScalar(1.7);
@@ -65,7 +80,12 @@ test("props that cast shadows are not merged with props that do not", () => {
   const stone = kit.surface("#888888");
   const flat = kit.solid(new BoxGeometry(4, 0.2, 4), stone, 0, 0, 0);
   flat.castShadow = false;
-  const root = kit.group(flat, kit.solid(new BoxGeometry(1, 3, 1), stone, 5, 1.5, 0), kit.solid(new BoxGeometry(1, 3, 1), stone, 8, 1.5, 0));
+
+  const root = kit.group(
+    flat,
+    kit.solid(new BoxGeometry(1, 3, 1), stone, 5, 1.5, 0),
+    kit.solid(new BoxGeometry(1, 3, 1), stone, 8, 1.5, 0),
+  );
 
   kit.mergeStatic(root);
   const merged = meshes(root);
@@ -88,12 +108,23 @@ function attachedTo(root: Object3D, target: Object3D): boolean {
 test("a swaying prop keeps moving as one piece with its own parts merged inside it", () => {
   const kit = createPropKit(4);
   const bark = kit.surface("#6b4a2b");
-  const tree = kit.group(kit.solid(new CylinderGeometry(0.5, 0.7, 6, 6), bark, 0, 3, 0), kit.solid(new ConeGeometry(3, 6, 6), bark, 0, 8, 0));
+
+  const tree = kit.group(
+    kit.solid(new CylinderGeometry(0.5, 0.7, 6, 6), bark, 0, 3, 0),
+    kit.solid(new ConeGeometry(3, 6, 6), bark, 0, 8, 0),
+  );
+
   tree.position.set(4, 0, -3);
   kit.animate([tree], (seconds) => {
     tree.rotation.z = seconds * 0.1;
   });
-  const root = kit.group(tree, kit.solid(new BoxGeometry(1, 1, 1), bark, 6, 0.5, 0), kit.solid(new BoxGeometry(1, 1, 1), bark, 9, 0.5, 0));
+
+  const root = kit.group(
+    tree,
+    kit.solid(new BoxGeometry(1, 1, 1), bark, 6, 0.5, 0),
+    kit.solid(new BoxGeometry(1, 1, 1), bark, 9, 0.5, 0),
+  );
+
   const treeBounds = exactBounds(tree);
 
   kit.mergeStatic(root);
@@ -156,7 +187,12 @@ test("a mirrored prop keeps its faces pointing outwards once merged", () => {
 test("merged batches are released with the rest of the environment", () => {
   const kit = createPropKit(6);
   const stone = kit.surface("#888888");
-  const root = kit.group(kit.solid(new BoxGeometry(1, 1, 1), stone, 0, 0, 0), kit.solid(new BoxGeometry(1, 1, 1), stone, 3, 0, 0));
+
+  const root = kit.group(
+    kit.solid(new BoxGeometry(1, 1, 1), stone, 0, 0, 0),
+    kit.solid(new BoxGeometry(1, 1, 1), stone, 3, 0, 0),
+  );
+
   kit.mergeStatic(root);
   const [merged] = meshes(root);
   assert.ok(merged !== undefined);

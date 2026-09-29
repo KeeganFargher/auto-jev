@@ -1,6 +1,6 @@
 import type { BattleId, PlayerId } from "./ids.js";
 
-function hashSeed(parts: readonly (string | number)[]): number {
+export function hashSeed(parts: readonly (string | number)[]): number {
   let hash = 0x811c9dc5;
 
   for (const part of parts) {
@@ -23,14 +23,10 @@ export function deriveBattleSeed(runSeed: number, round: number, battleId: Battl
   return hashSeed([runSeed, "battle", round, battleId]);
 }
 
-export function deriveOfferSeed(runSeed: number, round: number, playerId: PlayerId, purpose: string): number {
-  return hashSeed([runSeed, "offer", round, playerId, purpose]);
-}
-
-export function deriveControllerSeed(runSeed: number, round: number, playerId: PlayerId): number {
-  return hashSeed([runSeed, "controller", round, playerId]);
-}
-
-export function deriveDecisionSeed(controllerSeed: number, decisionId: string): number {
-  return hashSeed([controllerSeed, "decision", decisionId]);
+export function deriveControllerSeed(
+  runSeed: number,
+  phaseEpoch: number,
+  playerId: PlayerId,
+): number {
+  return hashSeed([runSeed, "controller", phaseEpoch, playerId]);
 }

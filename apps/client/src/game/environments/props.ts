@@ -47,7 +47,14 @@ const FIRE_LIGHT = 60;
 
 const UP = new Vector3(0, 1, 0);
 
-export function place<T extends Object3D>(object: T, x: number, y: number, z: number, turn = 0, scale?: number): T {
+export function place<T extends Object3D>(
+  object: T,
+  x: number,
+  y: number,
+  z: number,
+  turn = 0,
+  scale?: number,
+): T {
   object.position.set(x, y, z);
   object.rotation.y = turn;
 
@@ -101,7 +108,11 @@ export function palmTree(kit: PropKit, height: number, lean: number): Group {
     frondGeometry(height * 0.36, height * 0.12, height * 0.09, height * 0.24),
   ];
 
-  const greens = [kit.surface("#4fae52", { twoSided: true }), kit.surface("#6cc45a", { twoSided: true })];
+  const greens = [
+    kit.surface("#4fae52", { twoSided: true }),
+    kit.surface("#6cc45a", { twoSided: true }),
+  ];
+
   const count = 8;
 
   for (let index = 0; index < count; index += 1) {
@@ -205,7 +216,15 @@ export function bush(kit: PropKit, radius: number, tones: readonly ColorRepresen
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2 + kit.between(0, 1);
     const size = radius * kit.between(0.55, 0.85);
-    const lump = kit.solid(blob, kit.surface(kit.pick(tones)), Math.cos(angle) * radius * 0.5, size * 0.75, Math.sin(angle) * radius * 0.5);
+
+    const lump = kit.solid(
+      blob,
+      kit.surface(kit.pick(tones)),
+      Math.cos(angle) * radius * 0.5,
+      size * 0.75,
+      Math.sin(angle) * radius * 0.5,
+    );
+
     lump.scale.set(size, size * 0.85, size);
     shrub.add(lump);
   }
@@ -213,7 +232,13 @@ export function bush(kit: PropKit, radius: number, tones: readonly ColorRepresen
   return shrub;
 }
 
-export function pier(kit: PropKit, length: number, width: number, deck: number, depth: number): Group {
+export function pier(
+  kit: PropKit,
+  length: number,
+  width: number,
+  deck: number,
+  depth: number,
+): Group {
   const dock = kit.group();
   const planks = [kit.surface("#c69558"), kit.surface("#b3834a"), kit.surface("#d1a266")];
   const plankDepth = 2.3;
@@ -221,7 +246,14 @@ export function pier(kit: PropKit, length: number, width: number, deck: number, 
   const count = Math.floor(length / plankDepth);
 
   for (let index = 0; index < count; index += 1) {
-    const board = kit.solid(plank, kit.pick(planks), index * plankDepth + plankDepth / 2, deck + kit.between(-0.08, 0.08), 0);
+    const board = kit.solid(
+      plank,
+      kit.pick(planks),
+      index * plankDepth + plankDepth / 2,
+      deck + kit.between(-0.08, 0.08),
+      0,
+    );
+
     board.rotation.y = kit.between(-0.03, 0.03);
     dock.add(board);
   }
@@ -238,7 +270,9 @@ export function pier(kit: PropKit, length: number, width: number, deck: number, 
   const beam = new BoxGeometry(length, 0.7, 0.8);
 
   for (const side of [-1, 1]) {
-    dock.add(kit.solid(beam, kit.surface(WOOD_DARK), length / 2, deck - 0.65, side * (width / 2 - 1.2)));
+    dock.add(
+      kit.solid(beam, kit.surface(WOOD_DARK), length / 2, deck - 0.65, side * (width / 2 - 1.2)),
+    );
   }
 
   return dock;
@@ -276,7 +310,14 @@ export function rowboat(kit: PropKit): Group {
 
 export function treasureChest(kit: PropKit): Group {
   const wood = kit.surface("#8a4526");
-  const gold = kit.surface(GOLD, { metalness: 0.55, roughness: 0.4, emissive: "#7a5410", glow: 0.35 });
+
+  const gold = kit.surface(GOLD, {
+    metalness: 0.55,
+    roughness: 0.4,
+    emissive: "#7a5410",
+    glow: 0.35,
+  });
+
   const body = kit.solid(new BoxGeometry(6, 3.6, 4), wood, 0, 1.8, 0);
 
   const lidHinge = kit.group();
@@ -295,7 +336,14 @@ export function treasureChest(kit: PropKit): Group {
 
   chest.add(kit.solid(new BoxGeometry(0.9, 1, 0.3), gold, 0, 2.6, 2.05));
 
-  const hoard = kit.solid(new SphereGeometry(2.4, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2), gold, 0, 3.5, 0);
+  const hoard = kit.solid(
+    new SphereGeometry(2.4, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2),
+    gold,
+    0,
+    3.5,
+    0,
+  );
+
   hoard.scale.set(1.15, 0.55, 0.75);
   chest.add(hoard);
 
@@ -310,7 +358,15 @@ export function treasureChest(kit: PropKit): Group {
   const gem = new OctahedronGeometry(0.55, 0);
 
   for (const tone of ["#4fd1c5", "#e05d9b", "#7aa2ff"]) {
-    chest.add(kit.solid(gem, kit.surface(tone, { emissive: tone, glow: 0.4 }), kit.between(-2, 2), 3.9, kit.between(-1, 1)));
+    chest.add(
+      kit.solid(
+        gem,
+        kit.surface(tone, { emissive: tone, glow: 0.4 }),
+        kit.between(-2, 2),
+        3.9,
+        kit.between(-1, 1),
+      ),
+    );
   }
 
   return chest;
@@ -337,7 +393,14 @@ export function hut(kit: PropKit, tone: ColorRepresentation, thatch: ColorRepres
   roof.rotation.y = Math.PI / 4;
   roof.scale.set(1.15, 1, 1);
 
-  const fringe = kit.solid(new ConeGeometry(14.5, 2.4, 4, 1, true), kit.surface("#b98d4a", { twoSided: true }), 0, 14.4, 0);
+  const fringe = kit.solid(
+    new ConeGeometry(14.5, 2.4, 4, 1, true),
+    kit.surface("#b98d4a", { twoSided: true }),
+    0,
+    14.4,
+    0,
+  );
+
   fringe.rotation.y = Math.PI / 4;
   fringe.scale.set(1.15, 1, 1);
 
@@ -346,15 +409,48 @@ export function hut(kit: PropKit, tone: ColorRepresentation, thatch: ColorRepres
   return shack;
 }
 
-export function flag(kit: PropKit, height: number, cloth: ColorRepresentation, trim: ColorRepresentation): Group {
-  const pole = kit.solid(new CylinderGeometry(0.3, 0.4, height, 6), kit.surface(WOOD_DARK), 0, height / 2, 0);
-  const finial = kit.solid(new SphereGeometry(0.7, 8, 6), kit.surface(GOLD, { metalness: 0.5, roughness: 0.4 }), 0, height + 0.5, 0);
+export function flag(
+  kit: PropKit,
+  height: number,
+  cloth: ColorRepresentation,
+  trim: ColorRepresentation,
+): Group {
+  const pole = kit.solid(
+    new CylinderGeometry(0.3, 0.4, height, 6),
+    kit.surface(WOOD_DARK),
+    0,
+    height / 2,
+    0,
+  );
+
+  const finial = kit.solid(
+    new SphereGeometry(0.7, 8, 6),
+    kit.surface(GOLD, { metalness: 0.5, roughness: 0.4 }),
+    0,
+    height + 0.5,
+    0,
+  );
+
   const width = height * 0.32;
   const drop = height * 0.2;
   const sheet = kit.keep(new PlaneGeometry(width, drop, 10, 3));
   sheet.translate(width / 2, 0, 0);
-  const banner = kit.solid(sheet, kit.surface(cloth, { twoSided: true }), 0.3, height - drop / 2 - 0.4, 0);
-  const stripe = kit.solid(new BoxGeometry(width * 0.08, drop * 1.02, 0.12), kit.surface(trim), 0.3 + width * 0.06, height - drop / 2 - 0.4, 0);
+
+  const banner = kit.solid(
+    sheet,
+    kit.surface(cloth, { twoSided: true }),
+    0.3,
+    height - drop / 2 - 0.4,
+    0,
+  );
+
+  const stripe = kit.solid(
+    new BoxGeometry(width * 0.08, drop * 1.02, 0.12),
+    kit.surface(trim),
+    0.3 + width * 0.06,
+    height - drop / 2 - 0.4,
+    0,
+  );
 
   const position = sheet.getAttribute("position");
   const rest = Float32Array.from(position.array);
@@ -387,8 +483,22 @@ export function lanternPost(kit: PropKit, height: number): Group {
 }
 
 export function fire(kit: PropKit, size: number, light: number): Group {
-  const flame = kit.solid(new ConeGeometry(0.9 * size, 2.8 * size, 6), kit.surface(FLAME, { emissive: FLAME, glow: 2.2 }), 0, 1.4 * size, 0);
-  const core = kit.solid(new ConeGeometry(0.5 * size, 1.8 * size, 6), kit.surface(FLAME_CORE, { emissive: FLAME_CORE, glow: 2.6 }), 0, size, 0);
+  const flame = kit.solid(
+    new ConeGeometry(0.9 * size, 2.8 * size, 6),
+    kit.surface(FLAME, { emissive: FLAME, glow: 2.2 }),
+    0,
+    1.4 * size,
+    0,
+  );
+
+  const core = kit.solid(
+    new ConeGeometry(0.5 * size, 1.8 * size, 6),
+    kit.surface(FLAME_CORE, { emissive: FLAME_CORE, glow: 2.6 }),
+    0,
+    size,
+    0,
+  );
+
   flame.castShadow = false;
   core.castShadow = false;
 
@@ -403,7 +513,9 @@ export function fire(kit: PropKit, size: number, light: number): Group {
   const phase = kit.between(0, 10);
 
   kit.animate([flame, core], (seconds) => {
-    const flicker = Math.sin(seconds * 13 + phase) * 0.08 + Math.sin(seconds * 7.3 + phase * 2) * 0.06;
+    const flicker =
+      Math.sin(seconds * 13 + phase) * 0.08 + Math.sin(seconds * 7.3 + phase * 2) * 0.06;
+
     flame.scale.set(1 - flicker, 1 + flicker * 2, 1 - flicker);
     core.scale.set(1 + flicker, 1 - flicker, 1 + flicker);
 
@@ -421,7 +533,13 @@ export function torch(kit: PropKit, height: number, light: number): Group {
 
   return kit.group(
     kit.solid(new CylinderGeometry(0.35, 0.5, height, 6), kit.surface(WOOD_DEEP), 0, height / 2, 0),
-    kit.solid(new CylinderGeometry(1.1, 0.6, 1.2, 7), kit.surface(IRON, { metalness: 0.4, roughness: 0.5 }), 0, height, 0),
+    kit.solid(
+      new CylinderGeometry(1.1, 0.6, 1.2, 7),
+      kit.surface(IRON, { metalness: 0.4, roughness: 0.5 }),
+      0,
+      height,
+      0,
+    ),
     blaze,
   );
 }
@@ -443,21 +561,37 @@ export function starfish(kit: PropKit, tone: ColorRepresentation): Group {
 }
 
 export function shell(kit: PropKit, tone: ColorRepresentation): Mesh {
-  const dome = kit.solid(new SphereGeometry(1, 8, 4, 0, Math.PI), kit.surface(tone, { twoSided: true }));
+  const dome = kit.solid(
+    new SphereGeometry(1, 8, 4, 0, Math.PI),
+    kit.surface(tone, { twoSided: true }),
+  );
+
   dome.rotation.x = -Math.PI / 2;
   dome.scale.set(1, 1, 0.45);
 
   return dome;
 }
 
-export function grassTuft(kit: PropKit, height: number, tones: readonly ColorRepresentation[]): Group {
+export function grassTuft(
+  kit: PropKit,
+  height: number,
+  tones: readonly ColorRepresentation[],
+): Group {
   const blade = new ConeGeometry(0.28, 1, 3);
   const tuft = kit.group();
 
   for (let index = 0; index < 6; index += 1) {
     const angle = (index / 6) * Math.PI * 2 + kit.between(0, 0.8);
     const length = height * kit.between(0.6, 1);
-    const leaf = kit.solid(blade, kit.surface(kit.pick(tones)), Math.cos(angle) * 0.4, length / 2, Math.sin(angle) * 0.4);
+
+    const leaf = kit.solid(
+      blade,
+      kit.surface(kit.pick(tones)),
+      Math.cos(angle) * 0.4,
+      length / 2,
+      Math.sin(angle) * 0.4,
+    );
+
     leaf.scale.set(1, length, 1);
     leaf.rotation.set(Math.sin(angle) * 0.35, 0, -Math.cos(angle) * 0.35);
     tuft.add(leaf);
@@ -505,7 +639,15 @@ export function campfire(kit: PropKit, light: number): Group {
 
   for (let index = 0; index < 9; index += 1) {
     const angle = (index / 9) * Math.PI * 2;
-    const pebble = kit.solid(stone, stones[index % 2]!, Math.cos(angle) * 3, 0.45, Math.sin(angle) * 3);
+
+    const pebble = kit.solid(
+      stone,
+      stones[index % 2]!,
+      Math.cos(angle) * 3,
+      0.45,
+      Math.sin(angle) * 3,
+    );
+
     pebble.scale.set(1, 0.7, 1.2);
     pebble.rotation.y = angle;
     hearth.add(pebble);
@@ -527,7 +669,17 @@ export function campfire(kit: PropKit, light: number): Group {
 
   for (let index = 0; index < 3; index += 1) {
     const angle = (index / 3) * Math.PI * 2 + 0.5;
-    hearth.add(strut(kit, new Vector3(Math.cos(angle) * 3.4, 0, Math.sin(angle) * 3.4), tripodTop, 0.18, 0.14, pole, 5));
+    hearth.add(
+      strut(
+        kit,
+        new Vector3(Math.cos(angle) * 3.4, 0, Math.sin(angle) * 3.4),
+        tripodTop,
+        0.18,
+        0.14,
+        pole,
+        5,
+      ),
+    );
   }
 
   hearth.add(
@@ -554,7 +706,14 @@ export function campfire(kit: PropKit, light: number): Group {
 }
 
 export function logSeat(kit: PropKit, length: number): Mesh {
-  const seat = kit.solid(new CylinderGeometry(1.1, 1.2, length, 7), kit.surface("#8a5a33"), 0, 1.1, 0);
+  const seat = kit.solid(
+    new CylinderGeometry(1.1, 1.2, length, 7),
+    kit.surface("#8a5a33"),
+    0,
+    1.1,
+    0,
+  );
+
   seat.rotation.z = Math.PI / 2;
 
   return seat;
@@ -625,8 +784,14 @@ export function drift(kit: PropKit, options: DriftOptions): Points {
       const z = seeds[index * 4 + 1]!;
       const phase = seeds[index * 4 + 2]!;
       const pace = seeds[index * 4 + 3]!;
-      const travel = (((phase * height + seconds * options.fall * pace) % height) + height) % height;
-      const y = options.fall === 0 ? options.floor + phase * height + Math.sin(seconds * pace + phase * 9) * 2 : options.ceiling - travel;
+
+      const travel =
+        (((phase * height + seconds * options.fall * pace) % height) + height) % height;
+
+      const y =
+        options.fall === 0
+          ? options.floor + phase * height + Math.sin(seconds * pace + phase * 9) * 2
+          : options.ceiling - travel;
 
       attribute.setXYZ(
         index,
@@ -642,8 +807,20 @@ export function drift(kit: PropKit, options: DriftOptions): Points {
   return cloud;
 }
 
-export function pool(kit: PropKit, radius: number, tone: ColorRepresentation, rim: ColorRepresentation): Group {
-  const water = kit.solid(new CircleGeometry(radius, 28), kit.surface(tone, { roughness: 0.2, emissive: tone, glow: 0.12 }), 0, 0.35, 0);
+export function pool(
+  kit: PropKit,
+  radius: number,
+  tone: ColorRepresentation,
+  rim: ColorRepresentation,
+): Group {
+  const water = kit.solid(
+    new CircleGeometry(radius, 28),
+    kit.surface(tone, { roughness: 0.2, emissive: tone, glow: 0.12 }),
+    0,
+    0.35,
+    0,
+  );
+
   water.rotation.x = -Math.PI / 2;
   water.castShadow = false;
 
@@ -667,7 +844,11 @@ export function snowcap(kit: PropKit, width: number, depth: number): Mesh {
   return cap;
 }
 
-export function stripeTexture(kit: PropKit, tones: readonly string[], count: number): CanvasTexture {
+export function stripeTexture(
+  kit: PropKit,
+  tones: readonly string[],
+  count: number,
+): CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 128;
   canvas.height = 8;
@@ -686,14 +867,26 @@ export function stripeTexture(kit: PropKit, tones: readonly string[], count: num
   return texture;
 }
 
-export function banner(kit: PropKit, height: number, cloth: ColorRepresentation, trim: ColorRepresentation): Group {
+export function banner(
+  kit: PropKit,
+  height: number,
+  cloth: ColorRepresentation,
+  trim: ColorRepresentation,
+): Group {
   const width = height * 0.22;
   const drop = height * 0.42;
   const wood = kit.surface(WOOD_DARK);
   const sheet = kit.keep(new PlaneGeometry(width, drop, 2, 8));
   sheet.translate(0, -drop / 2, 0);
   const hang = kit.solid(sheet, kit.surface(cloth, { twoSided: true }), 0, height - 1.2, 0.5);
-  const hem = kit.solid(new BoxGeometry(width, drop * 0.08, 0.2), kit.surface(trim), 0, height - 1.2 - drop * 0.92, 0.5);
+
+  const hem = kit.solid(
+    new BoxGeometry(width, drop * 0.08, 0.2),
+    kit.surface(trim),
+    0,
+    height - 1.2 - drop * 0.92,
+    0.5,
+  );
 
   const position = sheet.getAttribute("position");
   const rest = Float32Array.from(position.array);
@@ -716,12 +909,31 @@ export function banner(kit: PropKit, height: number, cloth: ColorRepresentation,
   return kit.group(
     kit.solid(new CylinderGeometry(0.35, 0.45, height, 6), wood, 0, height / 2, 0),
     kit.solid(new BoxGeometry(width + 1.2, 0.5, 0.5), wood, 0, height - 1.2, 0.5),
-    kit.solid(new SphereGeometry(0.6, 8, 6), kit.surface(GOLD, { metalness: 0.5, roughness: 0.4 }), 0, height + 0.3, 0),
+    kit.solid(
+      new SphereGeometry(0.6, 8, 6),
+      kit.surface(GOLD, { metalness: 0.5, roughness: 0.4 }),
+      0,
+      height + 0.3,
+      0,
+    ),
     hang,
     hem,
   );
 }
 
-export function drum(kit: PropKit, radius: number, height: number, tone: ColorRepresentation): Group {
-  return kit.group(kit.solid(new CylinderGeometry(radius, radius * 1.02, height, 10), kit.surface(tone), 0, height / 2, 0));
+export function drum(
+  kit: PropKit,
+  radius: number,
+  height: number,
+  tone: ColorRepresentation,
+): Group {
+  return kit.group(
+    kit.solid(
+      new CylinderGeometry(radius, radius * 1.02, height, 10),
+      kit.surface(tone),
+      0,
+      height / 2,
+      0,
+    ),
+  );
 }

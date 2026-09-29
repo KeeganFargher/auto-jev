@@ -1,8 +1,9 @@
 # Architecture
 
-Snapshot as of Phase 1 (Jev_Game_Implementation_Plan.md). Prefer the lockfile
-and actual package.json files over this document if they disagree — this is
-a map, not the territory.
+Snapshot after the Bone & Banner pivot (2026-09-28, `docs/pivot-plan.md`).
+Prefer the lockfile and actual package.json files over this document if
+they disagree — this is a map, not the territory. The tree before the
+pivot is kept at the `pre-pivot` git tag.
 
 ## Environment
 
@@ -17,15 +18,15 @@ a map, not the territory.
 
 ```
 packages/game              — no workspace deps (deliberately: pure engine)
-packages/shared             — no workspace deps
-packages/content            — depends on packages/game
-packages/run                — depends on packages/game, packages/content
-packages/protocol           — depends on packages/run (types), zod
-packages/jev                — depends on packages/game, content, run, zod,
+packages/content           — depends on packages/game
+packages/run               — depends on packages/game, packages/content
+packages/protocol          — depends on packages/run (types), zod
+packages/jev               — depends on packages/game, content, run, zod,
                                @typesafe-ai/sdk; server-only
-packages/server-runtime    — depends on packages/shared, game, content, run, protocol
-apps/server                 — depends on packages/shared, packages/server-runtime
-apps/client                  — depends on packages/game, content, run, protocol;
+packages/server-runtime    — depends on packages/content, jev, protocol, run
+apps/server                — depends on packages/server-runtime; its tests
+                               also use jev, protocol and run
+apps/client                — depends on packages/game, content, run, protocol;
                                type-only packages/server-runtime/contract
 ```
 
@@ -37,34 +38,64 @@ additionally has its own override blocking Node built-ins, Colyseus and any
 `apps/client` is also barred from importing `@jev-game/jev`, so the Jev
 provider and its credentials can't reach the browser bundle.
 
-**`apps/client` imports only types from `packages/server-runtime`.** Since
-Phase 6, `apps/client/src/network/connect-room.ts` builds its
+**`apps/client` imports only types from `packages/server-runtime`.**
+`apps/client/src/network/connect-room.ts` builds its
 `ColyseusSDK<GameServer>` from the `/contract` type export, which is how
 `room.state` and the typed `view` / `ack` messages reach the client
 (server messages are declared by the room's
 `Client<{ messages: ServerMessages }>`). `@jev-game/server-runtime` is a
 client devDependency for that reason only.
 
-| Package | Job | Publishes |
-| --- | --- | --- |
-| `@jev-game/game` | Pure battle engine — ticks, targeting, movement, abilities/effects (damage/heal/shield), statuses, results, recording. No workspace or Node/browser/Colyseus imports, enforced by lint. | `dist/` (ESM + `.d.ts`) |
-| `@jev-game/content` | Hero/arena/scenario definitions and catalogue validation | `dist/` (ESM + `.d.ts`) |
-| `@jev-game/shared` | Code (not just types) needed by both server and client — currently `stepEntity`, arena/tick constants. As of the one-page consolidation, only `apps/server` still imports it. | `dist/` (ESM + `.d.ts`) |
-| `@jev-game/jev` | Jev players (Phase 7): the TypeSafe provider (`@typesafe-ai/sdk`, no retries, 5 s timeout), an offline stub, a concurrency limiter, observations, draft and reward questions, decision records, and a seat driver that keeps one job per seat and rejects stale results. `pnpm --filter @jev-game/jev probe` plays headless runs. Server-only. | `dist/` (ESM + `.d.ts`) |
-| `@jev-game/server-runtime` | The actual `defineServer(...)` result, room implementations (`Arena`), and a type-only `/contract` export (`GameServer = typeof server`) for client-side SDK inference | `dist/` (ESM + `.d.ts`); `./contract` subpath is types-only, no `import` condition |
-| `@jev-game/server` (`apps/server`) | Environment/startup wrapper only: `listen(server)`. No room/route logic lives here. | N/A (deployable app) |
-| `@jev-game/client` (`apps/client`) | Vite app, single page: a Three.js board renderer under a DOM/Tailwind HUD, serving the battle lab (`#lab`) and matches that run on the game server (`#match`: "Fight!" is a solo room against Jev seats, "Play online" is the shared lobby) — see `docs/phase-status.md` | N/A (static build) |
+| Package                            | Job                                                                                                                                                                                                                                                                                                 | Publishes                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `@jev-game/game`                   | Pure battle engine: ticks, targeting, movement, attacks, launches and landings, setup states, the five signatures, combo chains, results and recording. No workspace or Node/browser/Colyseus imports, enforced by lint.                                                                            | `dist/` (ESM + `.d.ts`)                                                            |
+| `@jev-game/content`                | The five heroes and the Training Dummy, the board arena, formations, lab presets and teams, and catalogue validation                                                                                                                                                                                | `dist/` (ESM + `.d.ts`)                                                            |
+| `@jev-game/run`                    | A match: the lobby, the draft (each seat picks 3 of the 5 heroes, mirrors allowed), formations, round pairings, battle setups, health and the winner. No levels, recruits or rewards.                                                                                                               | `dist/` (ESM + `.d.ts`)                                                            |
+| `@jev-game/protocol`               | The zod-checked messages between client and server, and the room name (`match`)                                                                                                                                                                                                                     | `dist/` (ESM + `.d.ts`)                                                            |
+| `@jev-game/jev`                    | Jev players: the TypeSafe provider (`@typesafe-ai/sdk`, no retries, 5 s timeout), an offline stub, a concurrency limiter, observations, the draft question, decision records, and a seat driver that keeps one job per seat and rejects stale results. `probe.ts` plays headless runs. Server-only. | `dist/` (ESM + `.d.ts`)                                                            |
+| `@jev-game/server-runtime`         | The actual `defineServer(...)` result, the one room (`MatchRoom`, with its state, command handler, timings, seat registry and Jev provider), and a type-only `/contract` export (`GameServer = typeof server`) for client-side SDK inference                                                        | `dist/` (ESM + `.d.ts`); `./contract` subpath is types-only, no `import` condition |
+| `@jev-game/server` (`apps/server`) | Environment/startup wrapper only: `listen(server)`. No room/route logic lives here. `test/match.test.ts` plays matches through the real room.                                                                                                                                                       | N/A (deployable app)                                                               |
+| `@jev-game/client` (`apps/client`) | Vite app, single page: a Three.js board renderer under a React/Tailwind HUD, serving the battle lab (`#lab`), the environment lab (`#env`) and matches that run on the game server (`#match`: "Fight!" is a solo room against Jev seats, "Play online" is the shared lobby)                         | N/A (static build)                                                                 |
+
+## The battle engine
+
+`packages/game` runs a fight to the end with no clock, no DOM and no
+network, so the server, `pnpm simulate`, the Jev probe and the client all
+run the same code. The design is in `docs/pivot-plan.md` §4 and §5.
+
+- **Ticks.** `createBattle` builds the state from a setup; `stepBattle`
+  advances it one tick at 30 ticks per second (`TICK_RATE`), and a fight
+  stops at 60 s (`BATTLE_TIME_LIMIT_SECONDS`). Every random choice comes
+  from the seeded `random/rng.ts`, so a seed replays exactly.
+  `scripts/sim-hash.ts` hashes the engine's sources, and
+  `packages/protocol`'s typecheck prints the hash.
+- **Physics.** Custom and deterministic, not a physics library.
+  `launch.ts` throws units on arcs, `motion.ts` flies and skids them
+  under `GRAVITY`, and `landing.ts` resolves touchdowns, including
+  bowling into the units a body lands on.
+- **Setup states.** A unit can be airborne, floating (in a bubble),
+  downed, burning or primed (carrying a lit fuse). `bubbles.ts` owns Big
+  Bubble and the Safety Bubble passive, and `fire.ts` owns fuses,
+  burning and spreading fire.
+- **Signatures.** `battle/signatures/` holds one module per hero:
+  Hammerfall, Rampage, Short Fuse, Big Bubble and Yank. Each plans a cast
+  (`CastPlan`: target, point, and whether the target is in a state the
+  signature wants), using `prediction.ts` to lead moving and flying
+  targets.
+- **Combos.** A signature that lands on a state another hero set up
+  records a combo link (`chain.ts`). Links in a team's chain raise that
+  team's damage (`chainDamageMultiplier`) until the chain expires.
+- **Recording and presentation.** `recording.ts` runs a battle and
+  keeps its frames and events. `presentation.ts` stretches the timeline
+  around the big beats in `beats.ts` (casts, the hammer, explosions,
+  yanks, crits, combos), so the client can slow down for them while the
+  simulation stays on ticks.
 
 ## The server type boundary
 
-Currently unexercised by any client code — see the package-graph note above.
-Described here because the mechanism is unchanged and will matter again once
-the client reconnects to a live server.
-
 `packages/server-runtime/src/app.config.ts` holds the real `defineServer(...)`
-call (rooms, routes, express middleware — moved here from `apps/server` in
-Phase 1). `contract.ts` re-exports `type GameServer = typeof server`.
-`apps/client` imports only that type:
+call (rooms, routes, express middleware). `contract.ts` re-exports
+`type GameServer = typeof server`. `apps/client` imports only that type:
 
 ```ts
 import type { GameServer } from "@jev-game/server-runtime/contract";
@@ -74,69 +105,51 @@ const client = new ColyseusSDK<GameServer>(endpoint);
 Verified empirically (not assumed from docs):
 
 - Declaration emission survives `tsc` cleanly — `dist/app.config.d.ts` names
-  a concrete `Server<{ arena: RegisteredHandler<Arena>; lobby: ... }, ...>`
-  type, not `any`. Re-checked with `--skipLibCheck false`: the only errors
-  surfaced live inside `@colyseus/core`'s and `@colyseus/sdk`'s own shipped
-  `.d.ts` files (a missing `debug` types package; an internal `HTTP.d.ts`
+  a concrete `Server<{ match: RegisteredHandler<MatchRoom> }, ...>` type,
+  not `any`. With `--skipLibCheck false`, the only errors surfaced live
+  inside `@colyseus/core`'s and `@colyseus/sdk`'s own shipped `.d.ts`
+  files (a missing `debug` types package; an internal `HTTP.d.ts`
   generic-constraint quirk), not in anything we own — `skipLibCheck: true`
   is hiding upstream noise, not our own problems.
-- `client.joinOrCreate("arena")` correctly infers `room.state` as the real
-  `ArenaState` schema (verified: accessing a nonexistent property on it is a
-  compile error).
-- **Caveat found during Phase 1, contradicting the plan's assumption:**
-  `client.joinOrCreate("banana")` (an invalid room name) does **not** itself
-  produce a compile error. `ColyseusSDK.joinOrCreate` has three overloads;
-  the literal-keyed one (`R extends keyof ServerType['~rooms']`) correctly
-  rejects `"banana"`, but a looser fallback overload
+- **Caveat:** joining an invalid room name does **not** itself produce a
+  compile error. `ColyseusSDK.joinOrCreate` has three overloads; the
+  literal-keyed one (`R extends keyof ServerType['~rooms']`) correctly
+  rejects an unknown name, but a looser fallback overload
   (`roomName: string`, unconstrained `RoomType`) then matches, silently
   returning `Room<any, any>`. So the type contract's real guard is "use the
   room correctly and get full inference," not "typo the room name and get a
-  compile error" — a misspelled room name degrades to `any` rather than
-  failing loudly. This is a property of the installed `@colyseus/sdk@0.18.2`,
-  not something `packages/server-runtime` can fix from this side.
+  compile error". The client joins through `MATCH_ROOM_NAME` from
+  `packages/protocol` for that reason. This is a property of the installed
+  `@colyseus/sdk@0.18.2`, not something `packages/server-runtime` can fix
+  from this side.
 
-## Build strategy (section 5 of the plan)
+## Build strategy
 
 Compiled workspace packages, not source-only exports:
 
-- `packages/shared` and `packages/server-runtime` each build with `tsc` to
-  their own `dist/`, and their `package.json` `exports` point there
-  (`server-runtime` additionally exposes `./contract` as types-only).
-- `apps/server`'s `tsc` output is plain Node-resolvable JS —
-  `node dist/index.js` now actually runs (it did not before Phase 1: `tsc`
-  alone left `@jev-game/shared` / `@jev-game/colyseus-contract` as
-  unresolvable bare specifiers, since those packages shipped raw `.ts`
-  source with no build step; `apps/server/build/index.js` was a stale
-  esbuild artifact from the original scaffold and has been deleted).
+- Every package builds with `tsc` to its own `dist/`, and its
+  `package.json` `exports` point there (`server-runtime` additionally
+  exposes `./contract` as types-only).
+- `apps/server`'s `tsc` output is plain Node-resolvable JS, so
+  `node dist/index.js` runs.
 - **Root `pnpm build` must be used**, not `pnpm --filter @jev-game/server
-  build` alone — `pnpm -r --if-present build` builds dependencies before
+build` alone — `pnpm -r --if-present build` builds dependencies before
   dependents because pnpm's recursive commands follow the workspace
   dependency graph. Building only `apps/server` on a clean checkout will
   fail to resolve its workspace dependencies at runtime.
-- `pnpm -r typecheck` relies on the same graph ordering: `packages/shared`'s
-  and `packages/server-runtime`'s own `typecheck` scripts are real builds
-  (`tsc -p tsconfig.json`, not `--noEmit`), so their `dist/*.d.ts` exist by
-  the time a dependent package's `tsc --noEmit` runs later in the same
-  `pnpm -r typecheck` invocation. `apps/server` and `apps/client` (leaves —
-  nothing depends on their output) keep plain `tsc --noEmit`.
+- `pnpm -r typecheck` relies on the same graph ordering: the packages'
+  own `typecheck` scripts are real builds (`tsc -p tsconfig.json`, not
+  `--noEmit`), so their `dist/*.d.ts` exist by the time a dependent
+  package's `tsc --noEmit` runs later in the same `pnpm -r typecheck`
+  invocation. `apps/server` and `apps/client` (leaves — nothing depends on
+  their output) keep plain `tsc --noEmit`, plus their test tsconfigs.
 - `apps/server`'s dev script watches compiled package output explicitly:
   `tsx watch --include '../../packages/**/dist/**/*.js' src/index.ts` (`tsx`
-  excludes `dist` by default). Verified live: editing
-  `packages/shared/src/constants.ts` while `packages/shared`'s and
-  `packages/server-runtime`'s own `tsc --watch` are running rebuilds their
-  `dist/`, which `tsx watch` picks up and restarts on, and which Vite
-  detects too (`[vite] page reload .../packages/shared/dist/constants.js`) —
-  no stale pre-bundled dependency cache.
+  excludes `dist` by default), so a package's own `tsc --watch` rebuilding
+  its `dist/` restarts the server, and Vite reloads the client.
 - `tsconfig.base.json` (declaration, strict, `noUncheckedIndexedAccess`,
-  etc.) was previously unused by anything. `packages/shared` and
-  `packages/server-runtime` now `extends` it, overriding `module`/
-  `moduleResolution` to `NodeNext` and adding `outDir`/`rootDir`. Wiring it
-  in surfaced one real thing: `noImplicitOverride` was off before, so
-  `Arena`'s lifecycle methods (`onCreate`, `onJoin`, ...) didn't need
-  `override` — they do now, and have it.
-- esbuild has been removed as a dependency of `apps/server` — the compiled-
-  workspace approach replaces it, per the plan's "remove esbuild only after
-  a clean Node launch works without it."
+  `noImplicitOverride`, etc.) is extended by the packages, which override
+  `module`/`moduleResolution` to `NodeNext` and add `outDir`/`rootDir`.
 
 ## Known pre-existing quirks fixed opportunistically
 
@@ -144,239 +157,103 @@ Compiled workspace packages, not source-only exports:
   yargs-based CLI parser mis-parses as a boolean `--import` flag with `tsx`
   as a stray positional (confirmed via `DEBUG=mocha:cli:mocha`) — the
   positional after `--import` then gets swallowed as fake `--import`'s
-  *value*, and Node tries to run the next token as its main script. Needs
-  `--import=tsx` (explicit `=`). Unrelated to the Phase 1 restructure; would
-  have failed identically before it.
+  _value_, and Node tries to run the next token as its main script. Needs
+  `--import=tsx` (explicit `=`).
+
+## Client structure
+
+The client is a React 19 app (`main.tsx` mounts `app/app.tsx` in
+`StrictMode`) with a three.js board behind it. Folders under `apps/client/src/`:
+
+- `app/` is the shell: `routes.ts` turns the URL hash into a `Route`
+  (`#lab`, `#match`, `#join/<room>`, `#env/<theme>`), `navigation.ts` counts
+  `hashchange` events, `GameProvider`/`useGame()` hand the audio engine,
+  graphics settings and navigation store to everything below, and
+  `ErrorBoundary` shows any render-time failure and resets on the next
+  navigation.
+- `features/<screen>/` holds one folder per screen (`battle-lab`,
+  `environment-lab`, `match`, `settings`). Screens are lazy-loaded from
+  `app/app.tsx`.
+- `state/` is the framework-agnostic `Store<T>`; `useStore` and
+  `useStoreSelector` (in `state/use-store.ts`) subscribe React to any store.
+  `hooks/` and `ui/` hold the shared hooks and presentational pieces
+  (tooltips, icons, rich text).
+- `game/` (scenes, views, environments, models) and `session/` (the lab and
+  online match sessions) know nothing about React.
+
+A match screen (`features/match/`) splits into `model/` (pure functions over
+the session snapshot), `state/` (`createMatchController`, which owns the
+running match and is tested with fake services), `hud/` and `modes/`
+(components, read through `useMatchState`/`useLive`/`useView`), `stage/`
+(boards that portal into the three.js stage) and `damage/` (the damage
+meter). `MatchScreen` creates the controller in an effect and disposes it on
+cleanup, so it survives StrictMode and Fast Refresh remounts. Failures the
+controller meets outside render are stored as `defect` and rethrown by
+`useMatchDefect`, which puts them in front of the `ErrorBoundary`.
 
 ## Client audio
 
 Everything lives in `apps/client/src/audio/`. One engine (`audio` in
 `engine.ts`) owns a single `AudioContext`, created when the page loads.
 
-**Channels.** `master` feeds the speakers, with `music`, `sfx` and
-`dialogue` under it. Music goes through an extra "duck" gain that drops
-to 35% while any dialogue sound plays and comes back after it ends.
-Volumes and mute are set on the Audio tab of the settings window
-(`hud/settings/`, opened from the gear top-right) and
-saved to `localStorage` under `jev-game.audio.*`. Sliders use a squared
-curve, so 50% sounds like half volume. The settings window is a centred modal
-with a tab row; to add a tab, pass another `SettingsTab` (id, label,
-icon, content element) to `mountSettingsWindow` in `main.ts`.
+**Channels.** `master` feeds the speakers, with `music` and `sfx` under
+it. Volumes and mute are set on the Audio tab of the settings window
+(`features/settings/`, opened from the gear top-right) and saved to
+`localStorage` under `jev-game.audio.*`. Sliders use a squared curve, so
+50% sounds like half volume. The settings window is a centred modal with a
+tab row; to add a tab, add another `SettingsTab` (id, label, icon,
+content element) to `SETTINGS_TABS` in `features/settings/settings-tabs.tsx`. The pivot removed
+the hero voice lines and, with them, the dialogue channel and its music
+ducking.
 
 **Adding a sound.** Add an entry to `SOUNDS` in `catalogue.ts` with its
 channel, preload group, volume and overlap rules, then call
 `audio.play(id)`. How the files are made is in `docs/audio.md`.
+`pnpm audio:check` fails if an entry points at a missing file, or if a
+file under `public/assets/audio` isn't used by any entry.
 
-**Battle sounds.** `battle-view.ts` fires each cue at the same moment as
+**Battle sounds.** `battle-view.ts` plays each cue at the same moment as
 the matching visual, through `game/fx/battle-sounds.ts`. Which sound a
-cue plays comes from the tables in `sound-map.ts`:
+cue plays comes from `sound-map.ts`:
 
-- `abilitySounds(id)`: an ability's cast and hit sounds, plus any heal,
-  falling, landing or zone sound.
-- `impactSounds(id, upgradeIds)`: an impact's falling and landing
-  sounds, given the caster's upgrades. An upgrade listed in
-  `UPGRADE_IMPACT_SOUNDS` replaces the ability's pair, so Supernova's
-  Meteor swaps the streak and strike for a riser and a bigger blast.
-- `formSound(key)`: the sound when a hero enters a form (Inferno,
-  Avatar).
-- `reviveSound(upgradeIds)`: the sound when a hero revives itself
-  (Phoenix, Ice Mirror). It is keyed by upgrade rather than hero,
-  because Aegis lets any hero revive and has no sound.
-- `emitterSound(id)`: the sound when an emitter starts, keyed by the
-  ability that owns it (Hailstorm is on `glacial-prison`).
-- `passiveSound(name)`: the sound when a passive triggers, keyed by the
-  event's `passive` name (Deep Freeze, Virulence, Blessed Overflow,
-  Weaver's `threads`, Harvest).
-- `reactionSound(id)`: the sound of a passive's reaction hit, keyed by
-  the hit's `abilityId` (Death Knell).
-- `paymentSound(reason)`: the sound when a hero pays HP, keyed by the
-  `hp-paid` event's `reason` (Unstable Core).
-- `shieldSound(id)`: `shield-up`, unless the shield's ability or
-  passive is in `SILENT_SHIELDS`.
-- `unitSounds(id)`: a summon's spawn and death sounds. Heroes use
-  `death`. Risen copies use `RISE_SOUND` and `CRUMBLE_SOUND` instead.
-- The combo, Ill Omen echo, puppet, crit, stun, thaw and teleport
-  sounds.
-
-`pnpm audio:check` fails if an ability or voiced hero has no entry, if
-an upgrade, form, revive, emitter, passive, reaction or silent shield
-entry names something the catalogue doesn't have, or if an ability with
-a zone sound leaves no zone.
-
-- Hits sound when a projectile lands, not when the event arrives. A hit
-  worth 20% or more of the target's max HP adds `crit-heavy`, and any
-  other crit adds `crit-hit`.
-- A leap's landing sound plays when its jump arc touches down, 0.36 s
-  after the cast and damage events arrive. That is why leaps have no hit
-  sound.
-- Heals and shields sound when they reach their target. Each hop of a
-  bouncing ability flies 0.16 s from the previous target, to an ally
-  as well as to an enemy (`allyHop`). So Judgment sounds hit, heal,
-  hit, heal, hit at 0.16, 0.32, 0.48, 0.64 and 0.8 s after the throw.
-  Oathbound's shields sound between Shield Toss's hits, and Captain's
-  Return's shield sounds as the shield gets back to Anvil. Other heals
-  and shields sound when their event arrives.
-- Blessed Overflow's shields are silent (`SILENT_SHIELDS`). Overhealing
-  makes one, and with Hallowed Path that is up to about once a second.
-  `blessed-overflow` doesn't bounce, so a shield made by a Judgment heal
-  would also sound before the hammer reached the ally.
-- DoT ticks are silent, and so are reactions unless `REACTION_SOUNDS`
-  maps them. Death Knell hits every surviving bound enemy on one tick,
-  and `death-knell`'s cooldown folds those hits into one toll. Ill
-  Omen's bonus hits stay silent because its echo already sounds.
-- A falling sound ends as its impact lands. It starts
-  `ceil(duration × 30)` ticks before `landsAtTick`, so a short streak
-  starts late in the fall and a long riser starts early. Impacts already
-  in the air after a snap stay silent.
-- An impact's landing sound plays on `impact-landed`. Living Bomb's
-  detonation arrives as one, carrying the blast's ability id.
-- An emitter's start sound plays on `emitter-started`, panned at its
-  `from` point. Its shots are ordinary hits, so each Frozen Orb or
-  Hailstorm shard plays `ice-shard` when its projectile lands. Orbs have
-  no visual yet, so their shots fly from Rime's chest, and that flight
-  sets when each shard sounds.
-- A passive's sound plays on `passive-triggered`, panned at the
-  event's `targetUnitId` when it has one (the frozen enemy for Deep
-  Freeze, the Bursting enemy for Virulence, the ally whose Blessed
-  shield broke for Blessed Overflow), else at the hero that holds the
-  passive. Deep Freeze sounds as the freeze starts, which is as the
-  bolt or shard that caused it leaves Rime, 0.16 s before that
-  projectile lands. A Burst also sends an `impact-landed` for
-  `plague-burst`, which has no landing sound, so each Burst plays once.
-  Blessed Overflow's burst works the same way: its `impact-landed` for
-  `blessed-burst` is silent, and its damage arrives as reactions.
-- A unit that stops being frozen plays `ice-break`, panned at the unit,
-  as its ice block breaks into chips. That happens when the freeze runs
-  out, a knock-down or hex replaces it, or the unit dies. The engine
-  sends no thaw event, so `syncFrozen` spots the change between
-  snapshots. Glacial Prison thaws up to 7 enemies within 100 ms, and
-  the sound's 100 ms cooldown plays them as one.
-- Hex has no cast sound. Its landing sound, `hex`, plays on each
-  `hexed` status as the violet puff appears: on the first enemy at
-  once, and on any others (Hex Bolt's second target, Weaver's extras)
-  when their fate bolt lands 0.2 s later. Extras that land together
-  fold into one puff.
-- Weaver plays `weaver` on `passive-triggered` for `threads`, panned at
-  Moira. It triggers on the tick Hex spends the 10 Threads, so it
-  sounds under that Hex's first puff.
-- An Ill Omen echo (`combo-detonated` with `echo`) plays `omen-echo`
-  instead of the combo's sound, when its fate bolt reaches the other
-  bound enemy 0.2 s after the combo. The engine sends the combo first,
-  then one echo per other bound enemy, all with the combo's
-  `causeSequence`. Echoes that land together fold into one caw.
-- Puppeteer plays `puppeteer` on each `puppeted` status. Shared Fate
-  puppets every bound enemy on one tick, which folds into one creak.
-  The puppet running out (`status-expired` for `puppet`) and the
-  threads between bound enemies are silent.
-- A self-revive (a `revived` event whose source is the hero itself)
-  plays the revive sound, and the form the hero enters on that tick
-  stays silent, so Phoenix doesn't also play Inferno's burst.
-- Resurrection plays its bell on the cast. Each ally it raises sends an
-  `impact-landed` for `resurrection` at that ally on the same tick,
-  which plays `holy-pillar` there. With Avatar, Morrow's form plays
-  `holy-pillar` at her first, and the raise's copy falls inside the
-  sound's 120 ms cooldown, so one pillar sounds, panned at Morrow. Mass
-  Resurrection's raises fold into one pillar the same way. If nobody
-  has fallen, the team turns invulnerable instead, and only the bell
-  plays.
-- A risen copy (`unit-spawned` with a `corpseUnitId`) plays
-  `grave-rise` at its corpse instead of a spawn sound. Army of the Dead
-  can raise several on one tick, and the sound's 80 ms cooldown plays
-  one. The Colossus plays `golem-rise`. Thralls rise silently: Harvest's
-  `passive-triggered` plays `thrall-rise` as its soul wisp leaves the
-  corpse, and Army thralls arrive under the Army cast.
-- Risen units never speak. `SoundSource.risen` is set for a unit with a
-  summoner that isn't a summon itself, and `playCast` and `playDeath`
-  skip its lines. Its death plays `death-bones` (`CRUMBLE_SOUND`)
-  instead of `death`. So does a `unit-dismissed` on or after the unit's
-  `expiresAtTick`: an Army timing out drops its copies and thralls on
-  one tick, which folds into one crumble. Blown thralls are dismissed
-  on their blast's tick and stay silent under it.
-- Corpse Explosion sounds on its `impact-landed` at the body, which
-  arrives on the cast's tick. Manual casts, Grave Chain and the
-  cast-on-kill gem all sound the same way. `isRangedAbility` skips its
-  `busiest-corpse` target policy, so its hits land at once and a big
-  one's `crit-heavy` sounds with the blast.
-- Golem Slam hits every enemy near its target on one tick, and
-  `hit-blunt`'s cooldown plays one thump. Its taunts, Grave Mark,
-  `corpse-spent` and the Lich form are silent. The form arrives with
-  the Army cast.
-- A projectile's area hits land with it. The first hit of a cast flies
-  the projectile, and `projectile()` returns its flight time, which
-  `flightTimes` keeps under the cast's `causeSequence`. The cast's other
-  hits wait that long, so they land in one frame. Mech Rocket's rocket
-  flies 0.3 s, and `hit-rocket`'s cooldown folds its hits into one
-  burst.
-- Mech Suit plays `mech-suit` on the cast. Its shield is silent
-  (`SILENT_SHIELDS`) and the `mech` form has no sound. With Doomsday,
-  the suit ending sends an `impact-landed` for `mech-suit` at
-  Brassjack, which plays `doomsday`. It doesn't come if he dies in the
-  suit.
-- With Self-Destruct, a turret that dies or is replaced sends an
-  `impact-landed` for `self-destruct` 0.3 s later, which plays
-  `self-destruct`. A death plays `death-turret` first. A replaced
-  turret is dismissed with no death event, so only the blast sounds,
-  and without Self-Destruct it goes quietly under the new turret's
-  `deploy-turret`. The hits of Doomsday and Self-Destruct are reactions
-  and stay silent.
-- Tesla Coils' chain hit has no area or bounces, so it takes `arc()`
-  and lands 66 ms after the event. That is 94 ms before the turret's
-  bolt reaches the first enemy. Both play `hit-rivet`.
-- A `stunned` status plays `stun`. A stun that rides on a hit (Skull
-  Basher, Ruthless) shares the hit's `causeSequence` and target, and
-  `stunningHitsIn` finds that hit in the same batch, so the stun sounds
-  right after the hit's own sound, when its projectile or leap lands. A
-  stun with no hit (Sentinel Ward) sounds when its status arrives.
-  Whirlwind stuns several enemies on one tick, and the 80 ms cooldown
-  plays one crack.
-- Ember Brand's fire zones (`zone-created` for `ember-trail`) play
-  `ember-trail` at the zone. A leap drops all its zones on the cast's
-  tick, so the fire sounds with the takeoff. Vesper drops zones on every
-  hop, 0.2 s apart. The sound's 800 ms cooldown, its full length, keeps
-  that to one whoosh at a time.
-- A Voidheart burst sends an `impact-landed` for `voidheart` at the body
-  0.3 s after the death, which plays `voidheart`. Its hits are reactions
-  and stay silent, like Self-Destruct's.
-- Unstable Core's cost (`hp-paid` with reason `unstable-core`) comes on
-  the original cast, so its sizzle sits between the cast and the echo
-  0.3 s later. The echo is a `cast` with `repeat: "multicast"`, which
-  plays the skill's cast sound again. Echoes are `triggered`, so they
-  never start a voice line.
-- Teleport beats play only while the teleport runs forward in real time.
+- `ATTACK_SOUNDS`: each attack kind's swing and hit. Melee swings
+  `swing-heavy` and hits `hit-blunt`; projectiles swing `swing-light` and
+  hit `hit-blade`. The swing plays on the `attack` event, the hit when the
+  damage lands.
+- `CAUSE_HIT_SOUNDS`: the hit sound for damage that isn't an attack,
+  keyed by the damage's `cause`. Throws, bowling and yanks thump
+  (`hit-blunt`). Splash, hammer, blast and burn damage are silent,
+  because the impact that caused them already sounds.
+- A crit adds `crit-hit`. Any other hit worth `BIG_HIT_FRACTION` of the
+  target's max HP adds `crit-heavy`.
+- Hammerfall's impact and a Short Fuse explosion play `crit-heavy`, a
+  landing plays `hit-blunt`, a throw `swing-heavy`, Yank's pull
+  `hit-blade`, a stun `stun` and a death `death`.
+- The teleport beats play `teleport-out`, `teleport-in` and
+  `teleport-warp`, only while the teleport runs forward in real time.
+- Bubbles forming and popping, ignites, Rampage and combo links have no
+  sound yet (`missing_assets.md`).
 - Snaps (skip to end, catching up after a stall) skip event handling
   entirely, so they stay silent.
 - A button click is not voiced if another effect started in the last
   30 ms, so a click that triggers its own sound plays once.
 
-**Voice lines.** Each hero has pick, cast, death and win lines
-(`voice-lines.ts`), played through `game/fx/hero-voices.ts`. Whether a
-line may play right now is decided by `line-policy.ts`, a pure function:
-
-- One line plays at a time. Pick and win lines interrupt by fading out
-  the dialogue channel; cast and death lines wait.
-- Cast and death lines need gaps since the last line, and play less
-  often for enemies.
-- Cast lines fire only on ultimate casts (the skill that costs mana), never on triggered ones.
-- Risen copies never speak.
-
-The numbers are in `docs/audio.md`.
-
-**Overlap rules** (`voice-policy.ts`, a pure function):
+**Overlap rules** (`voice-policy.ts`, a pure function; a "voice" here is
+one playing copy of a sound):
 
 - `cooldownMs`: a repeat of the same sound inside this window is
-  dropped. This stops 8 AoE hits in one frame from stacking.
+  dropped. This stops a crowd of hits in one frame from stacking.
 - `maxVoices`: at most this many copies of one sound play at once.
   `onLimit: "steal-oldest"` fades the oldest copy out over 15 ms, which
-  avoids a click. `"skip"` drops the new one instead, so a stinger or
-  line never restarts over itself.
-- `GLOBAL_VOICE_LIMIT` (16) caps each channel's one-shots. Voice lines
-  never compete with effects for slots. Each sound has a `priority`:
-  swings and hits 0, abilities 1, big impacts 2, stingers, UI sounds
-  and lines 3. When a channel is full, the new sound takes the slot of
-  the oldest sound in the lowest tier at or below its own, and is
+  avoids a click. `"skip"` drops the new one instead, so a stinger never
+  restarts over itself.
+- `GLOBAL_VOICE_LIMIT` (16) caps the one-shots. Each sound has a
+  `priority`: swings and hits 0, abilities 1, big impacts 2, stingers
+  and UI sounds 3. When the limit is reached, the new sound takes the slot
+  of the oldest sound in the lowest tier at or below its own, and is
   dropped if everything playing outranks it. A hit only ever replaces
-  another hit, so a busy fight never cuts a spell short, and a stinger
-  or line is never dropped because a fight is busy.
+  another hit, so a busy fight never cuts a big impact short, and a
+  stinger is never dropped because a fight is busy.
 - Each copy gets a small random pitch and volume change so repeats don't
   sound robotic. Battle sounds are also panned by the unit's position on
   screen.
@@ -386,17 +263,14 @@ unlocked, is dropped rather than queued. A late sound is worse than
 none. In dev builds, `window.jevAudio.stats()` shows each sound's
 requested, started, skipped and stolen counts.
 
-**Loading.** Sound effects are decoded into memory
-(`AudioBuffer`s). Each belongs to a `PreloadGroup`: `boot` loads at
-startup, and `battle` and `voices` load when the lab or match scene is
-created.
-Decoded audio costs about 384 KB per second of stereo sound, so keep
-effects short. Music is never decoded. Each track is an
-`HTMLAudioElement` with `preload="none"`, streamed with range requests
-and routed through a `MediaElementAudioSourceNode`, so a 50 MB
-soundtrack costs almost nothing until a track plays. As the asset list
-grows, add groups (per hero, per board theme) rather than loading
-everything up front.
+**Loading.** Sound effects are decoded into memory (`AudioBuffer`s).
+Each belongs to a `PreloadGroup`: `boot` loads at startup, and `battle`
+loads when the lab or match scene is created. Decoded audio costs about
+384 KB per second of stereo sound, so keep effects short. Music is never
+decoded. Each track is an `HTMLAudioElement` with `preload="none"`,
+streamed with range requests and routed through a
+`MediaElementAudioSourceNode`, so a large soundtrack costs almost nothing
+until a track plays.
 
 **Music.** Scenes call `audio.setMusic(id | null)`. The engine
 crossfades over 1 s and remembers the request until the first click or
@@ -405,120 +279,30 @@ scene picks its track from `MUSIC_FOR_SCREEN` (menu / planning / battle)
 in `syncMusic()`. Leaving the match fades the music out.
 
 The match scene also plays the draft sounds, the last three countdown
-seconds, `battle-start` when a battle is joined in its first 6 ticks,
-the round result and run result stingers, and reward and recruit
-sounds. Music is still a placeholder (`missing_assets.md` entry 7).
+seconds, `battle-start` when a battle begins, and the round result and
+run result stingers. Music is still a placeholder (`missing_assets.md`).
 
-## Client 3D models
+## Client figures
 
-`apps/client/src/models/` follows the audio layout:
-
-- **Catalogue.** `catalogue.ts` lists every model's URL and kind.
-- **Library.** `models` in `library.ts` owns one `GLTFLoader` with
-  three.js's bundled meshopt decoder. It loads each file once and hands
-  out `SkeletonUtils` copies that share geometry, clips and one skeleton
-  per copy.
-- **Loading.** `main.ts` mounts the first screen, then loads the hero
-  models in the background; nothing waits on them.
 - **Figures.** `createHeroFigure(heroId)` (`game/views/hero-figures.ts`)
-  returns a model-backed figure (`model-figure.ts`) when that hero's
-  model is loaded. Otherwise it returns the placeholder, which swaps
-  itself for the model when the load finishes. Both share
-  `figure-base.ts` and the `HeroFigure` interface, so the views never
-  know which one they have.
-- **Copies.** A model figure clones only the materials it recolours or
-  flashes. It releases its skeleton's bone texture on dispose.
-- **Channels.** `HeroFigure.setChanneling` is called by the battle view
-  wherever it already spins a channelling unit. Model figures loop their
-  `channel` clip while it's set, plus the catalogue's `channelEffect`
-  (`cyclone-effect.ts` for Gorrak). Placeholders ignore it.
-- **Board height.** A catalogue entry can set `boardHeight`, the on-board
-  height in units, when a model shouldn't take its placeholder's height.
-  Cinder uses it because her placeholder wears a tall hat. The model
-  figure scales to it, and `HeroFigure.height` (health plates, chest
-  point) follows it, including after a placeholder swaps to the model.
-- **Forms.** `HeroFigure.setForm` is optional. The battle view tells a
-  figure its unit's form key, or null when it has none or is dead.
-  Morrow's sun disc spins faster in Avatar.
-- **Celebrating.** `HeroFigure.setCelebrating` loops the `victory` clip
-  (for the draft lineup). Placeholders ignore it.
-- **Cast socket.** `HeroFigure.castOrigin` is where projectiles and cast
-  flares leave from. It's the catalogue's `castBone` when a model names
-  one (Cinder's `flame` bone), otherwise the chest.
-- **Spell visuals.** `game/views/spell-visuals.ts` maps ability ids to
-  code-drawn visuals. The battle view asks it at eleven points, and an
-  ability without an entry keeps the generic effect:
-  - pending impacts (Meteor's falling rock and ground shadow, timed from
-    ticks so it lands on the hit at any playback speed);
-  - impact landings (Fireball's blast, Leap Slam's shockwave, Nettle's
-    Burst splash, Blessed Overflow's burst of shell scutes, the torii gate
-    that rises over an ally Resurrection raises, Hex's violet puff on each hexed enemy, Corpse
-    Explosion's bone burst, which Grave Chain blasts reuse, and the
-    shrapnel of Brassjack's rockets, with gears flying out of
-    Self-Destruct and Doomsday);
-  - zones (Meteor's burning ground, Whirlwind's axes, Plague Bloom's
-    hellebore, Hallowed Path's floating rope circle);
-  - emitters (the Frozen Orb, and Hailstorm's cloud over Glacial
-    Prison);
-  - casts, drawn at the area's centre with the caster's own radius
-    (Glacial Prison's ice spikes, Pandemic's surge, Resurrection's bell toll,
-    Shared Fate's curse ring, Army of the Dead's grave ring);
-  - form starts (Inferno's burst, Avatar's rising sun, the Lich's teal
-    pillar, the Mech's brass plates snapping on);
-  - summons arriving (`spawnVisual`: a turret drops in with a brass
-    ring, steam and sparks);
-  - passive triggers (Weaver's flare when a full meter is spent, and
-    Harvest's pop when a soul reaches Sexton);
-  - projectiles (Firebolt's fireball, Rime's ice shards, the globs a
-    Contagion Burst throws, Nettle's thorn, Judgment's spirit mallet, the fate bolt
-    that carries Hex and Ill Omen from one enemy to the next, Grave and
-    Lich bolts, the soul that flies from a death to Sexton when
-    Harvest raises a thrall, and the Mech's arcing rockets). Emitter
-    shots fly from the emitter: `emitter-fired` carries the origin, and
-    hail falls from above its target.
-  - hits (`hitVisual`: Oath Hammer's bell ring, the seal Judgment
-    stamps on each enemy it hits);
-  - heals (`mendVisual`: the lotus over each ally Judgment heals).
-  A bouncing skill's hits, heals and shields share one cause sequence,
-  so they draw as one path: each hop flies after the last one lands,
-  and a bounce trail's zone waits until the hop that dropped it
-  arrives. A Hex that reaches more than one enemy (Hex Bolt, a full
-  Weaver meter) flies from the first hexed enemy to the others, and an
-  Ill Omen echo (`combo-detonated` with `echo`) flies from the combo it
-  copies before it pops. An area projectile's other hits wait for the
-  first hit's real flight time (`flightTimes`), so a rocket's splash
-  lands with the rocket. Hits from abilities that target a corpse
-  (Corpse Explosion) land at once instead of flying from the caster.
-  `game/views/fate-threads.ts` draws Shared Fate's bonds every frame from
-  the snapshot's links: sagging threads between the enemies on one link,
-  closed into a net at three or more, with marionette strings over each
-  puppet.
-  Rocks, burning ground, flowers and orbs are rebuilt from the
-  snapshot's impacts, zones and emitters, so seeks and resets never
-  leave them behind. Orbs move between ticks by the emitter's velocity.
-  Frozen units stand in an ice block with their pose held, and it
-  breaks into chips when the freeze ends or the unit dies. When
-  Morrow's Resurrection finds nobody to raise, each ally she makes
-  invulnerable stands in a shell dome; the battle view keeps one per
-  unit and shatters it when `invulnerableUntilTick` drops back to 0.
-  Other sources of invulnerability keep a plain flash. A raised
-  ally stands back up, a Blessed shield turns the bubble gold,
-  Avatar grows Morrow to 1.45×, and the Mech grows Brassjack to 1.3×.
-  Turrets spin up with Overclock: `HeroFigure.setOverclock` takes the
-  bonus from `overclockBonus` as a share of its maximum, and speeds the
-  rotor and brightens the brass accents with it.
-  Corpses lie where they fell while a living unit could still use them
-  (`HeroFigure.setLinger`): any corpse while Sexton lives, and Morrow's
-  side's fallen heroes while she lives. Otherwise they sink as before. A
-  corpse Army of the Dead raises (`unit-spawned` with `corpseUnitId`)
-  rises in a teal pillar and fights see-through and teal
-  (`HeroFigure.setSpectral`). The Bone Colossus stands 1.6× tall.
-- **Dev lab.** `#models` is the model lab: clips on demand, a crowd
-  button that cycles ×16 and ×32 stress crowds, a placeholder comparison and the stats panel with a
-  leak test. In dev builds, `window.jevModels` exposes the library.
-
-The sources, the export (`pnpm models:build`) and the contract check
-(`pnpm models:check`) are described in `docs/models.md`.
+  builds each hero from primitives: `figureBuilder` has one builder per
+  content id (the five heroes and the Training Dummy) and throws for any
+  other id. They are stand-ins until the KayKit characters are imported
+  (`docs/pivot-plan.md` §7.2). There is no model loader until then; the
+  old one is at the `pre-pivot` tag. Every figure uses `figure-base.ts`
+  (team ring, contact shadow) and the `HeroFigure` interface, so the
+  views don't change when the KayKit bodies replace the stand-ins.
+- **Looks.** `battle-visuals.ts` gives each hero its hit kind and the
+  look of what it throws (`heroLook`, `shotLook`): firecrackers, soap,
+  knives, fuse bombs and the harpoon hook. It also draws Big Bubble and the
+  Safety Bubble, Yank's chain, and the Hammerfall hammer, whose drop
+  follows `hammerPose` (it grows in above the target, slams down on
+  impact and fades out).
+- **Celebrating.** `HeroFigure.setCelebrating` plays the win pose: for
+  a picked hero in the draft lineup, and for the living units of the
+  winning team once a battle has a result.
+- **Cast socket.** `HeroFigure.castOrigin` is where shots and cast flares
+  leave from: a socket at the figure's chest.
 
 ## Client rendering
 
@@ -554,19 +338,14 @@ own objects to its scene.
   - Use `solid` for anything that has to read on the bright boards
     (sparks, embers, motes, smoke, dust). Additive colour washes to
     white there, so `glow` is for short flashes.
-- **Hit effects.** `hit-effects.ts` maps ability ids to what they hit
-  with: blunt, blade, fire, frost, dark, thorn, rivet, holy, or strike
-  for anything unlisted.
-  - Each kind has a burst that sprays away from the attacker, larger for
-    crits and heavy hits.
-  - Each kind also has a bolt tint, a trail and a release flare at the
-    cast socket.
-  - This is cosmetic, so it stays out of the engine.
+- **Hit effects.** `hit-effects.ts` sprays a burst away from the
+  attacker in one of three kinds: strike, blunt or blade. Crits and heavy
+  hits spray more. This is cosmetic, so it stays out of the engine.
 - **Effect materials.** `effect-materials.ts` pools the materials of
-  every short-lived effect by kind: glow, flash, flame, trail, scorch,
-  veil, core, rock, fading rock, solid, fading solid and arc.
+  every short-lived effect by kind.
   - An effect takes one with `effectMaterials.<kind>.take()` and hands
-    it back with `releaseEffectMaterial`. Nothing disposes them.
+    it back with `releaseEffectMaterial`, which throws if the material
+    wasn't taken. Nothing disposes them.
   - Why: three deletes a shader when its last material is disposed, so
     effects that made and disposed their own materials recompiled their
     shaders on every cast, and each compile stalled a frame.
@@ -576,15 +355,16 @@ own objects to its scene.
     the same pipeline the fight uses.
   - A shader variant also depends on the geometry: three r186 keys it on
     whether the geometry has normals. Every effect mesh has normals and
-    arc lines have none, like the warm-up's. A test checks every effect
-    against the warm-up.
+    chain lines have none, like the warm-up's. A test checks every effect
+    and visual against the warm-up.
   - The additive double-sided kinds set `forceSinglePass`. Otherwise
     three draws a transparent double-sided mesh twice, back faces then
     front, and rebuilds its shader key for each pass. Added light doesn't
     depend on draw order.
-- **Battle effects.** `battle-effects.ts` draws the battle view's combo
-  bursts, impact flashes, bolts, arcs and ground markers. Rings of one
-  proportion share a geometry, and arc lines reuse theirs.
+- **Battle effects.** `battle-effects.ts` draws impact flashes,
+  explosions, bubble pops, dust, embers, fuse sparks, stun stars, heal
+  motes, death dust and ground markers. Rings of one proportion share a
+  geometry.
 - **Static merging.** `merge-static.ts` merges the static meshes under a
   root into one mesh per material and shadow setting, in the root's
   space. Transparent meshes keep their own draw so three still sorts
@@ -596,8 +376,7 @@ own objects to its scene.
   - An animator may only change its targets themselves: their
     transform, geometry or material. Fire names its flame and core, not
     the group around them.
-  - Placeholder heroes merge their parts per material; the turret's
-    rotor merges on its own.
+  - Primitive heroes merge their parts per material.
 - **No layout reads per frame.** The stage caches its size. `screenPan`
   gives a point's audio pan without reading layout, and `showBoard`
   returns early when nothing changed, so views may call it every update.
@@ -605,11 +384,11 @@ own objects to its scene.
   - the scene, into a half-float target with 4× MSAA;
   - `UnrealBloomPass`, with a threshold of 1.05 in linear HDR;
   - `OutputPass`, which applies the ACES tone mapping and exposure.
-  Lit surfaces stay below the threshold, so only emissive things and
-  spell cores bloom.
+    Lit surfaces stay below the threshold, so only emissive things and
+    effect cores bloom.
 - **Graphics settings.** `graphics/settings.ts` saves them to
   `localStorage` under `jev-game.graphics.*`. The Graphics tab
-  (`hud/settings/graphics-tab.ts`) edits them, and every stage applies
+  (`features/settings/graphics-tab.tsx`) edits them, and every stage applies
   them live:
   - Resolution: 100%, 75% or 50% of the device pixel ratio, which is
     still capped at 2.
@@ -629,14 +408,16 @@ own objects to its scene.
 - **Tests.** `pnpm --filter ./apps/client test` runs `node:test` through
   `tsx` on the parts that don't need WebGL. It covers:
   - shadow quality;
-  - which figure parts cast shadows, and cast sockets;
+  - which figure parts cast shadows, cast sockets and figure batching;
   - the particle ring buffer, cone sampling, expiry and clear;
   - trails;
   - settings parsing and resolution;
   - the frame sampler;
-  - the effect material pool, and the warm-up covering every effect;
-  - hit effects and spells reusing their materials;
-  - static merging (placement, shadows, animated and mirrored props) and
-    merged heroes;
+  - the effect material pool, and the warm-up covering every effect and
+    visual;
+  - battle effects and visuals handing their materials back, and the
+    hammer's drop;
+  - static merging (placement, shadows, animated and mirrored props);
+  - the sound overlap rules;
   - HUD text written only when it changes.
-  `pnpm --filter ./apps/client typecheck` checks the tests too.
+    `pnpm --filter ./apps/client typecheck` checks the tests too.

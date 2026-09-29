@@ -1,271 +1,241 @@
-import type { AbilityDefinitionId, ArenaDefinitionId, HeroDefinitionId, TeamId, UnitId } from "../ids.js";
-import type { RngState } from "../random/rng.js";
+import type { ArenaDefinitionId, HeroDefinitionId, TeamId, UnitId } from "../ids.js";
+import type {
+  AttackDefinition,
+  PassiveDefinition,
+  RadialLaunch,
+  SetupState,
+  SignatureDefinition,
+} from "../definitions.js";
 import type { Vector2 } from "../math/vector.js";
-import type { ConditionKind, PassiveDefinition, School, EffectDefinition, FormDefinition, PullDefinition } from "../definitions.js";
+import type { RngState } from "../random/rng.js";
 import type { BattleResult } from "./result.js";
-import type { ChannelStatus, ChillStatus, ConditionStatus, ControlStatus, DotStatus, GraveMarkStatus, LinkStatus, PandemicStatus, ShieldStatus, SlowStatus, TauntStatus } from "./statuses.js";
-import type { CompiledAbility } from "../builds/compile-build.js";
-import type { HeroBuild } from "../builds/state.js";
 
-export interface ActiveForm {
-  abilityId: AbilityDefinitionId;
-  castSequence: number;
-  endsAtTick: number;
-  damageTaken: number;
-  hitsTaken: number;
-  freeCastReadyAt: number;
-  retaliatedAt: Record<UnitId, number>;
-  definition: FormDefinition;
+export type LaunchCause = "hammer" | "throw" | "yank" | "blast" | "crit" | "bowling" | "drop";
+
+export interface FlightPath {
+  from: Vector2;
+  bounce: Vector2 | null;
+  to: Vector2;
+  length: number;
 }
 
-export interface UnitMemory {
-  damageSinceTrigger: number;
-  firstHitTargets: UnitId[];
-  attackCounts: Record<string, number>;
-  attackCountedStrike: Record<string, string>;
-  siphonedAt: Record<UnitId, number>;
-  ruthlessStunned: Record<UnitId, number>;
-  revived: boolean;
-  souls: number;
-  fellAtTick: number;
-  resurrected: boolean;
-  corpseSpent: boolean;
-  summonsRaised: number;
-  overclockTicks: number;
-  spentTriggers: string[];
-  triggerReadyAt: Record<string, number>;
-  stacks: Record<string, number>;
-  stacksGainedAt: Record<string, number>;
-  stackProgress: Record<string, number>;
-  stored: Record<string, number>;
-  storedIncoming: Record<string, number>;
-  skillUses: Record<string, number>;
-  attackCasts: number;
-  mirrorUsed: boolean;
-  sentinelUsed: boolean;
-  tetherPending: number;
+export interface LandingEffect {
+  hard: boolean;
+  cause: LaunchCause;
+  launcherUnitId: UnitId;
+  launcherTeamId: TeamId;
+  bowlingHop: number;
+  bowlingDamage: number;
+  landingDamage: number;
+  stunTicks: number;
 }
 
-export interface SpeedBuff {
-  key: string;
-  bonus: number;
-  expiresAtTick: number;
+export interface FlightMotion {
+  kind: "flight";
+  path: FlightPath;
+  startTick: number;
+  endTick: number;
+  startHeight: number;
+  peak: number;
+  landing: LandingEffect;
 }
 
-export interface DamageMark {
-  sourceUnitId: UnitId;
-  bonus: number;
-  expiresAtTick: number;
+export interface FloatMotion {
+  kind: "float";
+  bubbleId: number;
+  offset: Vector2;
+}
+
+export interface SkidMotion {
+  kind: "skid";
+  from: Vector2;
+  to: Vector2;
+  startTick: number;
+  endTick: number;
+  makerUnitId: UnitId;
+}
+
+export interface DownedMotion {
+  kind: "downed";
+  startTick: number;
+  endTick: number;
+  makerUnitId: UnitId;
+}
+
+export interface GroundMotion {
+  kind: "ground";
+}
+
+export type Motion = GroundMotion | FlightMotion | FloatMotion | SkidMotion | DownedMotion;
+
+export type UnitAction =
+  | { kind: "idle" }
+  | { kind: "attack"; targetUnitId: UnitId; startTick: number; hitTick: number }
+  | {
+      kind: "hammerfall";
+      startTick: number;
+      impactTick: number;
+      endTick: number;
+      center: Vector2;
+    }
+  | { kind: "rampage-grow"; startTick: number; endTick: number }
+  | { kind: "grab"; targetUnitId: UnitId; startTick: number; throwTick: number }
+  | {
+      kind: "short-fuse";
+      targetUnitId: UnitId;
+      startTick: number;
+      releaseTick: number;
+    }
+  | {
+      kind: "big-bubble";
+      center: Vector2;
+      startTick: number;
+      releaseTick: number;
+    }
+  | {
+      kind: "yank";
+      targetUnitId: UnitId;
+      startTick: number;
+      throwTick: number;
+      endTick: number;
+    };
+
+export interface BurningState {
+  fuseId: number;
+  makerUnitId: UnitId;
+  hop: number;
+  untilTick: number;
+  nextPulseTick: number;
+}
+
+export interface PrimedState {
+  fuseId: number;
+  makerUnitId: UnitId;
+  explodeTick: number;
+}
+
+export interface RampageState {
+  startTick: number;
+  growEndTick: number;
+  shrinkStartTick: number;
+  endTick: number;
+  nextGrabTick: number;
 }
 
 export interface UnitState {
   unitId: UnitId;
-  heroId: HeroDefinitionId;
-  build: HeroBuild;
   teamId: TeamId;
+  heroId: HeroDefinitionId;
   position: Vector2;
+  elevation: number;
+  facing: Vector2;
+  baseRadius: number;
+  size: number;
+  radius: number;
   hp: number;
   maxHp: number;
-  moveSpeedUnitsPerSecond: number;
-  targetUnitId: UnitId | null;
-  abilityCooldowns: Record<AbilityDefinitionId, number>;
-  abilityCooldownDurations: Record<AbilityDefinitionId, number>;
-  shield: ShieldStatus | null;
-  slow: SlowStatus | null;
-  alive: boolean;
-  damageDealt: number;
-  school: School | null;
-  armor: number;
-  critChance: number;
-  critMultiplier: number;
-  damageMultiplier: number;
-  attackDamageMultiplier: number;
-  spellDamageMultiplier: number;
-  lifesteal: number;
-  slowStrengthBonus: number;
-  conditionDurationBonusTicks: number;
   mana: number;
   maxMana: number;
-  manaPerAttack: number;
-  basicAttackId: AbilityDefinitionId;
-  abilityId: AbilityDefinitionId | null;
-  ultimateId: AbilityDefinitionId | null;
-  abilities: Record<AbilityDefinitionId, CompiledAbility>;
-  passives: PassiveDefinition[];
-  condition: ConditionStatus | null;
-  control: ControlStatus | null;
-  taunt: TauntStatus | null;
-  invulnerableUntilTick: number;
-  untargetableUntilTick: number;
-  expiresAtTick: number;
-  dots: DotStatus[];
-  attackSpeedBonus: number;
-  speedBuffs: SpeedBuff[];
-  marks: DamageMark[];
-  chill: ChillStatus | null;
-  pandemic: PandemicStatus | null;
-  graveMark: GraveMarkStatus | null;
-  burstLockedUntilTick: number;
-  memory: UnitMemory;
-  summonerUnitId: UnitId | null;
-  link: LinkStatus | null;
-  channel: ChannelStatus | null;
-  form: ActiveForm | null;
-}
-
-export interface CastStun {
-  ticks: number;
-  useId: number;
-}
-
-export interface PendingImpact {
-  impactId: number;
-  sourceUnitId: UnitId;
-  teamId: TeamId;
-  abilityId: AbilityDefinitionId;
-  center: Vector2;
-  radiusUnits: number;
-  landsAtTick: number;
-  causeSequence: number;
-  scale: number;
-  stun: CastStun | null;
-  pull: PullDefinition | null;
-}
-
-export interface ActiveShower {
-  showerId: number;
-  sourceUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  castSequence: number;
-  scale: number;
-  stun: CastStun | null;
-  remaining: number;
-  fired: number;
-  nextTick: number;
-}
-
-export interface ActiveBomb {
-  bombId: number;
-  sourceUnitId: UnitId;
-  targetUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  castSequence: number;
-  scale: number;
-  stun: CastStun | null;
-  detonatesAtTick: number;
-  position: Vector2;
-}
-
-export interface ActiveEmitter {
-  emitterId: number;
-  sourceUnitId: UnitId;
-  teamId: TeamId;
-  abilityId: AbilityDefinitionId;
-  shotAbilityId: AbilityDefinitionId;
-  scale: number;
-  stun: CastStun | null;
-  position: Vector2;
-  velocity: Vector2;
-  endsAtTick: number;
-  nextShotTick: number;
-}
-
-export interface ActiveZone {
-  zoneId: number;
-  sourceUnitId: UnitId;
-  teamId: TeamId;
-  abilityId: AbilityDefinitionId;
-  center: Vector2;
-  radiusUnits: number;
-  expiresAtTick: number;
-  periodTicks: number;
-  nextPulseTick: number;
-  effects: EffectDefinition[];
-  allyEffects: EffectDefinition[];
-  followsUnitId: UnitId | null;
-  fullHits: boolean;
-}
-
-export interface PendingBlessedBurst {
-  allyUnitId: UnitId;
-  sourceUnitId: UnitId;
-  amount: number;
-  dueTick: number;
-  causeSequence: number;
-}
-
-export interface PendingCorpseBlast {
-  sourceUnitId: UnitId;
-  corpseUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  dueTick: number;
-  causeSequence: number;
-  scale: number;
-}
-
-export interface PendingDetonation {
-  unitId: UnitId;
-  sourceUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  dueTick: number;
-}
-
-export interface PendingBurst {
-  targetUnitId: UnitId;
-  holderUnitId: UnitId;
-  dueTick: number;
-  causeSequence: number;
-  spreads: boolean;
-}
-
-export interface ChainLink {
-  root: number;
-  link: number;
-}
-
-export type RepeatKind = "multicast" | "clone" | "barrage";
-
-export interface PendingCast {
-  order: number;
-  sourceUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  castAtTick: number;
-  scale: number;
+  alive: boolean;
+  diedAtTick: number;
+  moveUnitsPerSecond: number;
+  attack: AttackDefinition;
+  signature: SignatureDefinition | null;
+  passive: PassiveDefinition | null;
   targetUnitId: UnitId | null;
-  chain: ChainLink;
-  repeat: RepeatKind | null;
-  trigger: string | null;
-  fromCorpse: boolean;
+  nextAttackTick: number;
+  readySinceTick: number;
+  action: UnitAction;
+  motion: Motion;
+  stunnedUntilTick: number;
+  burning: BurningState | null;
+  primed: PrimedState | null;
+  rampage: RampageState | null;
+  safetyBubbled: boolean;
+  damageDealt: number;
 }
 
-export interface PendingStrike {
-  order: number;
+export type ProjectilePayload =
+  | {
+      kind: "attack";
+      damage: number;
+      crit: boolean;
+      splashRadiusUnits: number;
+      splashFraction: number;
+    }
+  | { kind: "fuse" }
+  | { kind: "hook" };
+
+export interface ProjectileState {
+  projectileId: number;
   sourceUnitId: UnitId;
   targetUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  atTick: number;
-  scale: number;
-  causeSequence: number;
-  effects: EffectDefinition[];
+  from: Vector2;
+  fromElevation: number;
+  launchTick: number;
+  arrivalTick: number;
+  payload: ProjectilePayload;
 }
 
-export interface ActiveSequence {
-  sequenceId: number;
-  sourceUnitId: UnitId;
-  abilityId: AbilityDefinitionId;
-  castSequence: number;
-  scale: number;
-  stun: CastStun | null;
-  hopsLeft: number;
-  hopsDone: number;
-  nextHopTick: number;
-  hitUnitIds: UnitId[];
-  anchor: Vector2;
-  moves: boolean;
-  repeat: RepeatKind | null;
+export type BubbleKind = "big" | "safety";
+
+export interface BubbleFlight {
+  path: FlightPath;
+  startTick: number;
+  endTick: number;
+  startHeight: number;
+  peak: number;
+  landing: LandingEffect;
 }
 
-export type TeamComboTiers = Record<ConditionKind, number>;
+export interface BubbleState {
+  bubbleId: number;
+  kind: BubbleKind;
+  ownerUnitId: UnitId;
+  ownerTeamId: TeamId;
+  center: Vector2;
+  elevation: number;
+  startElevation: number;
+  floatHeight: number;
+  radius: number;
+  memberUnitIds: UnitId[];
+  startTick: number;
+  riseEndTick: number;
+  endTick: number;
+  healPerPulse: number;
+  nextPulseTick: number;
+  flight: BubbleFlight | null;
+}
+
+export interface FuseState {
+  fuseId: number;
+  makerUnitId: UnitId;
+  makerTeamId: TeamId;
+  carrierUnitId: UnitId;
+  ignitedUnitIds: UnitId[];
+  detonated: boolean;
+  burnDamagePerPulse: number;
+  burnTicks: number;
+  maxTouchHops: number;
+  panicMoveMultiplier: number;
+  blastRadiusUnits: number;
+  blastDamage: number;
+  blastLaunch: RadialLaunch;
+  hotPotatoScale: number;
+}
+
+export interface ChainState {
+  teamId: TeamId;
+  count: number;
+  lastLinkTick: number;
+  unitIds: UnitId[];
+  pairs: string[];
+}
+
+export interface SetupMark {
+  state: SetupState;
+  makerUnitId: UnitId;
+}
 
 export interface BattleState {
   rulesetId: string;
@@ -278,24 +248,120 @@ export interface BattleState {
   arenaRows: number;
   tick: number;
   tickLimit: number;
-  units: UnitState[];
   rng: RngState;
-  eventSequence: number;
-  result: BattleResult | null;
-  resolutionPriority: UnitId[];
-  impacts: PendingImpact[];
-  zones: ActiveZone[];
-  pendingCasts: PendingCast[];
-  pendingStrikes: PendingStrike[];
-  sequences: ActiveSequence[];
-  showers: ActiveShower[];
-  bombs: ActiveBomb[];
-  emitters: ActiveEmitter[];
-  bursts: PendingBurst[];
-  blessedBursts: PendingBlessedBurst[];
-  corpseBlasts: PendingCorpseBlast[];
-  detonations: PendingDetonation[];
-  castChains: Record<number, ChainLink>;
-  comboTiers: Record<TeamId, TeamComboTiers>;
+  units: UnitState[];
+  resolutionOrder: UnitId[];
+  projectiles: ProjectileState[];
+  bubbles: BubbleState[];
+  fuses: FuseState[];
+  chains: ChainState[];
   nextEntityId: number;
+  sequence: number;
+  result: BattleResult | null;
+}
+
+export function unitById(state: BattleState, unitId: UnitId): UnitState {
+  const unit = state.units.find((candidate) => candidate.unitId === unitId);
+
+  if (unit === undefined) {
+    throw new Error(`Unknown unit "${unitId}"`);
+  }
+
+  return unit;
+}
+
+export function bubbleById(state: BattleState, bubbleId: number): BubbleState {
+  const bubble = state.bubbles.find((candidate) => candidate.bubbleId === bubbleId);
+
+  if (bubble === undefined) {
+    throw new Error(`Unknown bubble ${bubbleId}`);
+  }
+
+  return bubble;
+}
+
+export function fuseById(state: BattleState, fuseId: number): FuseState {
+  const fuse = state.fuses.find((candidate) => candidate.fuseId === fuseId);
+
+  if (fuse === undefined) {
+    throw new Error(`Unknown fuse ${fuseId}`);
+  }
+
+  return fuse;
+}
+
+export function nextEntityId(state: BattleState): number {
+  const id = state.nextEntityId;
+  state.nextEntityId += 1;
+
+  return id;
+}
+
+export function isGrounded(unit: UnitState): boolean {
+  return unit.motion.kind === "ground";
+}
+
+export function isAirborne(unit: UnitState): boolean {
+  return unit.motion.kind === "flight";
+}
+
+export function isLaunched(unit: UnitState): boolean {
+  const motion = unit.motion;
+
+  return motion.kind === "flight" && motion.landing.cause !== "drop";
+}
+
+export function isFloating(unit: UnitState): boolean {
+  return unit.motion.kind === "float";
+}
+
+export function isDowned(unit: UnitState): boolean {
+  return unit.motion.kind === "downed" || unit.motion.kind === "skid";
+}
+
+export function isOnFloor(unit: UnitState): boolean {
+  return !isAirborne(unit) && !isFloating(unit);
+}
+
+export function isImmovable(unit: UnitState): boolean {
+  return unit.rampage !== null;
+}
+
+export function isStunned(unit: UnitState, tick: number): boolean {
+  return unit.stunnedUntilTick > tick && unit.rampage === null;
+}
+
+export function canAct(unit: UnitState, tick: number): boolean {
+  return unit.alive && isGrounded(unit) && !isStunned(unit, tick);
+}
+
+export function setupMarks(state: BattleState, unit: UnitState): SetupMark[] {
+  const marks: SetupMark[] = [];
+  const motion = unit.motion;
+
+  if (motion.kind === "float") {
+    marks.push({ state: "floating", makerUnitId: bubbleById(state, motion.bubbleId).ownerUnitId });
+  }
+
+  if (motion.kind === "flight" && isLaunched(unit)) {
+    marks.push({ state: "airborne", makerUnitId: motion.landing.launcherUnitId });
+  }
+
+  if (unit.primed !== null) {
+    marks.push({ state: "primed", makerUnitId: unit.primed.makerUnitId });
+  }
+
+  if (unit.burning !== null) {
+    marks.push({ state: "burning", makerUnitId: unit.burning.makerUnitId });
+  }
+
+  if (motion.kind === "downed" || motion.kind === "skid") {
+    marks.push({ state: "downed", makerUnitId: motion.makerUnitId });
+  }
+
+  return marks;
+}
+
+export function hasSetup(state: BattleState, unit: UnitState): boolean {
+  return setupMarks(state, unit).length > 0;
 }

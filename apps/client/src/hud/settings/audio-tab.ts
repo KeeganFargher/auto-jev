@@ -1,14 +1,13 @@
 import type { AudioSettings, AudioSettingsStore, VolumeChannel } from "../../audio/settings.js";
 import { VOLUME_CHANNELS } from "../../audio/settings.js";
 import { button, el } from "../dom.js";
-import { dialogueIcon, effectsIcon, musicIcon, speakerIcon } from "../icons.js";
+import { effectsIcon, musicIcon, speakerIcon } from "../icons.js";
 import type { SettingsTab } from "./settings-window.js";
 
 const CHANNEL_LABELS: Readonly<Record<VolumeChannel, string>> = {
   master: "Master",
   music: "Music",
   sfx: "Effects",
-  dialogue: "Voices",
 };
 
 interface ChannelRow {
@@ -24,9 +23,6 @@ function channelIcon(channel: Exclude<VolumeChannel, "master">): SVGSVGElement {
 
     case "sfx":
       return effectsIcon();
-
-    case "dialogue":
-      return dialogueIcon();
   }
 }
 
@@ -44,10 +40,19 @@ export function createAudioTab(store: AudioSettingsStore): SettingsTab {
     slider.addEventListener("input", () => store.setVolume(channel, Number(slider.value) / 100));
 
     const readout = el("span", "settings-readout");
-    const icon = channel === "master" ? muteButton : el("span", "settings-channel-icon", channelIcon(channel));
+
+    const icon =
+      channel === "master" ? muteButton : el("span", "settings-channel-icon", channelIcon(channel));
 
     rows.set(channel, {
-      root: el("div", "settings-row", icon, el("span", "settings-channel-name", CHANNEL_LABELS[channel]), slider, readout),
+      root: el(
+        "div",
+        "settings-row",
+        icon,
+        el("span", "settings-channel-name", CHANNEL_LABELS[channel]),
+        slider,
+        readout,
+      ),
       slider,
       readout,
     });

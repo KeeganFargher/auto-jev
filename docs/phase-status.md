@@ -1,5 +1,11 @@
 # Phase status
 
+Sections before "Bone & Banner pivot" describe the game before the
+2026-09-28 pivot. Docs and scripts they name that the
+pivot removed (`docs/icons.md`, `docs/models.md`, `docs/lore.md`,
+`docs/hero-redesign.md`, `docs/heroes-and-builds-design.md`, and the
+`icons:*` and `models:*` scripts) are at the `pre-pivot` tag.
+
 ## Phase 1 — Stabilise the foundation — done
 
 ### What works now
@@ -39,7 +45,7 @@ The plan was written before inspecting this repo. Reconciliation notes:
 ### Known gaps / honestly-recorded limitations
 
 - **Room-name type safety is partial.** `client.joinOrCreate("arena")`
-  correctly infers the real `ArenaState`/message types. A *misspelled* room
+  correctly infers the real `ArenaState`/message types. A _misspelled_ room
   name does not itself fail to compile — `@colyseus/sdk@0.18.2`'s overloads
   fall back to an untyped `Room<any, any>` for any string it doesn't
   recognize as a literal key. Detailed in `docs/architecture.md`. Not
@@ -105,7 +111,7 @@ pnpm dev                                       # + two browser tabs, + a live ed
 
 - **Determinism, including event order, not just the final result:**
   `pnpm simulate duel 1` run twice produces identical tick count, result,
-  and digest. The browser lab reaches the *exact* same terminal tick and
+  and digest. The browser lab reaches the _exact_ same terminal tick and
   result at both 1x and 4x speed for the same seed/stats as the headless
   run (297 ticks, mutual-elimination, same per-tick damage log) — confirmed
   by screenshot/log comparison, not just by reading the code.
@@ -143,7 +149,7 @@ pnpm dev                                       # + two browser tabs, + a live ed
 ### Known gaps / minor rough edges
 
 - The controls panel's seed `<input>` doesn't sync from session state after
-  an *import* sets a different seed (it does reflect what you type before
+  an _import_ sets a different seed (it does reflect what you type before
   clicking Reset). Cosmetic only — the underlying battle did reset with the
   imported seed, confirmed via the inspector/event log, not the input's
   displayed value.
@@ -218,7 +224,7 @@ pnpm --filter @jev-game/client dev        # + / in two browser sessions,
 - A small effect union (`damage`, `heal`, `shield`) shared by abilities and
   the basic attack — `battle/effects.ts` is the single dispatcher, so a new
   ability needs a content entry, not a tick-loop change.
-- `mend` grants a heal *and* a shield in one ability (two effects on one
+- `mend` grants a heal _and_ a shield in one ability (two effects on one
   `AbilityDefinition`) — the plan names shield as a separate implementation
   step but the starter content list is fixed at three named abilities
   (`strike`/`bolt`/`mend`); bundling shield onto mend exercises the status
@@ -259,7 +265,7 @@ pnpm --filter @jev-game/client dev        # + / in two browser sessions,
 ### Verified, not assumed
 
 - **Same-seed reproducibility unchanged by the new pipeline stages:** `pnpm
-  simulate three-vs-three 1` run twice produces identical tick count,
+simulate three-vs-three 1` run twice produces identical tick count,
   result and digest — this is a real check (it would have caught the
   Phase 1+2 lexicographic-resolution-order bug this project already fixed
   once). It is **not** a check that the pipeline is free of new
@@ -278,7 +284,7 @@ pnpm --filter @jev-game/client dev        # + / in two browser sessions,
   most of the time.
 - **A same-hero mirror match now actually produces a mirror result.**
   `pnpm simulate three-bruisers <any seed>` used to end in a deterministic
-  *win*, always for the same team, regardless of seed — a same-hero mirror
+  _win_, always for the same team, regardless of seed — a same-hero mirror
   probe (this project's own established bias-detector) failing its own
   test. Root cause was a floating-point knife-edge: a unit's distance to
   its target could round to a hair over its ability's range on one side of
@@ -295,7 +301,7 @@ pnpm --filter @jev-game/client dev        # + / in two browser sessions,
   battle, since a shield that gets fully depleted by damage clears itself
   through a different code path than a shield that survives to its own
   timer): a shield absorbs up to its amount and any excess spills to HP in
-  the same hit; a depleted shield clears immediately; an *undamaged* shield
+  the same hit; a depleted shield clears immediately; an _undamaged_ shield
   survives untouched tick-by-tick until exactly its `expiresAtTick`, not one
   tick early or late; reapplying a shield replaces its amount and refreshes
   its duration rather than stacking. The first full `three-vs-three` run
@@ -393,10 +399,10 @@ pnpm --filter @jev-game/client dev        # + / in the browser: select/step/
 Not yet run by a human, and its scope turned out narrower than first
 written here. Both shipped scenarios are mirrored, symmetric matchups
 (three-bruisers-vs-three-bruisers, three-mixed-vs-three-mixed) — there is
-no scenario where mixed roles actually *fight* three identical bruisers, so
+no scenario where mixed roles actually _fight_ three identical bruisers, so
 `pnpm simulate three-bruisers 1` vs `pnpm simulate three-vs-three 1` cannot
 answer "do mixed roles create an understandable advantage over three
-identical bruisers." What it *can* still usefully compare: fight duration
+identical bruisers." What it _can_ still usefully compare: fight duration
 (bruiser mirror now ends at tick 392, mixed mirror at tick 829 — mixed
 roles take over twice as long to resolve a mirror match, post the review
 pass's targeting and range-boundary fixes; see `docs/decisions.md`) and
@@ -458,7 +464,7 @@ open.
   `failure` result with a `reaction-budget-exceeded` diagnostic event
   naming the offending chain, rather than looping or throwing.
 - A real chain-lightning effect: `chain-damage` (`battle/chain.ts`) hits a
-  primary target then bounces to the nearest *other* living enemy within
+  primary target then bounces to the nearest _other_ living enemy within
   range, tracking visited targets so no unit is hit twice by the same
   cast, with quantized-distance target selection so two geometrically
   mirrored casts can never pick different bounce targets over
@@ -500,7 +506,7 @@ open.
 - **A percent modifier onto a zero-base stat is silently inert — found by
   diffing, not by inspection.** `bonus-damage-vs-slowed` originally used a
   `percent` modifier; a probe comparing a bruiser's total `strike` damage
-  with and without the upgrade selected showed *no difference at all*
+  with and without the upgrade selected showed _no difference at all_
   (50 vs. 50 across identical hit counts). `compileBuild`'s own output
   confirmed the compiled bonus was exactly `0`. Root cause and fix in
   `docs/decisions.md`.
@@ -527,7 +533,7 @@ open.
   win.** With no upgrades, `three-vs-three` seed 1 is a symmetric draw by
   construction. With `healing-that-also-shields` + `stronger-shield` on
   team A's support only, the same matchup ended `team A wins` at tick 295
-  — a result-*kind* change, not just a bigger damage number, which is the
+  — a result-_kind_ change, not just a bigger damage number, which is the
   bar the plan's Phase 4 deliverable actually sets.
 - **A synergy upgrade with no partner present does nothing and breaks
   nothing.** Selecting `bonus-damage-vs-slowed` in a `duel` (bruiser vs.
@@ -566,8 +572,7 @@ open.
 ### Known gaps / minor rough edges
 
 - `mend`'s rebalance to heal-only changes the Phase 3 discovery-session
-  baseline materially: `three-vs-three` seed 1 now ends at tick 379 (was
-  829) with a `50 / 170 / 90` damage split (was `50 / 190 / 120`) — a
+  baseline materially: `three-vs-three` seed 1 now ends at tick 379 (was 829) with a `50 / 170 / 90` damage split (was `50 / 190 / 120`) — a
   15-point shield reapplied roughly every 90 ticks across every
   unmodified support was absorbing a meaningful share of chip damage.
   `duel` (297 ticks) and `three-bruisers` (392 ticks) are unaffected
@@ -636,7 +641,7 @@ and both produced an explicable, non-numeric behaviour change rather than
 just bigger numbers: the shield-on-heal pair turned a guaranteed draw into
 a win (see above), and chain lightning plus its bounce upgrade visibly
 spreads `bolt`'s damage across multiple enemies instead of stacking it on
-one target. Whether the *current six* upgrades are "a small set worth
+one target. Whether the _current six_ upgrades are "a small set worth
 choosing between" (the plan's decision-before-Phase-5 bar) — as opposed to
 some being an obvious always-take — has not been evaluated by a human yet.
 
@@ -722,12 +727,12 @@ because Colyseus can't boot twice in one), all passing:
 Measurements (four simultaneous three-versus-three battles per round,
 test timings sped up; in-process test server on an M-series Mac):
 
-| Measure | Observed |
-| --- | --- |
-| Resolving a round's four battles | 2.2–4.7 ms |
-| `view` message per client | 3.3 KB typical, 7.7 KB largest |
-| Heap growth over one full match | +2–6 MB across runs (garbage-collection noise dominates) |
-| Two full rooms at once | +1.4–4.7 MB heap across runs, 2.2–4.6 ms per round resolve each |
+| Measure                          | Observed                                                        |
+| -------------------------------- | --------------------------------------------------------------- |
+| Resolving a round's four battles | 2.2–4.7 ms                                                      |
+| `view` message per client        | 3.3 KB typical, 7.7 KB largest                                  |
+| Heap growth over one full match  | +2–6 MB across runs (garbage-collection noise dominates)        |
+| Two full rooms at once           | +1.4–4.7 MB heap across runs, 2.2–4.6 ms per round resolve each |
 
 These are observations from one machine, not a capacity claim.
 
@@ -831,7 +836,7 @@ user instruction.
 
 - New package `packages/run`: `RunState`/`PlayerSeat`/`RoundState`/
   `RoundBattle` types, a pure `createPairings(activePlayerIds, history,
-  pairingSeed)` (deterministic circle-method round-robin for an
+pairingSeed)` (deterministic circle-method round-robin for an
   unchanged roster, ranked perfect-matching fallback with bye handling
   once eliminations change the roster), `applyCommand` (four command
   kinds: `commit-draft`, `commit-upgrade`, `skip-upgrade`,
@@ -845,7 +850,7 @@ user instruction.
   private offers. Its `players` map has only public fields (name,
   controller kind, health, eliminated) for every other seat, so a pick
   made mid-upgrade-phase can't leak, and it never includes other seats'
-  offers or the run seed. Opponent builds *are* visible through
+  offers or the run seed. Opponent builds _are_ visible through
   `currentRound.battles[*].setup` once the battle starts — deliberately,
   since the plan treats locked battle state as public. (Setups used to
   be created on entering `preparing`; since the board track they are
@@ -880,6 +885,7 @@ user instruction.
   `MatchSession` (`apps/client/src/session/match-session.ts`) wraps the
   engine and auto-resolves bot turns and automatic phases after every
   human action.
+
 - The loop is: menu → draft → **a 15-second Ready countdown that
   auto-confirms if you don't click** → **you automatically watch your own
   battle play out**, full-screen, with the HUD layered on top as in the
@@ -921,13 +927,13 @@ user instruction.
   ordering).** An 8-player, 7-round schedule covers all 28 possible pairs
   exactly once with zero repeats, for two different seeds. A 6-player,
   5-round schedule covers all 15 pairs exactly once. A shrinking roster
-  (8→7→5→3→2 across successive rounds) gives the bye to a *different*
+  (8→7→5→3→2 across successive rounds) gives the bye to a _different_
   player each time one was needed. A 10-round bye simulation on a
   5-player roster produces a perfectly even 2-byes-each distribution
   with zero consecutive repeats.
 - **A full 8-bot match runs end to end with no human input**, through
   every phase (`lobby → draft → preparing → battle → round-result →
-  upgrade → ...`), to a single-winner `finished` state. Round 1 produces
+upgrade → ...`), to a single-winner `finished` state. Round 1 produces
   exactly 4 battles covering all 8 players with no bye, matching the
   acceptance check verbatim.
 - **Re-running the same run seed produces bit-for-bit identical
@@ -937,7 +943,7 @@ user instruction.
   runs.
 - **The round cap and shared-win rules both fire correctly**: a
   round-cap of 2 forces `finished` after exactly 2 rounds with every seat
-  still at full health *sharing* the win (a real three-way tie observed,
+  still at full health _sharing_ the win (a real three-way tie observed,
   not just a theoretical code path).
 - **A 2-player roster** (the final-duel case, no pairing algorithm
   needed) and **a 5-player roster** (odd every round, exercises the bye
@@ -972,8 +978,8 @@ user instruction.
   this, both invisible to the original text-summary flow: a dead
   "Continue" button when no upgrades are offered (there was no command
   for "I have nothing to pick, advance me" — added `skip-upgrade`), and a
-  bot that runs out of eligible upgrades could have stalled the *entire
-  match* forever, not just its own turn (`runBotCommands` treated "bot
+  bot that runs out of eligible upgrades could have stalled the _entire
+  match_ forever, not just its own turn (`runBotCommands` treated "bot
   has nothing to submit" as fine, but nothing was actually submitted, so
   that seat could never read as ready). See `docs/decisions.md`'s "Phase
   5 (client slice, round 2)" entry.
@@ -1012,7 +1018,7 @@ user instruction.
 
 ### Awaiting a decision
 
-Both were plan items that went unbuilt *and* unrecorded until the
+Both were plan items that went unbuilt _and_ unrecorded until the
 Phase 5 review pass below surfaced them.
 
 - **A timer on the draft screen.** Preparing and upgrade have one; draft
@@ -1051,7 +1057,7 @@ re-verified. Full rationale in `docs/decisions.md`. Summary:
   pauses when the overlay opens and resumes with the same remaining
   time, keyed by `phaseEpoch`. Verified live: 10s before a 17s rewatch,
   10s after, still on the upgrade screen; it then expired normally.
-  *Superseded:* the "Watch again" button was later removed on user
+  _Superseded:_ the "Watch again" button was later removed on user
   instruction, and this timer pause with it.
 - **The engine accepted one draft offer three times** (three bruisers
   from one offer). Now rejected as `duplicate-offer`.
@@ -1336,7 +1342,6 @@ pnpm survey --seeds 20 --runs 200
   placeholders; the art is requested in `missing_assets.md` 8 and 18.
 - **Capstone simplifications** are listed in the design doc's §18.
 
-
 ## Phase 7 — Integrate independent Jev players — IN PROGRESS
 
 ### What works now
@@ -1397,7 +1402,7 @@ pnpm survey --seeds 20 --runs 200
   back for that seat straight away instead of waiting for the deadline.
   Deadline fallbacks still cover every seat. Decision records are kept on
   the room (`jevRecords`), and fallbacks are logged as `[jev] ... fell
-  back: <reason>`.
+back: <reason>`.
 - **"Thinking" tag:** the room publishes each seat's `thinking` flag, and
   the player rail tags a seat "Thinking" while its question is out.
 - **Skip ends the shared hold.** When your replay ends or you press Skip,
@@ -1423,7 +1428,7 @@ pnpm survey --seeds 20 --runs 200
 
 - **Transport:** the user's account runs Jev on Cloudflare Workers AI.
   `provider/cloudflare.ts` posts `{ model: "typesafe/jev", input: { state,
-  questions } }` to `/accounts/{id}/ai/run`. The model has to go in the
+questions } }` to `/accounts/{id}/ai/run`. The model has to go in the
   body; `/ai/run/typesafe/jev` returns "No route for that URI". The answer
   comes back wrapped as `result.result`, validated with zod.
 - **Settings:** `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` live in
@@ -1542,7 +1547,7 @@ pnpm survey --seeds 20 --runs 200
 - Browser: a lab fight with Cast on Crit on Flicker Strike showed the ×2
   counter and filling Frenzy pips, with no console errors.
 - `pnpm -r build`, `pnpm typecheck`, `pnpm typecheck:scripts`, `pnpm
-  lint` clean; server tests 15 passing.
+lint` clean; server tests 15 passing.
 
 ### Not done yet
 
@@ -1550,3 +1555,208 @@ pnpm survey --seeds 20 --runs 200
   talents, the rest of the gems and items, then the other six heroes.
 - Blender models for the seven new bodies. Their portraits and slice
   1's icons are delivered (`docs/icons.md`).
+
+## Bone & Banner pivot — 2026-09-28
+
+The first build of `docs/pivot-plan.md`. §9 of the plan tracks it phase
+by phase, and `docs/decisions.md` ("Bone & Banner, first build") says
+what went and what stayed.
+
+### What works now
+
+- Five new draftable heroes: Paladin (Hammerfall), Berserker (Rampage),
+  Firebrand (Short Fuse), Bubble Cleric (Big Bubble and the Safety Bubble
+  passive) and Harpooner (Yank). The lab also has a Training Dummy.
+- A new headless engine in `packages/game`: 30 ticks a second on seeded
+  random numbers, with no dependencies. It runs launches, flights, wall
+  bounces, landings and bowling, juggles, bubbles, fuses and spreading
+  fire. A hero with full mana waits up to 1.5 s for a setup it wants,
+  and a signature that hits a teammate's setup adds a `combo-link` to
+  the team's chain.
+- The state rules follow plan §4.1–4.2: a melee crit hop makes a unit
+  Airborne, so it is a setup. A unit dropped by a popping bubble is not
+  launched, so it can't Comet, Hot Potato or count as Airborne. A
+  hammer or blast that hits one member of a bubble flings every enemy
+  in it. Hammerfall still waits only for what it wants, but its aim
+  counts any setup it can pay off (burning, primed, airborne,
+  floating) double.
+- The run: each seat picks three of the five, mirrors allowed, then
+  places them. 13 health and a 15-round cap. No gems, items, levels,
+  recruit or rewards.
+- The online match and Jev, with the draft and formation only. Joining
+  checks protocol version 10 and the sim hash, and round playback throws
+  if a battle's digest differs from the server's.
+- The client plays the engine's recording on KayKit heroes, with a
+  rewritten HUD and match scene. `#lab` has six presets.
+- The bodies, clips and weapons come from four free CC0 packs
+  (`CREDITS.md`) through `pnpm models:import`. Each attack, signature
+  and throw is timed so its strike frame lands on the sim's tick. The
+  heroes also run, tumble when launched, lie down and get up, flinch,
+  cheer and sink after death.
+- `pnpm simulate combos` prints each preset's combo rate.
+
+### Verified, not assumed
+
+- `pnpm build`, `pnpm -r typecheck` and `pnpm typecheck:scripts` are
+  clean. oxlint is clean over the repo, after 83 missing blank lines
+  were added to 16 client files that were already failing at
+  `pre-pivot`.
+- `pnpm test`: game 54, content 66 (including 48 golden digests, six
+  presets × 8 seeds), run 16 and client 60 pass; the server's room tests
+  are 19 passing.
+- `pnpm audio:check`: all 23 files exist and are used.
+  `pnpm models:check`: all 18 model files match the catalogue.
+- Combo rates over seeds 1–100: `comet` (Paladin and Firebrand against
+  five dummies) 97, `hot-potato` 92, `reel-in` 89, `full-chain` 96,
+  `mirror` 12 and `bubble-and-bat` 5. The Phase 5 exit asks for 60 on
+  `comet`.
+- `pnpm simulate run`: eight bots finish 15 rounds, and the run's digest
+  is identical on replay.
+- Jev probe, offline stub: seed 1 finishes after 14 rounds, one decision
+  per pick, and the replay is identical.
+- In the browser: the lab's `comet` preset plays to a Team A win at tick
+  538 with two combo links, `#env` renders the cove, `#models` falls
+  through to the lab and the `#match` menu renders. The console shows no
+  errors. The KayKit heroes render in the menu, the lab fight and `#env`.
+- Frame rate, in Edge on the user's GPU at 1600×900: the lab fight holds
+  60 fps at 190 to 220 draw calls and about 135k triangles, and the
+  worst frame is 17 ms. The in-app preview pane renders WebGL in
+  software, so the 12 fps it shows says nothing about the game.
+
+### Not done yet
+
+- A match in the browser. The only server on port 2567 was running
+  another checkout's code and refused the join as outdated (close code
+  4002). The draft, formation and round playback were checked only
+  headless, by the server's room tests and the Jev probe.
+
+- The rest of Phase 3: the first arena (plan §11, Q3), the slam
+  re-authored for Rig_Medium, a closer camera, the new style guide and a
+  model lab. From the board camera the two Mages show mostly hat.
+- The draft's pick flourish, the formation view and the teleports
+  haven't been seen in a browser with the KayKit bodies. They need a
+  match (above).
+- Sounds for the signatures and physics (entry 31), the music loops
+  (entry 7), the effect textures (entry 10) and the status icons
+  (entry 12).
+- The prototype copy in `art/reference`.
+- The browser matrix, and the lab control that launches, floats or
+  ignites a unit (Phase 2).
+- Phase 6's exits have not been measured cell by cell: `simulate combos`
+  counts links per preset, not per §4.4 cell. `bubble-and-bat` links in
+  only 5 of 100 seeds because the Paladin's mana fills about a second
+  after the Big Bubble pops (ready near tick 271, bubble up 165–240).
+  Tuning his starting mana, as was done for the Firebrand, is the likely
+  fix.
+- Plan items not built yet:
+  - a thrown bubble landing as a bouncing ball (§3.2);
+  - the chain banner with hero portraits, and per-link escalation
+    (every link plays the same freeze today; §4.3);
+  - the field-of-view punch, crater decals, debris and the cut-in
+    banner (§6).
+- Engine behaviour without its own test: Rampage's throw targeting and
+  its immovability, Short Fuse's choice of carrier, and Yank avoiding a
+  primed carrier.
+- The protocol's `dev` script computes the sim hash once, when it
+  starts. After an engine edit during `pnpm dev` the old hash stays until
+  it restarts, so the join check can't catch a client and server running
+  different engine code in that window. The per-round digest check still
+  does.
+- `pnpm lint` fails on Windows, as it did at `pre-pivot`: cmd can't run
+  the script's inline `NODE_OPTIONS=`. Run
+  `NODE_OPTIONS=--import=tsx node_modules/.bin/oxlint` from bash.
+- The user's sign-offs: the Paladin beside the prototype (Phase 4), and
+  the §11 answers the build assumed.
+
+## Physics and comedy pass — 2026-09-29
+
+The user said Hammerfall was "not right at all". In the prototype the
+Paladin pulls a huge hammer from behind his head, throws it over his
+shoulder and slams it into the ground, and the camera shakes. They also
+asked that everything be physical, exaggerated and comical. This pass
+ports those beats from the prototype, `Bone & Banner.html`.
+`docs/decisions.md` gives the reasons, from "Hammerfall as the
+prototype's swing" on.
+
+### What works now
+
+- **Hammerfall.** A giant hammer built in code pops out from behind the
+  Paladin's head. He swings it back over his shoulder, holds it up, and
+  brings it down on the ground in front of him, where it wobbles before
+  it shrinks away. His body plays `Hammer_Slam`, a clip posed from
+  KayKit's two-handed chop when the models load.
+  - The engine slows to quarter speed 10 ticks before the impact and
+    freezes for 0.1 s on it. The slam lands 18.5 units in front of him,
+    where the hammer's head lands on the model.
+  - The slam uses the prototype's numbers: shake 1.1, a field-of-view
+    punch, a flash of light, a crater, two shockwaves, a ring of dust,
+    rubble, sparks and 14 chunks of debris.
+- **Blasts** follow the prototype's meteor: fire and soot at chest
+  height, and a crater, shockwave and debris only where the blast
+  reaches the ground. The white-out and the scorch disc are gone.
+- **Bodies.**
+  - A launched hero tumbles whole turns about a random axis and lands
+    upright.
+  - A hard landing bounces it, and getting up is a little hop.
+  - Every hit and landing squashes it like jelly, harder for big hits
+    and crits.
+  - A yanked hero lands with a shake and a punch.
+- **Rampage** is the prototype's Berserk.
+  - The Berserker swells in five heaves, each bigger than the last. Each
+    squashes him, shakes the camera and throws out a ring of dust and a
+    burst of red.
+  - The last heave also punches the camera, leaves a crater, throws
+    debris and freezes for 0.08 s, a new engine beat.
+  - While big he is tinted red, gives off embers and fumes, and stomps
+    up dust as he walks.
+  - When he shrinks he squashes flat in a puff of dust and smoke.
+
+### Verified, not assumed
+
+- Tests: game 55 (54 before this pass), content 66, run 16, client 94
+  (60 before) and the server's room tests 19. The 48 golden digests were
+  re-recorded for the new reach and the Rampage freeze.
+- Every package typechecks. oxlint is clean on the 343 changed files,
+  and oxfmt on the whole repo except `.claude/launch.json`, the user's
+  file. `models:check` matches all 18 model files to the catalogue, and
+  `audio:check` finds all 23 sounds.
+- Combo rates over seeds 1–100: `comet` 99 (97 before), `hot-potato` 92,
+  `reel-in` 77 (89), `full-chain` 100 (96), `mirror` 12 and
+  `bubble-and-bat` 3 (5).
+- Why `reel-in` fell: the fixed reach changes when the Paladin spends
+  his mana. In 18 of the 23 seeds that don't link, he slams a group of
+  three at about tick 190 to 210. The Yank comes 80 to 130 ticks later,
+  when he has 2 to 19 of his 85 mana. In the other 5 seeds the Harpooner
+  never yanks.
+- In headless Edge on the user's GPU at 1600×900, the whole `comet`,
+  `hot-potato`, `full-chain` and `reel-in` fights hold 60 fps at 166 to
+  240 draw calls and 82k to 140k triangles. The worst frame is 17.1 ms,
+  no frame takes longer than 20 ms, and the console shows no errors.
+- Frame by frame in the same browser:
+  - the swing, whose head lands 18.5 units ahead on the real model;
+  - the `comet` slam and blast, with craters, cracks and debris and no
+    white-out;
+  - bodies tumbling, bouncing and squashing;
+  - the Rampage's five heaves, four stomps and one deflate, with the
+    freeze on the tick he is fully grown;
+  - the Yank reeling a skeleton in on its chain, the landing's flash and
+    dust, and the body it bowls tumbling away.
+
+  The heroes that turn white in these frames are the hit flash, which
+  the prototype has too.
+
+### Not done yet
+
+- Big Bubble and Short Fuse haven't been compared with the prototype.
+- Sounds. The prototype has none. The new beats are silent or borrow
+  `crit-heavy`, and entry 31 now also asks for `rampage-stomp` and
+  `rampage-deflate`.
+- The `reel-in` drop is the user's call. The Paladin could hold his
+  grouped want while a teammate's setup is on its way, or his mana could
+  be tuned.
+- The prototype's Berserk ends in a spinning whirlwind and a slam. Plan
+  §3.2 ends Rampage with a stomp and a puff of steam instead, so neither
+  is built.
+- Plan §6's cut-in banner. The field-of-view punch, craters, shockwaves
+  and debris are built. The debris is our own tumbling chunks, not
+  cannon-es, which would be a new dependency.

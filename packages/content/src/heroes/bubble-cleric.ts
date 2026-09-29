@@ -1,0 +1,55 @@
+import type { HeroDefinition } from "@jev-game/game";
+
+export const bubbleCleric: HeroDefinition = {
+  id: "bubble-cleric",
+  name: "Bubble Cleric",
+  title: "The float",
+  description:
+    "A backline healer who lifts the densest clump of enemies in a giant bubble, and wraps badly hurt allies in small healing ones.",
+  role: "backline",
+  draftable: true,
+  maxHp: 470,
+  moveUnitsPerSecond: 12,
+  bodyRadiusUnits: 3,
+  maxMana: 70,
+  startingMana: 30,
+  attack: {
+    kind: "projectile",
+    name: "Soap bolt",
+    damage: 38,
+    rangeUnits: 30,
+    intervalTicks: 38,
+    windupTicks: 12,
+    unitsPerSecond: 45,
+    splashRadiusUnits: 0,
+    splashFraction: 0,
+    allyHeal: 30,
+  },
+  signature: {
+    kind: "big-bubble",
+    name: "Big Bubble",
+    description:
+      "Blows a huge bubble over the densest group of enemies, including any already in the air. Up to four float helplessly for two and a half seconds, then drop and are downed.",
+    wants: ["grouped", "airborne"],
+    groupSize: 3,
+    rangeUnits: 50,
+    castTicks: 15,
+    radiusUnits: 12,
+    maxMembers: 4,
+    floatHeightUnits: 15,
+    riseTicks: 15,
+    durationTicks: 75,
+  },
+  passive: {
+    kind: "safety-bubble",
+    name: "Safety Bubble",
+    description:
+      "Once per fight, an ally that drops below 35% health is wrapped in a small bubble. It floats out of reach and heals 30% over two seconds.",
+    thresholdFraction: 0.35,
+    healFraction: 0.3,
+    durationTicks: 60,
+    riseTicks: 12,
+    floatHeightUnits: 12,
+    radiusUnits: 5,
+  },
+};

@@ -4,11 +4,7 @@
     {
       "name": "client",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "./apps/client",
-        "dev"
-      ],
+      "runtimeArgs": ["--filter", "./apps/client", "dev"],
       "port": 5173
     },
     {
@@ -55,11 +51,8 @@
     },
     {
       "name": "server",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": [
-        "-lc",
-        "export NVM_DIR=\"$HOME/.nvm\" && . \"$NVM_DIR/nvm.sh\" && nvm use 24 >/dev/null && pnpm --filter ./apps/server exec tsx src/index.ts"
-      ],
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "./apps/server", "exec", "tsx", "src/index.ts"],
       "port": 2567
     },
     {

@@ -36,7 +36,12 @@ const SWITCH_CHOICES: readonly Choice<boolean>[] = [
   { value: false, label: "Off" },
 ];
 
-function choiceRow<T>(icon: SVGSVGElement, name: string, choices: readonly Choice<T>[], pick: (value: T) => void): ChoiceRow<T> {
+function choiceRow<T>(
+  icon: SVGSVGElement,
+  name: string,
+  choices: readonly Choice<T>[],
+  pick: (value: T) => void,
+): ChoiceRow<T> {
   const buttons = choices.map((choice) => {
     const option = button("settings-choice", () => pick(choice.value), choice.label);
     option.setAttribute("role", "radio");
@@ -49,7 +54,13 @@ function choiceRow<T>(icon: SVGSVGElement, name: string, choices: readonly Choic
   group.setAttribute("aria-label", name);
 
   return {
-    root: el("div", "settings-row is-choice", el("span", "settings-channel-icon", icon), el("span", "settings-channel-name", name), group),
+    root: el(
+      "div",
+      "settings-row is-choice",
+      el("span", "settings-channel-icon", icon),
+      el("span", "settings-channel-name", name),
+      group,
+    ),
 
     render(current) {
       for (const { option, value } of buttons) {
@@ -77,8 +88,14 @@ export function createGraphicsTab(store: GraphicsSettingsStore): SettingsTab {
   );
 
   const glow = choiceRow(glowIcon(), "Glow", SWITCH_CHOICES, (value) => store.setGlow(value));
-  const monitor = choiceRow(gaugeIcon(), "Frame stats", SWITCH_CHOICES, (value) => store.setMonitor(value));
-  const fightCamera = choiceRow(cameraIcon(), "Fight camera", SWITCH_CHOICES, (value) => store.setFightCamera(value));
+
+  const monitor = choiceRow(gaugeIcon(), "Frame stats", SWITCH_CHOICES, (value) =>
+    store.setMonitor(value),
+  );
+
+  const fightCamera = choiceRow(cameraIcon(), "Fight camera", SWITCH_CHOICES, (value) =>
+    store.setFightCamera(value),
+  );
 
   const note = el(
     "p",
@@ -86,7 +103,16 @@ export function createGraphicsTab(store: GraphicsSettingsStore): SettingsTab {
     "On a slower computer, try Balanced or Fast resolution, simple shadows and glow off. Frame stats shows the frame rate and draw calls in the corner. Fight camera moves in closer once the heroes meet.",
   );
 
-  const content = el("div", "settings-graphics", resolution.root, shadows.root, glow.root, fightCamera.root, monitor.root, note);
+  const content = el(
+    "div",
+    "settings-graphics",
+    resolution.root,
+    shadows.root,
+    glow.root,
+    fightCamera.root,
+    monitor.root,
+    note,
+  );
 
   function render(settings: GraphicsSettings): void {
     resolution.render(settings.resolution);

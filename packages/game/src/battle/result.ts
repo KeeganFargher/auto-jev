@@ -12,10 +12,4 @@ export type BattleResult =
       reason: "mutual-elimination" | "timeout";
       endedAtTick: number;
       damageDealt: Record<UnitId, number>;
-    }
-  | {
-      kind: "failure";
-      reason: string;
-      endedAtTick: number;
-      damageDealt: Record<UnitId, number>;
     };

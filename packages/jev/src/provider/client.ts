@@ -42,10 +42,16 @@ function failureFrom(error: Error | null): JevProviderFailure {
   }
 
   if (error instanceof APIError) {
-    return new JevProviderFailure(error.status === 429 ? "rate-limited" : "http-error", `HTTP ${error.status}: ${error.message}`);
+    return new JevProviderFailure(
+      error.status === 429 ? "rate-limited" : "http-error",
+      `HTTP ${error.status}: ${error.message}`,
+    );
   }
 
-  return new JevProviderFailure("provider-error", error?.message ?? "the provider failed without an error");
+  return new JevProviderFailure(
+    "provider-error",
+    error?.message ?? "the provider failed without an error",
+  );
 }
 
 export function createTypeSafeProvider(options: TypeSafeProviderOptions): JevProvider {
@@ -70,11 +76,19 @@ export function createTypeSafeProvider(options: TypeSafeProviderOptions): JevPro
     async choose(question, signal) {
       try {
         const result = await client.systemOne(
-          { state: question.state, questions: { [DECISION_QUESTION]: choice(question.instructions, question.options) } },
+          {
+            state: question.state,
+            questions: { [DECISION_QUESTION]: choice(question.instructions, question.options) },
+          },
           { signal },
         );
 
-        return parseChoiceAnswer(result, DECISION_QUESTION, Object.keys(question.options), options.model);
+        return parseChoiceAnswer(
+          result,
+          DECISION_QUESTION,
+          Object.keys(question.options),
+          options.model,
+        );
       } catch (error) {
         throw failureFrom(error instanceof Error ? error : null);
       }

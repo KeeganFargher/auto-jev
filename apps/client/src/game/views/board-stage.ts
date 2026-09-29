@@ -14,6 +14,7 @@ import {
   MeshStandardMaterial,
   PerspectiveCamera,
   Plane,
+  PointLight,
   Raycaster,
   SRGBColorSpace,
   Scene,
@@ -25,11 +26,15 @@ import {
 import type { BoardGrid, Vector2 } from "@jev-game/game";
 import { easeInOut } from "./easing.js";
 import { warmEffectMaterials } from "./effect-materials.js";
+import { KAYKIT_UNIT } from "./figure-base.js";
 import { createParticleSystem, type ParticleSystem } from "./particles.js";
 import { applyShadowQuality } from "./shadow-quality.js";
 import { createStageGlow } from "./stage-glow.js";
-import { createStageMonitor } from "./stage-monitor.js";
-import { graphicsSettings, renderPixelRatio, type GraphicsSettings } from "../../graphics/settings.js";
+import {
+  graphicsSettings,
+  renderPixelRatio,
+  type GraphicsSettings,
+} from "../../graphics/settings.js";
 
 export interface ViewportInsets {
   left: number;
@@ -149,10 +154,18 @@ export interface StageStats {
   shaders: number;
 }
 
+export interface StageReadout {
+  drawCalls: number;
+  triangles: number;
+  particles: number;
+  pixelRatio: number;
+}
+
+export type FrameListener = (deltaSeconds: number, now: number) => void;
+
 export interface BoardStage {
   readonly scene: Scene;
   readonly canvas: HTMLCanvasElement;
-  readonly overlay: HTMLElement;
   readonly particles: ParticleSystem;
   showBoard(grid: BoardGrid, side: ViewSide, insets: ViewportInsets): void;
   frame(shot: StageShot | null): void;
@@ -163,9 +176,14 @@ export interface BoardStage {
   screenPan(point: Vector3): number | undefined;
   groundPointAt(clientX: number, clientY: number): Vector2 | null;
   setExposure(multiplier: number): void;
+  setTimeScale(scale: number): void;
+  shake(strength: number): void;
+  punch(strength: number): void;
+  flash(point: Vector3, strength: number): void;
   setTheme(theme: StageTheme): void;
   stats(): StageStats;
-  onFrame(listener: (deltaSeconds: number) => void): () => void;
+  readout(): StageReadout;
+  onFrame(listener: FrameListener): () => void;
   dispose(): void;
 }
 
@@ -213,6 +231,26 @@ const MAX_FOCUS_ZOOM = 1.5;
 
 const FOCUS_MARGIN_UNITS = 4;
 
+const SHAKE_REACH_UNITS = 5;
+
+const SHAKE_DECAY_PER_SECOND = 2.2;
+
+const PUNCH_DEGREES = 5;
+
+const PUNCH_DECAY_PER_SECOND = 2.5;
+
+const FLASH_COLOR = "#ffe0a0";
+
+const FLASH_DECAY = 1.4;
+
+const FLASH_REACH_UNITS = 16 * KAYKIT_UNIT;
+
+const FLASH_HEIGHT_UNITS = 1.5 * KAYKIT_UNIT;
+
+const FLASH_FADE_PER_SECOND = 6;
+
+const FLASH_BELOW = FLASH_HEIGHT_UNITS ** FLASH_DECAY;
+
 export function boardFootprint(grid: BoardGrid): number {
   return Math.max(grid.width, grid.height) / 2 + FRAME_WIDTH + 1;
 }
@@ -222,6 +260,7 @@ interface StageLights {
   key: DirectionalLight;
   rim: DirectionalLight;
   rig: Group;
+  flash: PointLight;
 }
 
 function sameGrid(first: BoardGrid | null, second: BoardGrid): boolean {
@@ -262,7 +301,10 @@ function createLights(scene: Scene): StageLights {
   rig.add(key, rim);
   scene.add(rig);
 
-  return { hemisphere, key, rim, rig };
+  const flash = new PointLight(FLASH_COLOR, 0, FLASH_REACH_UNITS, FLASH_DECAY);
+  scene.add(flash);
+
+  return { hemisphere, key, rim, rig, flash };
 }
 
 function createGlowTexture(): CanvasTexture {
@@ -296,7 +338,13 @@ function createGround(scene: Scene): Mesh<CircleGeometry, MeshStandardMaterial> 
   return ground;
 }
 
-function tileColor(grid: BoardGrid, side: ViewSide, style: BoardStyle, column: number, row: number): Color {
+function tileColor(
+  grid: BoardGrid,
+  side: ViewSide,
+  style: BoardStyle,
+  column: number,
+  row: number,
+): Color {
   const base = new Color((column + row) % 2 === 0 ? style.tileLight : style.tileDark);
   const isSouthHalf = row >= grid.rows / 2;
   const isNear = side === "south" ? isSouthHalf : !isSouthHalf;
@@ -360,13 +408,22 @@ function createBoardMeshes(grid: BoardGrid, side: ViewSide, style: BoardStyle): 
     board.add(mesh);
   }
 
-  const brass = new MeshStandardMaterial({ color: style.caps, roughness: 0.45, metalness: style.capsMetalness });
+  const brass = new MeshStandardMaterial({
+    color: style.caps,
+    roughness: 0.45,
+    metalness: style.capsMetalness,
+  });
+
   const cornerX = (grid.width + FRAME_WIDTH) / 2;
   const cornerZ = (grid.height + FRAME_WIDTH) / 2;
 
   for (const x of [-cornerX, cornerX]) {
     for (const z of [-cornerZ, cornerZ]) {
-      const cap = new Mesh(new BoxGeometry(CORNER_CAP_SIZE, FRAME_HEIGHT + 0.6, CORNER_CAP_SIZE), brass);
+      const cap = new Mesh(
+        new BoxGeometry(CORNER_CAP_SIZE, FRAME_HEIGHT + 0.6, CORNER_CAP_SIZE),
+        brass,
+      );
+
       cap.position.set(x, (FRAME_HEIGHT + 0.6) / 2 - TILE_HEIGHT, z);
       cap.castShadow = true;
       board.add(cap);
@@ -409,11 +466,7 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   renderer.info.autoReset = false;
 
   const canvas = renderer.domElement;
-  canvas.classList.add("board-canvas");
-
-  const overlay = document.createElement("div");
-  overlay.className = "board-overlay";
-  container.append(canvas, overlay);
+  container.append(canvas);
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(FIELD_OF_VIEW_DEGREES, 1, 1, 3000);
@@ -422,17 +475,9 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   const particles = createParticleSystem(scene);
   const glow = createStageGlow(renderer, scene, camera);
 
-  const monitor = createStageMonitor(() => ({
-    drawCalls: renderer.info.render.calls,
-    triangles: renderer.info.render.triangles,
-    particles: particles.alive(),
-    pixelRatio: renderer.getPixelRatio(),
-  }));
-
-  container.append(monitor.root);
   const raycaster = new Raycaster();
   const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
-  const listeners = new Set<(deltaSeconds: number) => void>();
+  const listeners = new Set<FrameListener>();
 
   let grid: BoardGrid | null = null;
   let side: ViewSide = "south";
@@ -451,6 +496,11 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   let orbit = 0;
   let theme = DEFAULT_STAGE_THEME;
   let exposureBoost = 1;
+  let timeScale = 1;
+  let shaking = 0;
+  let punching = 0;
+  let flashing = 0;
+  const jolt = new Vector3();
   const fog = new Fog(new Color(theme.atmosphere.backdrop));
   scene.fog = fog;
 
@@ -549,7 +599,14 @@ export function createBoardStage(container: HTMLElement): BoardStage {
 
   function applyFit(next: CameraFit): void {
     placeCamera(next.distance, next.pitch, next.target);
-    camera.setViewOffset(viewportWidth, viewportHeight, next.offsetX, next.offsetY, viewportWidth, viewportHeight);
+    camera.setViewOffset(
+      viewportWidth,
+      viewportHeight,
+      next.offsetX,
+      next.offsetY,
+      viewportWidth,
+      viewportHeight,
+    );
     camera.updateProjectionMatrix();
     fit = next;
     placeFog();
@@ -557,21 +614,46 @@ export function createBoardStage(container: HTMLElement): BoardStage {
 
   function focusFraming(area: StageFocus): StageShot {
     const board = boardShot();
-    const halfWidth = Math.min(board.halfWidth, Math.max(board.halfWidth / MAX_FOCUS_ZOOM, (area.maxX - area.minX) / 2 + FOCUS_MARGIN_UNITS));
-    const halfDepth = Math.min(board.halfDepth, Math.max(board.halfDepth / MAX_FOCUS_ZOOM, (area.maxZ - area.minZ) / 2 + FOCUS_MARGIN_UNITS));
-    const centerX = Math.min(board.halfWidth - halfWidth, Math.max(halfWidth - board.halfWidth, (area.minX + area.maxX) / 2));
-    const centerZ = Math.min(board.halfDepth - halfDepth, Math.max(halfDepth - board.halfDepth, (area.minZ + area.maxZ) / 2));
+
+    const halfWidth = Math.min(
+      board.halfWidth,
+      Math.max(board.halfWidth / MAX_FOCUS_ZOOM, (area.maxX - area.minX) / 2 + FOCUS_MARGIN_UNITS),
+    );
+
+    const halfDepth = Math.min(
+      board.halfDepth,
+      Math.max(board.halfDepth / MAX_FOCUS_ZOOM, (area.maxZ - area.minZ) / 2 + FOCUS_MARGIN_UNITS),
+    );
+
+    const centerX = Math.min(
+      board.halfWidth - halfWidth,
+      Math.max(halfWidth - board.halfWidth, (area.minX + area.maxX) / 2),
+    );
+
+    const centerZ = Math.min(
+      board.halfDepth - halfDepth,
+      Math.max(halfDepth - board.halfDepth, (area.minZ + area.maxZ) / 2),
+    );
 
     return { ...board, target: new Vector3(centerX, 0, centerZ), halfWidth, halfDepth };
   }
 
   function solveFit(): CameraFit {
+    camera.fov = FIELD_OF_VIEW_DEGREES;
     camera.aspect = viewportWidth / viewportHeight;
     camera.clearViewOffset();
 
     const framing = shot ?? focusShot ?? boardShot();
-    const safeWidth = Math.max(1, viewportWidth - insets.left - insets.right - FIT_PADDING_PIXELS * 2);
-    const safeHeight = Math.max(1, viewportHeight - insets.top - insets.bottom - FIT_PADDING_PIXELS * 2);
+
+    const safeWidth = Math.max(
+      1,
+      viewportWidth - insets.left - insets.right - FIT_PADDING_PIXELS * 2,
+    );
+
+    const safeHeight = Math.max(
+      1,
+      viewportHeight - insets.top - insets.bottom - FIT_PADDING_PIXELS * 2,
+    );
 
     let near = 20;
     let far = 4000;
@@ -580,7 +662,9 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       const distance = (near + far) / 2;
       placeCamera(distance, framing.pitch, framing.target);
       const bounds = projectedBounds(framing);
-      const fits = bounds.maxX - bounds.minX <= safeWidth && bounds.maxY - bounds.minY <= safeHeight;
+
+      const fits =
+        bounds.maxX - bounds.minX <= safeWidth && bounds.maxY - bounds.minY <= safeHeight;
 
       if (fits) {
         far = distance;
@@ -660,6 +744,52 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     applyFit(chasing ? blendFits(from, to, 1 - Math.exp(-deltaSeconds / CHASE_SECONDS)) : to);
   }
 
+  function stepShake(deltaSeconds: number): void {
+    shaking = Math.max(0, shaking - deltaSeconds * SHAKE_DECAY_PER_SECOND);
+  }
+
+  function stepPunch(deltaSeconds: number): void {
+    if (punching === 0) {
+      return;
+    }
+
+    punching = Math.max(0, punching - deltaSeconds * PUNCH_DECAY_PER_SECOND);
+    camera.fov = FIELD_OF_VIEW_DEGREES - punching * PUNCH_DEGREES;
+    camera.updateProjectionMatrix();
+  }
+
+  function stepFlash(deltaSeconds: number): void {
+    if (flashing === 0) {
+      return;
+    }
+
+    flashing = Math.max(0, flashing - deltaSeconds * FLASH_FADE_PER_SECOND);
+    lights.flash.intensity = flashing * lights.key.intensity * FLASH_BELOW;
+  }
+
+  function renderScene(): void {
+    const jolting = shaking > 0;
+
+    if (jolting) {
+      const reach = shaking * SHAKE_REACH_UNITS;
+      jolt.setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar((Math.random() - 0.5) * reach);
+      jolt.y += (Math.random() - 0.5) * reach;
+      camera.position.add(jolt);
+      camera.updateMatrixWorld();
+    }
+
+    if (graphics.glow) {
+      glow.render();
+    } else {
+      renderer.render(scene, camera);
+    }
+
+    if (jolting) {
+      camera.position.sub(jolt);
+      camera.updateMatrixWorld();
+    }
+  }
+
   function measure(): boolean {
     const width = container.clientWidth;
     const height = container.clientHeight;
@@ -700,7 +830,6 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     renderer.setPixelRatio(renderPixelRatio(next.resolution, window.devicePixelRatio || 1));
     glow.setSize(viewportWidth, viewportHeight, renderer.getPixelRatio());
     applyShadowQuality(renderer.shadowMap, lights.key, next.shadows);
-    monitor.setVisible(next.monitor);
     warmEffects();
   }
 
@@ -712,26 +841,21 @@ export function createBoardStage(container: HTMLElement): BoardStage {
     lastFrameTime = now;
     stepGlide(deltaSeconds);
     stepChase(deltaSeconds);
-    particles.update(deltaSeconds);
+    stepShake(deltaSeconds);
+    stepPunch(deltaSeconds);
+    stepFlash(deltaSeconds * timeScale);
+    particles.update(deltaSeconds * timeScale);
 
     for (const listener of listeners) {
-      listener(deltaSeconds);
+      listener(deltaSeconds, now);
     }
 
     if (isVisible) {
       renderer.info.reset();
-
-      if (graphics.glow) {
-        glow.render();
-      } else {
-        renderer.render(scene, camera);
-      }
-
+      renderScene();
       finishWarming?.();
       finishWarming = null;
     }
-
-    monitor.record(now);
 
     animationFrame = requestAnimationFrame(frame);
   }
@@ -741,11 +865,15 @@ export function createBoardStage(container: HTMLElement): BoardStage {
   return {
     scene,
     canvas,
-    overlay,
     particles,
 
     showBoard(nextGrid, nextSide, nextInsets) {
-      if (board !== null && sameGrid(grid, nextGrid) && side === nextSide && sameInsets(insets, nextInsets)) {
+      if (
+        board !== null &&
+        sameGrid(grid, nextGrid) &&
+        side === nextSide &&
+        sameInsets(insets, nextInsets)
+      ) {
         return;
       }
 
@@ -851,6 +979,40 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       renderer.toneMappingExposure = theme.atmosphere.exposure * exposureBoost;
     },
 
+    setTimeScale(scale) {
+      if (!Number.isFinite(scale) || scale < 0) {
+        throw new Error(`Stage time scale must be a finite non-negative number, got ${scale}`);
+      }
+
+      timeScale = scale;
+    },
+
+    shake(strength) {
+      if (!Number.isFinite(strength) || strength <= 0) {
+        throw new Error(`Stage shake strength must be a positive number, got ${strength}`);
+      }
+
+      shaking = Math.max(shaking, strength);
+    },
+
+    punch(strength) {
+      if (!Number.isFinite(strength) || strength <= 0) {
+        throw new Error(`Stage punch strength must be a positive number, got ${strength}`);
+      }
+
+      punching = Math.max(punching, strength);
+    },
+
+    flash(point, strength) {
+      if (!Number.isFinite(strength) || strength <= 0) {
+        throw new Error(`Stage flash strength must be a positive number, got ${strength}`);
+      }
+
+      flashing = strength;
+      lights.flash.position.set(point.x, FLASH_HEIGHT_UNITS, point.z);
+      lights.flash.intensity = flashing * lights.key.intensity * FLASH_BELOW;
+    },
+
     stats() {
       const { info } = renderer;
 
@@ -860,6 +1022,15 @@ export function createBoardStage(container: HTMLElement): BoardStage {
         geometries: info.memory.geometries,
         textures: info.memory.textures,
         shaders: info.programs?.length ?? 0,
+      };
+    },
+
+    readout() {
+      return {
+        drawCalls: renderer.info.render.calls,
+        triangles: renderer.info.render.triangles,
+        particles: particles.alive(),
+        pixelRatio: renderer.getPixelRatio(),
       };
     },
 
@@ -888,7 +1059,6 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       stopGraphics();
       finishWarming?.();
       finishWarming = null;
-      monitor.root.remove();
       listeners.clear();
 
       if (board !== null) {
@@ -903,7 +1073,6 @@ export function createBoardStage(container: HTMLElement): BoardStage {
       renderer.dispose();
       renderer.forceContextLoss();
       canvas.remove();
-      overlay.remove();
     },
   };
 }

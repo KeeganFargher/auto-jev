@@ -38,7 +38,15 @@ function sandbank(kit: PropKit, radius: number, x: number, z: number): Object3D[
   const sand = kit.solid(outline, kit.surface("#f1d59a"), x, SAND_TOP - 3, z);
   const shelf = kit.solid(outline, kit.surface("#d7b476"), x, SAND_TOP - 4.4, z);
   shelf.scale.set(1.09, 1, 1.09);
-  const foam = kit.solid(outline, kit.surface("#ffffff", { opacity: 0.5 }), x, WATER_LEVEL + 0.12, z);
+
+  const foam = kit.solid(
+    outline,
+    kit.surface("#ffffff", { opacity: 0.5 }),
+    x,
+    WATER_LEVEL + 0.12,
+    z,
+  );
+
   foam.scale.set(1.17, 0.03, 1.17);
   foam.castShadow = false;
   foam.receiveShadow = false;

@@ -1,48 +1,45 @@
 import type { PlayerId } from "./ids.js";
-import type { RunState } from "./types.js";
+import type { PlayerSeat, RoundState, RunState } from "./types.js";
 
-export function isSeatReady(state: RunState, playerId: PlayerId): boolean {
+export function requireSeat(state: RunState, playerId: PlayerId): PlayerSeat {
   const seat = state.players[playerId];
 
   if (seat === undefined) {
-    return false;
+    throw new Error(`Run ${state.runId} has no player "${playerId}"`);
   }
 
-  if (state.phase === "reward") {
-    return (state.pendingDecisionsByPlayer[playerId] ?? []).length === 0;
-  }
-
-  const threshold = state.readyThresholdByPlayer[playerId] ?? -1;
-
-  return seat.decisionRevision > threshold;
+  return seat;
 }
 
-export function activePairedPlayerIds(state: RunState): PlayerId[] {
+export function requireRound(state: RunState): RoundState {
   if (state.currentRound === null) {
-    return [];
+    throw new Error(`Run ${state.runId} is in ${state.phase} without a round`);
   }
 
-  const ids: PlayerId[] = [];
+  return state.currentRound;
+}
 
-  for (const battle of Object.values(state.currentRound.battles)) {
-    ids.push(battle.teamAPlayerId, battle.teamBPlayerId);
-  }
+export function isSeatReady(state: RunState, playerId: PlayerId): boolean {
+  const seat = requireSeat(state, playerId);
+  const threshold = state.readyThresholdByPlayer[playerId];
 
-  return ids;
+  return threshold === undefined || seat.decisionRevision > threshold;
 }
 
 export function activePlayerIds(state: RunState): PlayerId[] {
-  return Object.values(state.players)
-    .filter((seat) => !seat.eliminated)
-    .map((seat) => seat.playerId);
+  return Object.values(state.players).flatMap((seat) => (seat.eliminated ? [] : [seat.playerId]));
 }
 
 export function pairablePlayerIds(state: RunState): PlayerId[] {
-  return Object.values(state.players)
-    .filter((seat) => !seat.eliminated && !seat.forfeited)
-    .map((seat) => seat.playerId);
+  return Object.values(state.players).flatMap((seat) =>
+    seat.eliminated || seat.forfeited ? [] : [seat.playerId],
+  );
 }
 
-export function allRequiredSeatsReady(state: RunState, requiredPlayerIds: readonly PlayerId[]): boolean {
-  return requiredPlayerIds.every((playerId) => isSeatReady(state, playerId));
+export function pairedPlayerIds(round: RoundState): PlayerId[] {
+  return round.pairings.flatMap((pairing) => [pairing.teamAPlayerId, pairing.teamBPlayerId]);
+}
+
+export function allSeatsReady(state: RunState, playerIds: readonly PlayerId[]): boolean {
+  return playerIds.every((playerId) => isSeatReady(state, playerId));
 }

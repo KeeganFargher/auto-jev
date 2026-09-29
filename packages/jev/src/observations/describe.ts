@@ -1,169 +1,61 @@
 import {
-  ATTUNEMENT_ARCANA_MANA_GAIN,
-  ATTUNEMENT_CUNNING_CRIT_CHANCE,
-  ATTUNEMENT_MIGHT_MAX_HP,
-  ATTUNEMENT_THRESHOLD,
-  computeTeamTraits,
-  SKILL_SLOTS,
-  createHeroBuild,
-  skillIdFor,
-  type Catalogue,
-  type ComboKind,
-  type ConditionKind,
-  type HeroBuild,
-  type School,
-  type TeamTraits,
+  CHAIN_DAMAGE_BONUS_PER_LINK,
+  CHAIN_WINDOW_TICKS,
+  READY_WAIT_TICKS,
+  TICK_RATE,
+  heroDefinition,
+  type HeroDefinitionId,
+  type SetupWant,
+  type SignatureDefinition,
 } from "@jev-game/game";
-import { loadoutBuilds as runLoadoutBuilds, type Loadout } from "@jev-game/run";
+import { gameCatalogue } from "@jev-game/content";
 
-const SCHOOL_NAMES: Readonly<Record<School, string>> = { might: "Might", arcana: "Arcana", cunning: "Cunning" };
-
-const CONDITION_NAMES: Readonly<Record<ConditionKind, string>> = {
-  staggered: "Staggered",
-  brittle: "Brittle",
-  disoriented: "Disoriented",
-};
-
-const COMBO_NAMES: Readonly<Record<ComboKind, string>> = { overload: "Overload", shatter: "Shatter", crush: "Crush" };
-
-const ATTUNEMENT_BONUS: Readonly<Record<School, string>> = {
-  might: `+${Math.round(ATTUNEMENT_MIGHT_MAX_HP * 100)}% max HP`,
-  arcana: `+${Math.round(ATTUNEMENT_ARCANA_MANA_GAIN * 100)}% mana gain`,
-  cunning: `+${Math.round(ATTUNEMENT_CUNNING_CRIT_CHANCE * 100)}% crit chance`,
-};
-
-export const COMBO_RULES = [
-  "A hero that sets up a condition and a different hero of the detonating school light a combo; the detonating hit consumes the condition.",
-  "Staggered is detonated by an Arcana hit: Overload, extra damage and a knockdown.",
-  "Brittle is detonated by a Cunning hit: Shatter, a heavy critical hit and shards that hurt nearby enemies.",
-  "Disoriented is detonated by a Might hit: Crush, extra damage and the target loses mana.",
-  "Two heroes setting up the condition and two detonating it raise a combo to tier II.",
-  `Three heroes of one school activate its attunement: Might ${ATTUNEMENT_BONUS.might}, Arcana ${ATTUNEMENT_BONUS.arcana}, Cunning ${ATTUNEMENT_BONUS.cunning}.`,
+export const SETUP_RULES = [
+  "Heroes fight on their own. Attacking and taking hits fills a hero's mana, and a hero with full mana is ready to cast its signature.",
+  `A ready hero holds its signature until an enemy is in a state the signature wants, then casts. If none turns up within ${READY_WAIT_TICKS / TICK_RATE} seconds, it casts anyway.`,
+  "Airborne: launched, thrown or yanked into the air. A unit that lands is downed for a moment.",
+  "Floating: held helpless inside a bubble.",
+  "Burning: on fire. Fire spreads to the unit's friends when they touch.",
+  "Primed: carrying a lit fuse that explodes.",
+  "Grouped: several enemies bunched close together.",
+  `When a signature hits an enemy whose state a different ally made, that team's chain gains a link. Each link makes the team's area strikes ${Math.round(CHAIN_DAMAGE_BONUS_PER_LINK * 100)}% stronger, until ${CHAIN_WINDOW_TICKS / TICK_RATE} seconds pass without a new link.`,
 ];
 
-export function heroName(catalogue: Catalogue, heroId: string): string {
-  return catalogue.heroes[heroId]?.name ?? heroId;
+export function heroName(heroId: HeroDefinitionId): string {
+  return heroDefinition(gameCatalogue, heroId).name;
 }
 
-export function pieceName(catalogue: Catalogue, pieceId: string): string {
-  return catalogue.upgrades[pieceId]?.name ?? pieceId;
+function wantText(signature: SignatureDefinition, want: SetupWant): string {
+  return want === "grouped" ? `grouped (${signature.groupSize} or more close together)` : want;
 }
 
-export function heroRole(catalogue: Catalogue, heroId: string): string {
-  const hero = catalogue.heroes[heroId];
+function wantsText(signature: SignatureDefinition): string {
+  const wants = signature.wants.map((want) => wantText(signature, want));
+  const last = wants.pop();
 
-  if (hero === undefined) {
-    return heroId;
+  if (last === undefined) {
+    throw new Error(`${signature.name} wants no setups`);
   }
 
-  const school = hero.school === undefined ? "" : `${SCHOOL_NAMES[hero.school]} `;
-
-  return `${school}${hero.archetype ?? "hero"}`;
+  return wants.length === 0 ? last : `${wants.join(", ")} or ${last}`;
 }
 
-export function heroSummary(catalogue: Catalogue, heroId: string): string {
-  const hero = catalogue.heroes[heroId];
+export function heroSummary(heroId: HeroDefinitionId): string {
+  const hero = heroDefinition(gameCatalogue, heroId);
+  const signature = hero.signature;
 
-  if (hero === undefined) {
-    return heroId;
+  if (signature === null) {
+    throw new Error(`${hero.name} has no signature to describe`);
   }
 
-  const parts = [`${hero.name}, ${heroRole(catalogue, heroId)}${hero.title === undefined ? "" : ` ("${hero.title}")`}.`];
+  const parts = [
+    `${hero.name}, "${hero.title}", ${hero.role}. ${hero.description}`,
+    `Signature, ${signature.name}: ${signature.description} It wants enemies that are ${wantsText(signature)}.`,
+  ];
 
-  for (const slot of SKILL_SLOTS) {
-    const skillId = skillIdFor(hero, slot);
-    const ability = skillId === null ? undefined : catalogue.abilities[skillId];
-
-    if (ability?.description !== undefined) {
-      parts.push(`${slot === "ultimate" ? "Ultimate" : "Ability"}, ${ability.name}: ${ability.description}`);
-    }
-  }
-
-  if (hero.appliesCondition !== undefined) {
-    parts.push(`Sets up ${CONDITION_NAMES[hero.appliesCondition]}.`);
+  if (hero.passive !== null) {
+    parts.push(`Passive, ${hero.passive.name}: ${hero.passive.description}`);
   }
 
   return parts.join(" ");
-}
-
-export function pieceSummary(catalogue: Catalogue, pieceId: string): string {
-  const piece = catalogue.upgrades[pieceId];
-
-  if (piece === undefined) {
-    return pieceId;
-  }
-
-  const tags = [piece.rarity, piece.cursed === true ? "cursed: it has a downside" : undefined].filter((tag) => tag !== undefined);
-  const label = tags.length === 0 ? "" : ` (${tags.join(", ")})`;
-
-  return `${piece.name}${label}: ${piece.description}`;
-}
-
-export function traitsOf(heroIds: readonly string[], catalogue: Catalogue): TeamTraits {
-  return computeTeamTraits(
-    heroIds.map((heroId, slot) => createHeroBuild(`observed-${slot}`, heroId, [], catalogue)),
-    catalogue,
-  );
-}
-
-function names(catalogue: Catalogue, heroIds: readonly string[]): string {
-  return heroIds.map((heroId) => heroName(catalogue, heroId)).join(" and ");
-}
-
-export function describeTraits(traits: TeamTraits, catalogue: Catalogue): string[] {
-  const lines: string[] = [];
-
-  for (const combo of traits.combos) {
-    const comboName = COMBO_NAMES[combo.combo];
-    const condition = CONDITION_NAMES[combo.condition];
-    const detonator = SCHOOL_NAMES[combo.detonatingSchool];
-
-    if (combo.tier > 0) {
-      lines.push(
-        `${comboName} combo is lit${combo.tier === 2 ? " at tier II" : ""}: ${names(catalogue, combo.appliers)} set up ${condition}, ${names(catalogue, combo.detonators)} detonate it.`,
-      );
-    } else if (combo.appliers.length > 0) {
-      lines.push(`${comboName} combo is not lit: ${names(catalogue, combo.appliers)} set up ${condition} but a ${detonator} hero is needed to detonate it.`);
-    }
-  }
-
-  for (const attunement of traits.attunements) {
-    const school = SCHOOL_NAMES[attunement.school];
-
-    if (attunement.active) {
-      lines.push(`${school} attunement is active (${ATTUNEMENT_BONUS[attunement.school]}).`);
-    } else if (attunement.heroes.length === ATTUNEMENT_THRESHOLD - 1) {
-      lines.push(`One more ${school} hero would activate ${school} attunement (${ATTUNEMENT_BONUS[attunement.school]}).`);
-    }
-  }
-
-  return lines;
-}
-
-export function describeTraitChange(before: TeamTraits, after: TeamTraits): string[] {
-  const lines: string[] = [];
-
-  after.combos.forEach((combo, index) => {
-    const previous = before.combos[index]?.tier ?? 0;
-
-    if (combo.tier > previous) {
-      lines.push(combo.tier === 2 && previous === 1 ? `raises ${COMBO_NAMES[combo.combo]} to tier II` : `lights the ${COMBO_NAMES[combo.combo]} combo`);
-    }
-  });
-
-  after.attunements.forEach((attunement, index) => {
-    if (attunement.active && before.attunements[index]?.active !== true) {
-      lines.push(`activates ${SCHOOL_NAMES[attunement.school]} attunement`);
-    }
-  });
-
-  return lines;
-}
-
-export function loadoutBuilds(loadout: Loadout): HeroBuild[] {
-  return runLoadoutBuilds(loadout);
-}
-
-export function loadoutTraits(loadout: Loadout, catalogue: Catalogue): TeamTraits {
-  return computeTeamTraits(loadoutBuilds(loadout), catalogue);
 }

@@ -1,6 +1,11 @@
 import type { BoardCell } from "@jev-game/game";
 import type { PlayerView } from "@jev-game/run";
-import { CLIENT_MESSAGES, SERVER_MESSAGES, type CommandIntent, type ViewMessage } from "@jev-game/protocol";
+import {
+  CLIENT_MESSAGES,
+  SERVER_MESSAGES,
+  type CommandIntent,
+  type ViewMessage,
+} from "@jev-game/protocol";
 import {
   connectMatchRoom,
   savedResumeToken,
@@ -10,8 +15,6 @@ import {
 } from "../network/connect-room.js";
 import type { ConnectionState, LobbyInfo, MatchSession, ResolvedRound } from "./match-session.js";
 
-const REPLAYED_PHASES = new Set(["round-result", "finished"]);
-
 function resolvedRoundFrom(view: PlayerView): ResolvedRound | null {
   const current = view.currentRound;
 
@@ -19,18 +22,15 @@ function resolvedRoundFrom(view: PlayerView): ResolvedRound | null {
     return null;
   }
 
-  const battles = Object.values(current.battles);
-
-  if (battles.length === 0 || battles.some((battle) => battle.setup === null || battle.result === null)) {
+  if (current.battles.length === 0) {
     return null;
   }
 
   return {
     round: current.round,
-    battles,
+    battles: current.battles,
     byePlayerId: current.byePlayerId,
     seats: view.players,
-    replay: REPLAYED_PHASES.has(view.phase),
   };
 }
 
@@ -122,7 +122,7 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
     room.send(CLIENT_MESSAGES.sync, {});
 
     if (latestSelection !== null && view?.phase === "draft" && !view.you.ready) {
-      send({ kind: "select-heroes", offerIds: latestSelection });
+      send({ kind: "select-heroes", heroIds: latestSelection });
     }
 
     notify();
@@ -137,16 +137,22 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
 
   room.send(CLIENT_MESSAGES.sync, {});
 
-  function send(intent: CommandIntent): void {
+  function requireView(): PlayerView {
     if (view === null) {
-      return;
+      throw new Error("The match has not sent a view yet");
     }
+
+    return view;
+  }
+
+  function send(intent: CommandIntent): void {
+    const current = requireView();
 
     room.send(CLIENT_MESSAGES.command, {
       commandId: nextCommandId(),
-      runId: view.runId,
-      phaseEpoch: view.phaseEpoch,
-      expectedRevision: view.you.decisionRevision,
+      runId: current.runId,
+      phaseEpoch: current.phaseEpoch,
+      expectedRevision: current.you.decisionRevision,
       intent,
     });
   }
@@ -200,29 +206,13 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
       room.send(CLIENT_MESSAGES.start, {});
     },
 
-    selectHeroes(offerIds) {
-      latestSelection = [...offerIds];
-      send({ kind: "select-heroes", offerIds: latestSelection });
+    selectHeroes(heroIds) {
+      latestSelection = [...heroIds];
+      send({ kind: "select-heroes", heroIds: latestSelection });
     },
 
-    pickHeroes(offerIds) {
-      send({ kind: "commit-draft", offerIds: [...offerIds] });
-    },
-
-    chooseOffer(decisionId, offerId, heroSlot, skill) {
-      send({ kind: "choose-offer", decisionId, offerId, heroSlot, skill });
-    },
-
-    moveItem(instanceId, heroSlot) {
-      send({ kind: "move-item", instanceId, heroSlot });
-    },
-
-    socketGem(instanceId, heroSlot, skill) {
-      send({ kind: "socket-gem", instanceId, heroSlot, skill });
-    },
-
-    discardItem(instanceId) {
-      send({ kind: "discard-item", instanceId });
+    pickHeroes(heroIds) {
+      send({ kind: "commit-draft", heroIds: [...heroIds] });
     },
 
     confirmReady() {
@@ -230,13 +220,14 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
     },
 
     markWatched() {
-      if (view !== null) {
-        room.send(CLIENT_MESSAGES.watched, { phaseEpoch: view.phaseEpoch });
-      }
+      room.send(CLIENT_MESSAGES.watched, { phaseEpoch: requireView().phaseEpoch });
     },
 
     placeHeroes(formation: readonly BoardCell[]) {
-      send({ kind: "place-heroes", formation: formation.map((cell) => ({ column: cell.column, row: cell.row })) });
+      send({
+        kind: "place-heroes",
+        formation: formation.map((cell) => ({ column: cell.column, row: cell.row })),
+      });
     },
 
     suspend() {
@@ -254,7 +245,7 @@ export async function createOnlineSession(target: MatchConnectTarget): Promise<M
         saveResumeToken(null);
       }
 
-      room.leave(true).catch(() => {});
+      void room.leave(true);
     },
   };
 }

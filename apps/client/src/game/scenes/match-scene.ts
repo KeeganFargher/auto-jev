@@ -1,17 +1,24 @@
-import type { BattleResult } from "@jev-game/game";
+import {
+  TICK_RATE,
+  type BattleResult,
+  type BattleSnapshot,
+  type HeroDefinitionId,
+  type UnitState,
+} from "@jev-game/game";
 import { boardArena } from "@jev-game/content";
 import {
-  DEFAULT_RUN_RULES,
-  lossCost,
+  PLAYBACK_SPEED,
   ROUND_END_PAUSE_SECONDS,
   TELEPORT_SECONDS,
+  type Pairing,
   type PlayerId,
   type PlayerView,
   type PublicSeat,
   type RoundBattle,
+  type RoundState,
 } from "@jev-game/run";
-import { battleFor, type MatchSession, type ResolvedRound } from "../../session/match-session.js";
-import { createRoundPlayback, type RoundPlayback } from "../../session/round-playback.js";
+import type { MatchSession, ResolvedRound } from "../../session/match-session.js";
+import { createRoundPlayback } from "../../session/round-playback.js";
 import { createOnlineSession } from "../../session/online-session.js";
 import {
   joinFailureMessage,
@@ -20,12 +27,16 @@ import {
   type MatchConnectTarget,
 } from "../../network/connect-room.js";
 import { createBattleView, type BattleView } from "../views/battle-view.js";
-import { createBoardStage, type ViewportInsets } from "../views/board-stage.js";
+import { createBoardStage, type ViewSide, type ViewportInsets } from "../views/board-stage.js";
 import { createFormationView, type FormationView } from "../views/formation-view.js";
 import { createDraftView, type DraftView } from "../views/draft-view.js";
 import { createTeleportView, type TeleportView } from "../views/teleport-view.js";
 import { createMenuView, type MenuView } from "../views/menu-view.js";
-import { mountEnvironment, type EnvironmentTheme, type MountedEnvironment } from "../environments/environment.js";
+import {
+  mountEnvironment,
+  type EnvironmentTheme,
+  type MountedEnvironment,
+} from "../environments/environment.js";
 import { boardThemeFor, savedBoardTheme } from "../environments/board-choice.js";
 import { createUnitInspectorView, type UnitInspectorView } from "../../hud/unit-inspector.js";
 import { createDamageMeter } from "../../hud/damage-meter.js";
@@ -33,41 +44,42 @@ import { hideTip } from "../../hud/tooltip.js";
 import { createCountdown, type Countdown } from "../../hud/countdown.js";
 import { button, el, setText } from "../../hud/dom.js";
 import { botSilhouette, heartIcon, humanSilhouette, skipIcon } from "../../hud/icons.js";
-import { renderDraftLoadout, renderLoadout, renderTeamLoadout, type SelectedPiece } from "../../hud/loadout.js";
-import { buildLevel } from "../../hud/levels.js";
 import { createDraftPlate, type DraftPlate } from "../../hud/draft.js";
-import { renderRewardPanel } from "../../hud/rewards.js";
+import { renderTeamRoster } from "../../hud/team-roster.js";
 import { gameCatalogue } from "../catalogues.js";
 import { audio } from "../../audio/engine.js";
 import { MUSIC_FOR_SCREEN, type MusicScreen, type SoundId } from "../../audio/catalogue.js";
-import { heroVoices } from "../fx/hero-voices.js";
 
 export interface MatchScene {
   joinRoom(roomId: string): void;
   dispose(): void;
 }
 
-type Seats = Record<PlayerId, PublicSeat>;
+export interface MatchSceneOptions {
+  joinRoomId: string | null;
+}
 
-const ROUND_TIMER_SECONDS = 30;
+type Seats = Record<PlayerId, PublicSeat>;
 
 const URGENT_SECONDS = 3;
 
-const MAX_FRAME_SECONDS = 0.1;
-
 const CATCH_UP_SECONDS = 1;
+
+const NEXT_PHASE_PAUSE_SECONDS = 1;
+
+const SEAT_COUNT = 8;
 
 const SEAT_COLOR_COUNT = 8;
 
 const LONG_ACTION_LABEL = 6;
 
-const BATTLE_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 76, bottom: 24 };
-
-const PLACEMENT_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 76, bottom: 24 };
+const BOARD_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 76, bottom: 24 };
 
 const DRAFT_HUD_INSETS: ViewportInsets = { left: 208, right: 244, top: 170, bottom: 150 };
 
 const MENU_INSETS: ViewportInsets = { left: 360, right: 40, top: 80, bottom: 200 };
+
+const BATTLE_START_TICKS = 6;
 
 type BannerTone = "blue" | "gold" | "crimson" | "slate";
 
@@ -87,10 +99,6 @@ const RESULT_SOUNDS: Readonly<Record<SeatTone, SoundId | null>> = {
   lost: "round-lost",
 };
 
-const WIN_LINE_OVERLAP = 0.85;
-
-const BATTLE_START_TICKS = 6;
-
 interface SeatRow {
   seat: PublicSeat;
   health: number;
@@ -102,24 +110,99 @@ interface SeatRow {
   onWatch: (() => void) | null;
 }
 
-function displayName(seats: Seats, playerId: string): string {
-  return seats[playerId]?.displayName ?? playerId;
+interface TeleportStage {
+  kind: "teleport";
+  view: TeleportView;
 }
 
-function opponentOf(battle: RoundBattle, playerId: string): string {
-  return battle.teamAPlayerId === playerId ? battle.teamBPlayerId : battle.teamAPlayerId;
+interface FightStage {
+  kind: "fight";
+  view: BattleView;
+  inspector: UnitInspectorView;
 }
 
-function battleOf(battles: readonly RoundBattle[], playerId: string): RoundBattle | null {
-  return battles.find((battle) => battle.teamAPlayerId === playerId || battle.teamBPlayerId === playerId) ?? null;
+type WatchStage = TeleportStage | FightStage;
+
+interface RoundWatch {
+  skip(): void;
+  serverMovedOn(view: PlayerView): void;
+  dispose(): void;
 }
 
-function thisRoundBattle(view: PlayerView, latest: ResolvedRound | null): RoundBattle | null {
-  if (latest === null || view.currentRound === null || latest.round !== view.currentRound.round) {
-    return null;
+function seatOf(seats: Seats, playerId: string): PublicSeat {
+  const seat = seats[playerId];
+
+  if (seat === undefined) {
+    throw new Error(`The match has no seat for player "${playerId}"`);
   }
 
-  return battleFor(latest, view.you.playerId);
+  return seat;
+}
+
+function displayName(seats: Seats, playerId: string): string {
+  return seatOf(seats, playerId).displayName;
+}
+
+function opponentOf(pairing: Pairing, playerId: string): PlayerId {
+  if (pairing.teamAPlayerId === playerId) {
+    return pairing.teamBPlayerId;
+  }
+
+  if (pairing.teamBPlayerId === playerId) {
+    return pairing.teamAPlayerId;
+  }
+
+  throw new Error(`Player "${playerId}" is not in ${pairing.battleId}`);
+}
+
+function pairingOf<T extends Pairing>(pairings: readonly T[], playerId: string): T | null {
+  return (
+    pairings.find(
+      (pairing) => pairing.teamAPlayerId === playerId || pairing.teamBPlayerId === playerId,
+    ) ?? null
+  );
+}
+
+function roundOf(view: PlayerView): RoundState {
+  if (view.currentRound === null) {
+    throw new Error(`The ${view.phase} phase arrived without a round`);
+  }
+
+  return view.currentRound;
+}
+
+function winnersOf(view: PlayerView): PlayerId[] {
+  const winners = view.winnerPlayerIds;
+
+  if (winners === null || winners.length === 0) {
+    throw new Error(`The ${view.phase} phase arrived without winners`);
+  }
+
+  return winners;
+}
+
+function requireDeadline(activeSession: MatchSession, view: PlayerView): number {
+  const deadline = activeSession.getDeadline();
+
+  if (deadline === null) {
+    throw new Error(`The ${view.phase} phase arrived without a deadline`);
+  }
+
+  return deadline;
+}
+
+function secondsUntil(deadline: number): number {
+  return Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
+}
+
+function unitIn(snapshot: BattleSnapshot, unitId: string): UnitState {
+  const unit = snapshot.units.find((candidate) => candidate.unitId === unitId);
+
+  if (unit === undefined) {
+    throw new Error(`Snapshot at tick ${snapshot.tick} has no unit ${unitId}`);
+  }
+
+  return unit;
 }
 
 function roundLabel(round: number): string {
@@ -127,52 +210,56 @@ function roundLabel(round: number): string {
 }
 
 function seatColor(seats: Seats, playerId: string): string {
-  const index = Math.max(0, Object.keys(seats).indexOf(playerId));
+  const index = Object.keys(seats).indexOf(playerId);
+
+  if (index === -1) {
+    throw new Error(`The match has no seat for player "${playerId}"`);
+  }
 
   return `var(--color-seat-${(index % SEAT_COLOR_COUNT) + 1})`;
 }
 
-function silhouetteFor(seat: PublicSeat | undefined): SVGSVGElement {
-  return seat?.controllerKind === "human" ? humanSilhouette() : botSilhouette();
+function silhouetteFor(seat: PublicSeat): SVGSVGElement {
+  return seat.controllerKind === "human" ? humanSilhouette() : botSilhouette();
 }
 
-function banner(tone: BannerTone, title: string, sub: string | null): HTMLElement {
-  return el(
-    "div",
-    `brush-banner ${BANNER_TONE_CLASS[tone]}`,
-    el("div", "banner-title", title),
-    sub === null ? null : el("div", "banner-sub", sub),
-  );
+function titleBanner(tone: BannerTone, title: string): HTMLElement {
+  return el("div", `brush-banner ${BANNER_TONE_CLASS[tone]}`, el("div", "banner-title", title));
+}
+
+function banner(tone: BannerTone, title: string, sub: string): HTMLElement {
+  const box = titleBanner(tone, title);
+  box.append(el("div", "banner-sub", sub));
+
+  return box;
 }
 
 function resultBanner(seats: Seats, battle: RoundBattle, meId: string): HTMLElement {
   const versus = `vs ${displayName(seats, opponentOf(battle, meId))}`;
   const result = battle.result;
 
-  if (result === null || result.kind === "failure") {
-    return banner("crimson", "No result", versus);
-  }
-
   if (result.kind === "draw") {
-    return banner("slate", "Draw", `${versus} · ${result.reason === "timeout" ? "time ran out" : "both teams wiped out"}`);
+    return banner(
+      "slate",
+      "Draw",
+      `${versus} · ${result.reason === "timeout" ? "time ran out" : "both teams wiped out"}`,
+    );
   }
 
-  return result.winningTeamId === meId ? banner("gold", "Victory", versus) : banner("crimson", "Defeat", versus);
+  return result.winningTeamId === meId
+    ? banner("gold", "Victory", versus)
+    : banner("crimson", "Defeat", versus);
 }
 
-function outcomeFor(result: BattleResult | null, playerId: string): SeatTone {
-  if (result === null || result.kind !== "win") {
+function outcomeFor(result: BattleResult, playerId: string): SeatTone {
+  if (result.kind === "draw") {
     return "neutral";
   }
 
   return result.winningTeamId === playerId ? "won" : "lost";
 }
 
-function outcomeTag(result: BattleResult | null, playerId: string): string {
-  if (result === null || result.kind === "failure") {
-    return "—";
-  }
-
+function outcomeTag(result: BattleResult, playerId: string): string {
   if (result.kind === "draw") {
     return "Draw";
   }
@@ -185,15 +272,11 @@ function boardOwnerLabel(seats: Seats, ownerId: string, meId: string): string {
 }
 
 function battleStatus(seats: Seats, battle: RoundBattle, ended: boolean): string {
-  const result = battle.result;
-
   if (!ended) {
     return "Fighting";
   }
 
-  if (result === null || result.kind === "failure") {
-    return "No result";
-  }
+  const result = battle.result;
 
   if (result.kind === "draw") {
     return result.reason === "timeout" ? "Time's up · draw" : "Draw";
@@ -203,7 +286,7 @@ function battleStatus(seats: Seats, battle: RoundBattle, ended: boolean): string
 }
 
 function portraitRing(seats: Seats, playerId: string, sizePx: number): HTMLElement {
-  const inner = el("div", "portrait-ring-inner", silhouetteFor(seats[playerId]));
+  const inner = el("div", "portrait-ring-inner", silhouetteFor(seatOf(seats, playerId)));
   inner.style.setProperty("--seat", seatColor(seats, playerId));
 
   const ring = el("div", "portrait-ring", inner);
@@ -212,7 +295,13 @@ function portraitRing(seats: Seats, playerId: string, sizePx: number): HTMLEleme
   return ring;
 }
 
-function viewSeatTag(seat: PublicSeat, isYou: boolean, isOpponent: boolean, isAway: boolean, isThinking: boolean): string | null {
+function viewSeatTag(
+  seat: PublicSeat,
+  isYou: boolean,
+  isOpponent: boolean,
+  isAway: boolean,
+  isThinking: boolean,
+): string | null {
   if (isYou) {
     return "You";
   }
@@ -234,33 +323,36 @@ function viewSeatTag(seat: PublicSeat, isYou: boolean, isOpponent: boolean, isAw
 
 function rowsForView(
   view: PlayerView,
-  opponentId: string | null,
+  isOpponent: (playerId: string) => boolean,
   isAway: (playerId: string) => boolean,
   isThinking: (playerId: string) => boolean,
 ): SeatRow[] {
-  return Object.values(view.players).map((seat) => ({
+  return Object.values(view.players).map((seat): SeatRow => ({
     seat,
-    health: Math.max(0, seat.runHealth),
+    health: seat.runHealth,
     eliminated: seat.eliminated,
     tag: viewSeatTag(
       seat,
       seat.playerId === view.you.playerId,
-      seat.playerId === opponentId,
+      isOpponent(seat.playerId),
       isAway(seat.playerId),
       isThinking(seat.playerId),
     ),
     tone: "neutral",
-    isOpponent: seat.playerId === opponentId,
+    isOpponent: isOpponent(seat.playerId),
     isFocused: false,
     onWatch: null,
   }));
 }
 
-function renderSeatRail(root: HTMLElement, seats: Seats, rows: readonly SeatRow[], meId: string): void {
+function renderSeatRail(
+  root: HTMLElement,
+  seats: Seats,
+  rows: readonly SeatRow[],
+  meId: string,
+): void {
   const cards = rows.map((row) => {
     const { seat } = row;
-    const isYou = seat.playerId === meId;
-
     const portrait = el("div", "seat-portrait", silhouetteFor(seat));
     portrait.style.setProperty("--seat", seatColor(seats, seat.playerId));
 
@@ -269,19 +361,32 @@ function renderSeatRail(root: HTMLElement, seats: Seats, rows: readonly SeatRow[
 
     const children = [
       portrait,
-      el("div", "seat-info", el("div", "seat-name", seat.displayName), el("div", "seat-health", String(row.health), heartIcon())),
+      el(
+        "div",
+        "seat-info",
+        el("div", "seat-name", seat.displayName),
+        el("div", "seat-health", String(row.health), heartIcon()),
+      ),
       tag,
     ];
 
     const label = `${seat.displayName}, ${row.health} health${row.eliminated ? ", eliminated" : ""}`;
     const onWatch = row.onWatch;
-    const card = onWatch === null ? el("div", "seat-card", ...children) : button("seat-card", onWatch, ...children);
 
-    card.classList.toggle("is-you", isYou);
+    const card =
+      onWatch === null
+        ? el("div", "seat-card", ...children)
+        : button("seat-card", onWatch, ...children);
+
+    card.classList.toggle("is-you", seat.playerId === meId);
     card.classList.toggle("is-opponent", row.isOpponent);
     card.classList.toggle("is-focused", row.isFocused);
     card.classList.toggle("is-eliminated", row.eliminated);
-    card.setAttribute("aria-label", onWatch === null ? label : `Watch ${seat.displayName}'s battle. ${label}`);
+
+    card.setAttribute(
+      "aria-label",
+      onWatch === null ? label : `Watch ${seat.displayName}'s battle. ${label}`,
+    );
 
     return card;
   });
@@ -311,47 +416,15 @@ function createRoundPlate(): RoundPlate {
   };
 }
 
-interface RoundWatch {
-  resolved: ResolvedRound;
-  playback: RoundPlayback;
-  focusPlayerId: string;
-  battle: RoundBattle;
-  battleView: BattleView | null;
-  teleportView: TeleportView | null;
-  inspector: UnitInspectorView | null;
-  selectedUnitId: string | null;
-  clock: number;
-  lastTick: number;
-  railKey: string;
-  animationFrame: number;
-  endCountdown: Countdown | null;
-  holdEnded: boolean;
-}
-
-function isTeleporting(active: RoundWatch): boolean {
-  return active.clock < TELEPORT_SECONDS;
-}
-
-function advanceWatch(active: RoundWatch, deltaSeconds: number): void {
-  active.clock += Math.max(0, deltaSeconds);
-  active.playback.advance(Math.max(0, active.clock - TELEPORT_SECONDS) - active.playback.elapsedSeconds());
-}
-
-export interface MatchSceneOptions {
-  joinRoomId: string | null;
-}
-
 export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOptions): MatchScene {
   void audio.preload("battle");
-  void audio.preload("voices");
 
+  let disposed = false;
   let session: MatchSession | null = null;
   let sessionUnsubscribe: (() => void) | null = null;
-  let draftSelection: string[] = [];
+  let draftSelection: HeroDefinitionId[] = [];
   let activeCountdown: Countdown | null = null;
   let timerEpoch = -1;
-  let timerStartedAt = 0;
-  let timerTotalSeconds = 0;
   let formationView: FormationView | null = null;
   let formationKey = "";
   let draftView: DraftView | null = null;
@@ -363,20 +436,19 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   let connecting = false;
   let draftSubmittedEpoch = -1;
   let lastRenderedEpoch = -1;
-  let selectedPiece: SelectedPiece | null = null;
+  let finishAnnounced = false;
   const watchedRounds = new Set<number>();
   const announcedRounds = new Set<number>();
-  let finishAnnounced = false;
-  let winLineTimer = 0;
-  const healthBeforeRound = new Map<string, number>();
+  const healthBeforeRound = new Map<PlayerId, number>();
 
   const seatRail = el("div", "seat-rail");
   seatRail.setAttribute("aria-label", "Players");
 
   const damageMeter = createDamageMeter();
   damageMeter.root.hidden = true;
-  const teamLoadout = el("div", "team-loadout");
-  const teamRail = el("div", "team-rail", damageMeter.root, teamLoadout);
+
+  const teamRoster = el("div", "team-roster");
+  const teamRail = el("div", "team-rail", damageMeter.root, teamRoster);
   teamRail.setAttribute("aria-label", "Your team");
   teamRail.dataset.tipEdge = "";
 
@@ -392,7 +464,13 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   let environmentThemeId: string | null = null;
   const battleHeader = el("div", "battle-header");
   const battleUnit = el("div", "hud-unit battle-unit");
-  const battleSkip = button("pill-button battle-skip", () => skipRound(), skipIcon(), "Skip");
+
+  const battleSkip = button(
+    "pill-button battle-skip",
+    () => requireWatch().skip(),
+    skipIcon(),
+    "Skip",
+  );
 
   const menuLayer = el("div", "menu-screen");
   const connectionBanner = el("div", "connection-banner");
@@ -422,14 +500,36 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
   battleUnit.hidden = true;
 
+  function requireSession(): MatchSession {
+    if (session === null) {
+      throw new Error("No match session is running");
+    }
+
+    return session;
+  }
+
+  function requireView(activeSession: MatchSession): PlayerView {
+    const view = activeSession.getView();
+
+    if (view === null) {
+      throw new Error("The match has not sent a view yet");
+    }
+
+    return view;
+  }
+
+  function requireWatch(): RoundWatch {
+    if (watch === null) {
+      throw new Error("No round is being watched");
+    }
+
+    return watch;
+  }
+
   function stopTimer(): void {
     activeCountdown?.dispose();
     activeCountdown = null;
     timerEpoch = -1;
-  }
-
-  function me(): string {
-    return session?.playerId() ?? "";
   }
 
   function musicScreen(): MusicScreen {
@@ -444,25 +544,21 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     audio.setMusic(MUSIC_FOR_SCREEN[musicScreen()]);
   }
 
-  function announceRoundResult(round: number, battle: RoundBattle): void {
+  function announceRoundResult(round: number, battle: RoundBattle, playerId: PlayerId): void {
     if (announcedRounds.has(round)) {
       return;
     }
 
     announcedRounds.add(round);
-    const outcome = outcomeFor(battle.result, me());
-    const sound = RESULT_SOUNDS[outcome];
-    const seconds = sound === null ? 0 : audio.play(sound);
+    const sound = RESULT_SOUNDS[outcomeFor(battle.result, playerId)];
 
-    if (outcome === "won") {
-      const heroIds = session?.getView()?.you.heroBuilds.map((build) => build.heroId) ?? [];
-      window.clearTimeout(winLineTimer);
-      winLineTimer = window.setTimeout(() => heroVoices.win(heroIds), seconds * WIN_LINE_OVERLAP * 1000);
+    if (sound !== null) {
+      audio.play(sound);
     }
   }
 
   function announceFinish(view: PlayerView): void {
-    if (finishAnnounced || view.abortReason !== null) {
+    if (finishAnnounced) {
       return;
     }
 
@@ -470,24 +566,9 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     if (view.you.eliminated) {
       audio.play("eliminated");
-    } else if ((view.winnerPlayerIds ?? []).includes(view.you.playerId)) {
+    } else if (winnersOf(view).includes(view.you.playerId)) {
       audio.play("run-won");
     }
-  }
-
-  function announceChoice(view: PlayerView, decisionId: string, offerId: string): void {
-    const offer = view.pendingDecisions
-      .find((decision) => decision.decisionId === decisionId)
-      ?.offers.find((candidate) => candidate.offerId === offerId);
-
-    if (offer?.kind === "recruit" && offer.heroId !== null) {
-      audio.play("recruit");
-      heroVoices.pick(offer.heroId);
-
-      return;
-    }
-
-    audio.play("reward-claim");
   }
 
   function countdownTick(remaining: number): void {
@@ -496,47 +577,37 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
   }
 
-  function timerSeconds(): number {
-    const deadline = session?.getDeadline() ?? null;
-
-    return deadline === null ? ROUND_TIMER_SECONDS : Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
-  }
-
   function roundEndPauseSeconds(): number {
-    if (session === null) {
-      return ROUND_END_PAUSE_SECONDS;
+    const activeSession = requireSession();
+    const view = requireView(activeSession);
+
+    switch (view.phase) {
+      case "round-result":
+        return secondsUntil(requireDeadline(activeSession, view));
+
+      case "finished":
+        return ROUND_END_PAUSE_SECONDS;
+
+      case "lobby":
+      case "draft":
+      case "preparing":
+        return NEXT_PHASE_PAUSE_SECONDS;
     }
-
-    const phase = session.getView()?.phase;
-    const deadline = session.getDeadline();
-
-    if (phase === "round-result" && deadline !== null) {
-      return Math.max(1, Math.ceil((deadline - Date.now()) / 1000));
-    }
-
-    return phase === "finished" ? ROUND_END_PAUSE_SECONDS : 1;
   }
 
-  function startTimer(epoch: number, onExpire: () => void): void {
+  function startTimer(epoch: number, deadline: number): void {
     if (activeCountdown !== null && timerEpoch === epoch) {
       return;
     }
 
     stopTimer();
-    timerTotalSeconds = timerSeconds();
-    timerStartedAt = Date.now();
-    activeCountdown = createCountdown(roundPlate.timer, timerTotalSeconds, onExpire, countdownTick);
+    activeCountdown = createCountdown(
+      roundPlate.timer,
+      secondsUntil(deadline),
+      () => {},
+      countdownTick,
+    );
     timerEpoch = epoch;
-  }
-
-  function timerBar(): HTMLElement {
-    const totalMilliseconds = Math.max(1, timerTotalSeconds * 1000);
-    const remaining = Math.max(0, totalMilliseconds - (Date.now() - timerStartedAt));
-    const fill = el("span", "reward-timer-fill");
-    fill.style.setProperty("--from", String(remaining / totalMilliseconds));
-    fill.style.animationDuration = `${remaining}ms`;
-
-    return el("div", "reward-timer", fill);
   }
 
   function versusHeader(seats: Seats, friendlyId: string, enemyId: string, status: string): void {
@@ -577,37 +648,11 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
   }
 
-  function showRewardBoard(view: PlayerView): void {
-    dressBoard(boardThemeFor(view.you.playerId, view.you.playerId));
-    battleLayer.hidden = false;
-    battleHeader.hidden = true;
-    const heroIds = view.you.heroBuilds.map((build) => build.heroId);
-    const heroLevels = view.you.heroBuilds.map(buildLevel);
-    const key = `reward:${view.phaseEpoch}:${heroIds.join(",")}`;
-
-    if (formationView !== null && formationKey === key) {
-      formationView.setFormation(view.you.formation);
-      formationView.setLevels(heroLevels);
-
-      return;
-    }
-
-    formationView?.dispose();
-    formationKey = key;
-
-    formationView = createFormationView(boardStage, {
-      grid: boardArena,
-      insets: PLACEMENT_HUD_INSETS,
-      heroIds,
-      heroLevels,
-      formation: view.you.formation,
-      onChange: () => {},
-    });
-
-    formationView.setLocked(true);
-  }
-
-  function showPlacementBoard(view: PlayerView, activeSession: MatchSession, opponentId: string): void {
+  function showPlacementBoard(
+    view: PlayerView,
+    activeSession: MatchSession,
+    opponentId: string,
+  ): void {
     dressBoard(boardThemeFor(view.you.playerId, view.you.playerId));
     battleLayer.hidden = false;
     battleHeader.hidden = false;
@@ -628,9 +673,8 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     formationView = createFormationView(boardStage, {
       grid: boardArena,
-      insets: PLACEMENT_HUD_INSETS,
-      heroIds: view.you.heroBuilds.map((build) => build.heroId),
-      heroLevels: view.you.heroBuilds.map(buildLevel),
+      insets: BOARD_HUD_INSETS,
+      heroIds: view.you.heroIds,
       formation: view.you.formation,
       onChange: (formation) => activeSession.placeHeroes(formation),
     });
@@ -653,7 +697,6 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     dressBoard(savedBoardTheme());
     battleLayer.hidden = false;
-    battleLayer.classList.remove("is-dimmed");
     battleLayer.classList.add("is-menu");
     menuView ??= createMenuView(boardStage, { grid: boardArena, insets: MENU_INSETS });
 
@@ -661,7 +704,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       "div",
       "brush-banner menu-brand",
       el("div", "menu-brand-title", "Jev Game"),
-      el("div", "menu-brand-sub", "Local match · you + 7 baseline bots"),
+      el("div", "menu-brand-sub", `Local match · you + ${SEAT_COUNT - 1} bots`),
     );
 
     const labLink = el("a", "menu-link", "Battle lab");
@@ -670,13 +713,29 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     const boardsLink = el("a", "menu-link", "Board themes");
     boardsLink.href = "#env";
 
-    const onlineButton = button("menu-link", () => startOnline({ kind: "quick" }), connecting ? "Connecting…" : "Play online");
+    const onlineButton = button(
+      "menu-link",
+      () => startOnline({ kind: "quick" }),
+      connecting ? "Connecting…" : "Play online",
+    );
+
     onlineButton.disabled = connecting;
     const notice = menuNotice === null ? null : el("div", "menu-notice", menuNotice);
-    const fight = button("menu-fight-button", () => startMatch(), el("span", "brush-banner menu-fight", "Fight!"));
+
+    const fight = button(
+      "menu-fight-button",
+      () => startMatch(),
+      el("span", "brush-banner menu-fight", "Fight!"),
+    );
+
     fight.disabled = connecting;
 
-    menuLayer.replaceChildren(brand, el("nav", "menu-nav", onlineButton, labLink, boardsLink, notice), fight);
+    menuLayer.replaceChildren(
+      brand,
+      el("nav", "menu-nav", onlineButton, labLink, boardsLink, notice),
+      fight,
+    );
+
     menuLayer.hidden = false;
   }
 
@@ -706,64 +765,63 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   }
 
   function draftLockedByTimer(view: PlayerView): boolean {
-    return draftView !== null && draftSubmittedEpoch !== lastRenderedEpoch && draftSelection.length === view.rules.draftPicks;
+    return (
+      draftView !== null &&
+      draftSubmittedEpoch !== lastRenderedEpoch &&
+      draftSelection.length === view.rules.draftPicks
+    );
   }
 
-  function toggleDraftPick(offerId: string): void {
-    const activeSession = session;
-    const view = activeSession?.getView() ?? null;
+  function toggleDraftPick(heroId: HeroDefinitionId): void {
+    const activeSession = requireSession();
+    const view = requireView(activeSession);
 
-    if (activeSession === null || view === null || view.phase !== "draft" || draftLocked(view)) {
+    if (view.phase !== "draft") {
+      throw new Error(`A draft pick arrived during the ${view.phase} phase`);
+    }
+
+    if (draftLocked(view)) {
       return;
     }
 
-    if (draftSelection.includes(offerId)) {
-      draftSelection = draftSelection.filter((id) => id !== offerId);
+    if (draftSelection.includes(heroId)) {
+      draftSelection = draftSelection.filter((picked) => picked !== heroId);
       audio.play("draft-unpick");
     } else if (draftSelection.length < view.rules.draftPicks) {
-      draftSelection = [...draftSelection, offerId];
+      draftSelection = [...draftSelection, heroId];
       audio.play("draft-pick");
-      const heroId = view.heroOffers.find((offer) => offer.offerId === offerId)?.heroId;
-
-      if (heroId !== undefined) {
-        heroVoices.pick(heroId);
-      }
     }
 
     activeSession.selectHeroes(draftSelection);
     render();
   }
 
-  function lockedPicks(view: PlayerView): string[] {
-    const heroIds = view.you.heroBuilds.map((build) => build.heroId);
-
-    if (heroIds.length === 0) {
-      return draftSelection;
-    }
-
-    return heroIds.flatMap((heroId) => {
-      const offer = view.heroOffers.find((candidate) => candidate.heroId === heroId);
-
-      return offer === undefined ? [] : [offer.offerId];
-    });
+  function lockedPicks(view: PlayerView): readonly HeroDefinitionId[] {
+    return view.you.heroIds.length === 0 ? draftSelection : view.you.heroIds;
   }
 
-  function showDraftLineup(view: PlayerView, picked: readonly string[], locked: boolean): void {
+  function showDraftLineup(
+    view: PlayerView,
+    picked: readonly HeroDefinitionId[],
+    locked: boolean,
+  ): void {
     dressBoard(boardThemeFor(view.you.playerId, view.you.playerId));
     battleLayer.hidden = false;
     battleHeader.hidden = true;
-    const key = `draft:${view.phaseEpoch}:${view.heroOffers.map((offer) => offer.offerId).join(",")}`;
+    const key = `draft:${view.phaseEpoch}:${view.draftPool.join(",")}`;
 
     if (draftView === null || draftKey !== key) {
       hideDraft();
       draftKey = key;
-      draftPlates = view.heroOffers.map((offer) => createDraftPlate(offer, gameCatalogue, () => toggleDraftPick(offer.offerId)));
+      draftPlates = view.draftPool.map((heroId) =>
+        createDraftPlate(heroId, () => toggleDraftPick(heroId)),
+      );
 
       draftView = createDraftView(boardStage, {
         grid: boardArena,
         insets: DRAFT_HUD_INSETS,
-        offers: view.heroOffers,
-        slots: new Map(draftPlates.map((plate) => [plate.offer.offerId, plate.slot])),
+        heroIds: view.draftPool,
+        slots: new Map(draftPlates.map((plate) => [plate.heroId, plate.slot])),
         onRise: () => audio.play("draft-rise"),
       });
     }
@@ -772,28 +830,18 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     stage.classList.add("is-draft");
     const picks = view.rules.draftPicks;
 
-    const builds = picked.flatMap((offerId) => {
-      const plate = draftPlates.find((candidate) => candidate.offer.offerId === offerId);
-
-      return plate === undefined ? [] : [plate.build];
-    });
-
     for (const plate of draftPlates) {
-      plate.sync({ picked, builds, picks, locked });
+      plate.sync({ picked, picks, locked });
     }
 
     draftView.setState({ picked, full: picked.length >= picks, locked });
-    renderDraftLoadout(teamLoadout, builds, picks, gameCatalogue);
+    renderTeamRoster(teamRoster, picked, picks);
     teamRail.hidden = false;
   }
 
   function renderDraft(view: PlayerView, activeSession: MatchSession): void {
-    roundPlate.set("Round 1", "Draft");
-
-    if (activeSession.getDeadline() !== null) {
-      startTimer(view.phaseEpoch, () => {});
-    }
-
+    roundPlate.set(roundLabel(0), "Draft");
+    startTimer(view.phaseEpoch, requireDeadline(activeSession, view));
     const picks = view.rules.draftPicks;
     const locked = draftLocked(view);
     showDraftLineup(view, locked ? lockedPicks(view) : draftSelection, locked);
@@ -804,7 +852,13 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       return;
     }
 
-    stage.append(banner("blue", "Draft your team", `Pick ${picks} heroes · ${draftSelection.length}/${picks} chosen`));
+    stage.append(
+      banner(
+        "blue",
+        "Draft your team",
+        `Pick ${picks} heroes · ${draftSelection.length}/${picks} chosen`,
+      ),
+    );
 
     setAction(
       "Confirm",
@@ -819,124 +873,81 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
   }
 
   function renderPreparing(view: PlayerView, activeSession: MatchSession): void {
-    roundPlate.set(roundLabel(view.currentRound?.round ?? 0), "Preparing");
+    const round = roundOf(view);
+    roundPlate.set(roundLabel(round.round), "Preparing");
+    const pairing = pairingOf(round.pairings, view.you.playerId);
 
-    const battle = battleOf(Object.values(view.currentRound?.battles ?? {}), view.you.playerId);
-
-    if (battle === null) {
+    if (pairing === null) {
       stage.append(banner("slate", "Bye", "Waiting for the other battles"));
 
       return;
     }
 
-    const opponentId = opponentOf(battle, view.you.playerId);
     stage.hidden = true;
-    showPlacementBoard(view, activeSession, opponentId);
-    startTimer(view.phaseEpoch, () => {});
+    showPlacementBoard(view, activeSession, opponentOf(pairing, view.you.playerId));
+    startTimer(view.phaseEpoch, requireDeadline(activeSession, view));
 
     if (!view.you.ready) {
       setAction("Ready", () => activeSession.confirmReady(), false);
     }
   }
 
-  function renderRoundResult(view: PlayerView, activeSession: MatchSession): void {
-    if (view.currentRound?.byePlayerId === view.you.playerId) {
+  function renderRoundOver(view: PlayerView, activeSession: MatchSession): void {
+    const round = roundOf(view);
+    roundPlate.set(roundLabel(round.round), "Round over");
+    startTimer(view.phaseEpoch, requireDeadline(activeSession, view));
+
+    if (round.byePlayerId === view.you.playerId) {
       stage.append(banner("slate", "Bye", "You sat this round out"));
 
       return;
     }
 
-    const latest = activeSession.getLatestRound();
-    const battle = thisRoundBattle(view, latest);
+    const battle = pairingOf(round.battles, view.you.playerId);
 
-    if (latest !== null && battle !== null) {
-      announceRoundResult(latest.round, battle);
-      stage.append(resultBanner(view.players, battle, view.you.playerId));
-    }
-  }
-
-  function renderReward(view: PlayerView, activeSession: MatchSession): void {
-    roundPlate.set(roundLabel(view.currentRound?.round ?? 0), "Rewards");
-    showRewardBoard(view);
-    renderRoundResult(view, activeSession);
-
-    startTimer(view.phaseEpoch, () => {});
-
-    if (view.you.ready) {
-      stage.append(el("div", "stage-subtitle reward-waiting", "Waiting for the other players · you can still move items and gems"));
-
-      return;
+    if (battle === null) {
+      throw new Error(`${roundLabel(round.round)} has no battle for ${view.you.playerId}`);
     }
 
-    const panel = renderRewardPanel(stage, view, gameCatalogue, (decisionId, offerId, skill) => {
-      announceChoice(view, decisionId, offerId);
-      activeSession.chooseOffer(decisionId, offerId, null, skill);
-    });
+    announceRoundResult(round.round, battle, view.you.playerId);
 
-    panel?.append(timerBar());
+    stage.append(
+      resultBanner(view.players, battle, view.you.playerId),
+      el("div", "stage-subtitle", "The next round is about to start"),
+    );
   }
 
-  function renderTeamRail(view: PlayerView, activeSession: MatchSession): void {
-    const interactive =
-      !view.you.eliminated && (view.phase === "reward" || (view.phase === "preparing" && !view.you.ready));
-
-    if (!interactive) {
-      selectedPiece = null;
-    }
-
-    renderLoadout(teamLoadout, view.you, view.rules, gameCatalogue, {
-      selected: selectedPiece,
-      interactive,
-      select(piece) {
-        selectedPiece = piece;
-        render();
-      },
-      moveItem(instanceId, heroSlot) {
-        activeSession.moveItem(instanceId, heroSlot);
-      },
-      socketGem(instanceId, heroSlot, skill) {
-        activeSession.socketGem(instanceId, heroSlot, skill);
-      },
-      discardItem(instanceId) {
-        activeSession.discardItem(instanceId);
-      },
-    });
-  }
-
-  function renderFinished(view: PlayerView, activeSession: MatchSession): void {
-    roundPlate.set(roundLabel(view.currentRound?.round ?? 0), "Finished");
+  function renderFinished(view: PlayerView): void {
+    const round = roundOf(view);
+    roundPlate.set(roundLabel(round.round), "Finished");
     setAction("Menu", () => endMatch(), false);
     announceFinish(view);
 
-    if (view.abortReason !== null) {
-      stage.append(banner("crimson", "Aborted", view.abortReason));
-
-      return;
-    }
-
-    const winners = view.winnerPlayerIds ?? [];
-
-    const winnerText =
-      winners.length === 0
-        ? "Nobody survived"
-        : `Winner${winners.length > 1 ? "s" : ""}: ${winners.map((playerId) => displayName(view.players, playerId)).join(", ")}`;
+    const winners = winnersOf(view);
+    const names = winners.map((playerId) => displayName(view.players, playerId)).join(", ");
+    const winnerText = `Winner${winners.length > 1 ? "s" : ""}: ${names}`;
 
     if (view.you.eliminated) {
-      const latest = activeSession.getLatestRound();
-      const lastBattle = latest === null ? null : battleFor(latest, view.you.playerId);
+      const lastBattle = pairingOf(round.battles, view.you.playerId);
 
-      const lostTo =
-        latest === null || lastBattle === null
-          ? null
-          : `Round ${latest.round + 1} · lost to ${displayName(view.players, opponentOf(lastBattle, view.you.playerId))}`;
-
-      stage.append(banner("crimson", "Eliminated", lostTo), el("div", "stage-subtitle", winnerText));
+      stage.append(
+        lastBattle === null
+          ? titleBanner("crimson", "Eliminated")
+          : banner(
+              "crimson",
+              "Eliminated",
+              `${roundLabel(round.round)} · lost to ${displayName(view.players, opponentOf(lastBattle, view.you.playerId))}`,
+            ),
+        el("div", "stage-subtitle", winnerText),
+      );
 
       return;
     }
 
     if (winners.includes(view.you.playerId)) {
-      stage.append(banner("gold", "Victory!", winners.length > 1 ? "You share the win" : "You won the run"));
+      stage.append(
+        banner("gold", "Victory!", winners.length > 1 ? "You share the win" : "You won the run"),
+      );
 
       return;
     }
@@ -944,235 +955,290 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     stage.append(banner("slate", "Match over", winnerText));
   }
 
-  function rowsForWatch(active: RoundWatch): SeatRow[] {
-    const { resolved, playback } = active;
+  function createRoundWatch(
+    activeSession: MatchSession,
+    meId: PlayerId,
+    resolved: ResolvedRound,
+  ): RoundWatch {
+    if (resolved.battles.length === 0) {
+      throw new Error(`${roundLabel(resolved.round)} has no battles to watch`);
+    }
 
-    return Object.values(resolved.seats).map((seat): SeatRow => {
-      const battle = battleOf(resolved.battles, seat.playerId);
-      const isFocused = battle !== null && battle.battleId === active.battle.battleId;
+    const ownBattle = pairingOf(resolved.battles, meId);
+    let battle = ownBattle ?? resolved.battles[0];
+    let focusPlayerId = ownBattle === null ? battle.teamAPlayerId : meId;
+    const playback = createRoundPlayback(resolved.battles, battle, gameCatalogue);
+    let clock = 0;
+    let selectedUnitId: string | null = null;
+    let railKey = "";
+    let endCountdown: Countdown | null = null;
+    let holdEnded = false;
 
-      if (battle === null) {
-        const isBye = resolved.byePlayerId === seat.playerId;
+    function advance(deltaSeconds: number): void {
+      clock += deltaSeconds;
+      const target = Math.max(0, clock - TELEPORT_SECONDS);
+      playback.advance(Math.max(0, target - playback.elapsedSeconds()));
+    }
 
+    function teleporting(): boolean {
+      return clock < TELEPORT_SECONDS;
+    }
+
+    function viewSide(): ViewSide {
+      return battle.teamAPlayerId === focusPlayerId ? "south" : "north";
+    }
+
+    function mountStage(): WatchStage {
+      const history = playback.follow(battle);
+      const opening = playback.openingSnapshot(battle);
+      damageMeter.start(opening, focusPlayerId, history);
+      selectedUnitId = null;
+      railKey = "";
+
+      if (teleporting()) {
         return {
-          seat,
-          health: Math.max(0, seat.runHealth),
-          eliminated: !isBye && seat.eliminated,
-          tag: isBye ? "Bye" : "Out",
-          tone: "neutral",
-          isOpponent: false,
-          isFocused: false,
-          onWatch: null,
+          kind: "teleport",
+          view: createTeleportView(boardStage, {
+            seconds: TELEPORT_SECONDS,
+            opening,
+            friendlyTeamId: focusPlayerId,
+            homeTeamId: battle.teamAPlayerId,
+            viewSide: viewSide(),
+            insets: BOARD_HUD_INSETS,
+          }),
         };
       }
 
-      const ended = playback.hasEnded(battle);
-      const lostThisRound = outcomeFor(battle.result, seat.playerId) === "lost";
-      const cost = lostThisRound ? lossCost(session?.getView()?.rules ?? DEFAULT_RUN_RULES, battle.winnerSurvivors) : 0;
-      const health = Math.max(0, ended ? seat.runHealth : (healthBeforeRound.get(seat.playerId) ?? seat.runHealth + cost));
-      const playerId = seat.playerId;
-
-      return {
-        seat,
-        health,
-        eliminated: ended && seat.eliminated,
-        tag: ended ? outcomeTag(battle.result, playerId) : "Live",
-        tone: ended ? outcomeFor(battle.result, playerId) : "live",
-        isOpponent: false,
-        isFocused,
-        onWatch: () => focusPlayer(playerId),
-      };
-    });
-  }
-
-  function renderWatchChrome(active: RoundWatch): void {
-    const { resolved, battle, focusPlayerId, playback } = active;
-
-    const status =
-      active.teleportView === null
-        ? battleStatus(resolved.seats, battle, playback.hasEnded(battle))
-        : boardOwnerLabel(resolved.seats, battle.teamAPlayerId, me());
-
-    versusHeader(resolved.seats, focusPlayerId, opponentOf(battle, focusPlayerId), status);
-
-    renderSeatRail(seatRail, resolved.seats, rowsForWatch(active), me());
-  }
-
-  function watchBoardOwner(active: RoundWatch): string {
-    const warp = active.teleportView?.warpSeconds ?? null;
-
-    return warp !== null && active.clock < warp ? active.focusPlayerId : active.battle.teamAPlayerId;
-  }
-
-  function renderTeleportFrame(active: RoundWatch, teleportView: TeleportView): void {
-    teleportView.seek(active.clock);
-    battleSkip.hidden = false;
-    roundPlate.set(roundLabel(active.resolved.round), "Teleport");
-    setText(roundPlate.timer, "");
-    roundPlate.timer.classList.remove("is-urgent");
-  }
-
-  function renderFightFrame(active: RoundWatch): void {
-    const { playback, battle } = active;
-    const frame = playback.frame(battle);
-    const tick = playback.tick();
-    const events = playback.eventsBetween(battle, active.lastTick, tick);
-    active.lastTick = tick;
-
-    active.battleView?.update(frame.snapshot, active.selectedUnitId, events);
-    damageMeter.push(events);
-
-    const selectedUnit =
-      active.selectedUnitId === null
-        ? null
-        : (frame.snapshot.units.find((unit) => unit.unitId === active.selectedUnitId) ?? null);
-
-    active.inspector?.update(selectedUnit, frame.snapshot.tick);
-
-    const roundDone = playback.isDone();
-    battleSkip.hidden = roundDone;
-
-    if (!roundDone) {
-      const secondsLeft = Math.ceil(playback.secondsLeft(frame.snapshot.tickLimit));
-      roundPlate.set(roundLabel(active.resolved.round), "Battle");
-      setText(roundPlate.timer, String(secondsLeft));
-      roundPlate.timer.classList.toggle("is-urgent", secondsLeft <= URGENT_SECONDS);
-    } else if (active.endCountdown === null) {
-      roundPlate.set(roundLabel(active.resolved.round), "Round over");
-      active.endCountdown = createCountdown(roundPlate.timer, roundEndPauseSeconds(), () => closeRoundWatch());
-      session?.markWatched();
-    }
-  }
-
-  function renderWatchFrame(active: RoundWatch): void {
-    const teleportView = active.teleportView;
-
-    if (teleportView !== null && !isTeleporting(active)) {
-      mountBattle(active);
-
-      return;
-    }
-
-    dressBoard(boardThemeFor(watchBoardOwner(active), me()));
-
-    if (teleportView === null) {
-      renderFightFrame(active);
-    } else {
-      renderTeleportFrame(active, teleportView);
-    }
-
-    const endedIds = active.resolved.battles
-      .filter((candidate) => active.playback.hasEnded(candidate))
-      .map((candidate) => candidate.battleId);
-
-    const ownBattle = battleFor(active.resolved, me());
-
-    if (ownBattle !== null && endedIds.includes(ownBattle.battleId)) {
-      announceRoundResult(active.resolved.round, ownBattle);
-    }
-
-    const beat = teleportView === null ? "fight" : "teleport";
-    const railKey = `${beat}|${active.focusPlayerId}|${endedIds.join(",")}`;
-
-    if (railKey !== active.railKey) {
-      active.railKey = railKey;
-      renderWatchChrome(active);
-    }
-  }
-
-  function mountBattle(active: RoundWatch): void {
-    active.teleportView?.dispose();
-    active.teleportView = null;
-    active.battleView?.dispose();
-    active.battleView = null;
-    active.inspector?.dispose();
-
-    const viewSide = active.battle.teamAPlayerId === active.focusPlayerId ? "south" : "north";
-
-    if (isTeleporting(active)) {
-      active.teleportView = createTeleportView(boardStage, {
-        seconds: TELEPORT_SECONDS,
-        opening: active.playback.openingSnapshot(active.battle),
-        friendlyTeamId: active.focusPlayerId,
-        homeTeamId: active.battle.teamAPlayerId,
-        viewSide,
-        insets: BATTLE_HUD_INSETS,
-      });
-    } else {
-      if (active.playback.tick() <= BATTLE_START_TICKS) {
+      if (playback.moment().tick <= BATTLE_START_TICKS) {
         audio.play("battle-start");
       }
 
-      active.battleView = createBattleView(boardStage, {
-        friendlyTeamId: active.focusPlayerId,
-        viewSide,
-        insets: BATTLE_HUD_INSETS,
-        targetLines: "selected",
-        showUnitIds: false,
-        onSelectUnit: (unitId) => {
-          active.selectedUnitId = active.selectedUnitId === unitId ? null : unitId;
-          renderWatchFrame(active);
-        },
+      return {
+        kind: "fight",
+        view: createBattleView(boardStage, {
+          friendlyTeamId: focusPlayerId,
+          viewSide: viewSide(),
+          insets: BOARD_HUD_INSETS,
+          targetLines: "selected",
+          showUnitIds: false,
+          onSelectUnit(unitId) {
+            selectedUnitId = selectedUnitId === unitId ? null : unitId;
+          },
+        }),
+        inspector: createUnitInspectorView(battleUnit, focusPlayerId),
+      };
+    }
+
+    function disposeStage(mounted: WatchStage): void {
+      mounted.view.dispose();
+
+      if (mounted.kind === "fight") {
+        mounted.inspector.dispose();
+      }
+    }
+
+    advance(activeSession.roundElapsedSeconds());
+    let watchStage = mountStage();
+
+    function remount(): void {
+      disposeStage(watchStage);
+      watchStage = mountStage();
+    }
+
+    function boardOwner(): PlayerId {
+      if (watchStage.kind === "teleport") {
+        const warp = watchStage.view.warpSeconds;
+
+        if (warp !== null && clock < warp) {
+          return focusPlayerId;
+        }
+      }
+
+      return battle.teamAPlayerId;
+    }
+
+    function watchRows(): SeatRow[] {
+      return Object.values(resolved.seats).map((seat): SeatRow => {
+        const playerId = seat.playerId;
+        const seatBattle = pairingOf(resolved.battles, playerId);
+
+        if (seatBattle === null) {
+          const isBye = resolved.byePlayerId === playerId;
+
+          return {
+            seat,
+            health: seat.runHealth,
+            eliminated: !isBye && seat.eliminated,
+            tag: isBye ? "Bye" : "Out",
+            tone: "neutral",
+            isOpponent: false,
+            isFocused: false,
+            onWatch: null,
+          };
+        }
+
+        const ended = playback.hasEnded(seatBattle);
+
+        return {
+          seat,
+          health: ended ? seat.runHealth : (healthBeforeRound.get(playerId) ?? seat.runHealth),
+          eliminated: ended && seat.eliminated,
+          tag: ended ? outcomeTag(seatBattle.result, playerId) : "Live",
+          tone: ended ? outcomeFor(seatBattle.result, playerId) : "live",
+          isOpponent: false,
+          isFocused: seatBattle.battleId === battle.battleId,
+          onWatch: () => focus(playerId),
+        };
       });
     }
 
-    active.inspector = createUnitInspectorView(battleUnit, active.focusPlayerId);
-    active.selectedUnitId = null;
-    active.lastTick = active.playback.tick();
-    active.railKey = "";
-    showWatchedTeam(active);
-    renderWatchFrame(active);
-  }
+    function drawChrome(): void {
+      const status =
+        watchStage.kind === "teleport"
+          ? boardOwnerLabel(resolved.seats, battle.teamAPlayerId, meId)
+          : battleStatus(resolved.seats, battle, playback.hasEnded(battle));
 
-  function showWatchedTeam(active: RoundWatch): void {
-    const units = active.battle.setup?.units ?? [];
-    const builds = units.flatMap((unit) => (unit.teamId === active.focusPlayerId ? [unit.build] : []));
-    const itemSlots = session?.getView()?.rules.itemSlots ?? DEFAULT_RUN_RULES.itemSlots;
-    renderTeamLoadout(teamLoadout, builds, itemSlots, gameCatalogue);
-
-    damageMeter.start(
-      active.playback.openingSnapshot(active.battle),
-      active.focusPlayerId,
-      active.playback.eventsBetween(active.battle, -1, active.lastTick),
-    );
-  }
-
-  function focusPlayer(playerId: string): void {
-    const active = watch;
-
-    if (active === null) {
-      return;
+      versusHeader(resolved.seats, focusPlayerId, opponentOf(battle, focusPlayerId), status);
+      renderSeatRail(seatRail, resolved.seats, watchRows(), meId);
     }
 
-    const battle = battleOf(active.resolved.battles, playerId);
-
-    if (battle === null) {
-      return;
+    function drawTeleport(teleport: TeleportStage): void {
+      teleport.view.seek(clock);
+      battleSkip.hidden = false;
+      roundPlate.set(roundLabel(resolved.round), "Teleport");
+      setText(roundPlate.timer, "");
+      roundPlate.timer.classList.remove("is-urgent");
     }
 
-    active.focusPlayerId = playerId;
-    active.battle = battle;
-    mountBattle(active);
+    function drawFight(fight: FightStage, deltaSeconds: number): void {
+      const moment = playback.moment();
+      const snapshot = moment.snapshot;
+      const events = playback.takeEvents();
+
+      fight.view.update({
+        moment,
+        events,
+        selectedUnitId,
+        deltaSeconds,
+        playRate: PLAYBACK_SPEED,
+      });
+
+      damageMeter.push(events);
+
+      if (selectedUnitId === null) {
+        fight.inspector.hide();
+      } else {
+        fight.inspector.show(snapshot, unitIn(snapshot, selectedUnitId));
+      }
+
+      const roundDone = playback.isDone();
+      battleSkip.hidden = roundDone;
+
+      if (roundDone) {
+        if (endCountdown === null) {
+          roundPlate.set(roundLabel(resolved.round), "Round over");
+          endCountdown = createCountdown(roundPlate.timer, roundEndPauseSeconds(), closeRoundWatch);
+          activeSession.markWatched();
+        }
+
+        return;
+      }
+
+      if (playback.hasEnded(battle)) {
+        roundPlate.set(roundLabel(resolved.round), "Battle over");
+        setText(roundPlate.timer, "");
+        roundPlate.timer.classList.remove("is-urgent");
+
+        return;
+      }
+
+      const secondsLeft = Math.max(0, Math.ceil((snapshot.tickLimit - moment.tick) / TICK_RATE));
+      roundPlate.set(roundLabel(resolved.round), "Battle");
+      setText(roundPlate.timer, String(secondsLeft));
+      roundPlate.timer.classList.toggle("is-urgent", secondsLeft <= URGENT_SECONDS);
+    }
+
+    function draw(deltaSeconds: number): void {
+      if (watchStage.kind === "teleport" && !teleporting()) {
+        remount();
+      }
+
+      dressBoard(boardThemeFor(boardOwner(), meId));
+
+      if (watchStage.kind === "teleport") {
+        drawTeleport(watchStage);
+      } else {
+        drawFight(watchStage, deltaSeconds);
+      }
+
+      if (ownBattle !== null && playback.hasEnded(ownBattle)) {
+        announceRoundResult(resolved.round, ownBattle, meId);
+      }
+
+      const endedIds = resolved.battles.flatMap((candidate) =>
+        playback.hasEnded(candidate) ? [candidate.battleId] : [],
+      );
+
+      const key = `${watchStage.kind}|${focusPlayerId}|${endedIds.join(",")}`;
+
+      if (key !== railKey) {
+        railKey = key;
+        drawChrome();
+      }
+    }
+
+    function focus(playerId: PlayerId): void {
+      const next = pairingOf(resolved.battles, playerId);
+
+      if (next === null) {
+        throw new Error(`${playerId} has no battle to watch in ${roundLabel(resolved.round)}`);
+      }
+
+      focusPlayerId = playerId;
+      battle = next;
+      remount();
+      draw(0);
+    }
+
+    const stopFrames = boardStage.onFrame((deltaSeconds) => {
+      const behind = activeSession.roundElapsedSeconds() - clock;
+      advance(behind > CATCH_UP_SECONDS ? behind : deltaSeconds);
+      draw(deltaSeconds);
+    });
+
+    draw(0);
+
+    return {
+      skip() {
+        playback.skipToEnd();
+        clock = TELEPORT_SECONDS + playback.elapsedSeconds();
+        remount();
+        draw(0);
+      },
+
+      serverMovedOn(view) {
+        if (holdEnded || endCountdown === null || view.phase === "round-result") {
+          return;
+        }
+
+        holdEnded = true;
+        endCountdown.dispose();
+        endCountdown = createCountdown(roundPlate.timer, roundEndPauseSeconds(), closeRoundWatch);
+      },
+
+      dispose() {
+        stopFrames();
+        endCountdown?.dispose();
+        disposeStage(watchStage);
+      },
+    };
   }
 
-  function skipRound(): void {
-    if (watch === null) {
-      return;
-    }
-
-    watch.playback.skipToEnd();
-    watch.clock = TELEPORT_SECONDS + watch.playback.elapsedSeconds();
-    renderWatchFrame(watch);
-  }
-
-  function openRoundWatch(resolved: ResolvedRound): void {
-    const ownBattle = battleFor(resolved, me());
-    const battle = ownBattle ?? resolved.battles[0];
-
-    if (battle === undefined) {
-      return;
-    }
-
+  function openRoundWatch(
+    activeSession: MatchSession,
+    view: PlayerView,
+    resolved: ResolvedRound,
+  ): void {
     stopTimer();
     formationView?.dispose();
     formationView = null;
@@ -1183,67 +1249,25 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       region.hidden = false;
     }
 
-    const active: RoundWatch = {
-      resolved,
-      playback: createRoundPlayback(resolved.battles, gameCatalogue),
-      focusPlayerId: ownBattle === null ? battle.teamAPlayerId : me(),
-      battle,
-      battleView: null,
-      teleportView: null,
-      inspector: null,
-      selectedUnitId: null,
-      clock: 0,
-      lastTick: 0,
-      railKey: "",
-      animationFrame: 0,
-      endCountdown: null,
-      holdEnded: false,
-    };
-
-    advanceWatch(active, session?.roundElapsedSeconds() ?? 0);
-    watch = active;
-    syncMusic();
     actionButton.hidden = true;
-    selectedPiece = null;
+    teamRoster.replaceChildren();
     teamRail.hidden = false;
     teamRail.classList.add("is-battle");
     damageMeter.root.hidden = false;
-    mountBattle(active);
-
-    let lastFrameTime = performance.now();
-
-    const frame = (now: number): void => {
-      if (watch !== active) {
-        return;
-      }
-
-      const step = Math.min(MAX_FRAME_SECONDS, (now - lastFrameTime) / 1000);
-      const behind = (session?.roundElapsedSeconds() ?? 0) - active.clock;
-      advanceWatch(active, behind > CATCH_UP_SECONDS ? behind : step);
-      lastFrameTime = now;
-      renderWatchFrame(active);
-      active.animationFrame = requestAnimationFrame(frame);
-    };
-
-    active.animationFrame = requestAnimationFrame(frame);
+    watch = createRoundWatch(activeSession, view.you.playerId, resolved);
+    syncMusic();
   }
 
   function disposeRoundWatch(): void {
-    const active = watch;
-
-    if (active === null) {
+    if (watch === null) {
       return;
     }
 
-    cancelAnimationFrame(active.animationFrame);
-    active.endCountdown?.dispose();
-    active.teleportView?.dispose();
-    active.battleView?.dispose();
-    active.inspector?.dispose();
+    watch.dispose();
+    watch = null;
     damageMeter.clear();
     damageMeter.root.hidden = true;
     teamRail.classList.remove("is-battle");
-    teamLoadout.replaceChildren();
     hideTip();
 
     for (const region of battleRegions) {
@@ -1253,17 +1277,6 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     battleUnit.hidden = true;
     roundPlate.timer.textContent = "";
     stage.hidden = false;
-    watch = null;
-  }
-
-  function shortenRoundOverIfHoldEnded(active: RoundWatch, view: PlayerView | null): void {
-    if (active.holdEnded || active.endCountdown === null || view === null || view.phase === "round-result") {
-      return;
-    }
-
-    active.holdEnded = true;
-    active.endCountdown.dispose();
-    active.endCountdown = createCountdown(roundPlate.timer, roundEndPauseSeconds(), () => closeRoundWatch());
   }
 
   function closeRoundWatch(): void {
@@ -1283,7 +1296,11 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     const lost = state === "lost";
 
-    const text = el("span", "connection-banner-text", lost ? "Connection to the match was lost" : "Reconnecting…");
+    const text = el(
+      "span",
+      "connection-banner-text",
+      lost ? "Connection to the match was lost" : "Reconnecting…",
+    );
 
     connectionBanner.replaceChildren(text);
 
@@ -1315,13 +1332,22 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     linkField.readOnly = true;
     linkField.setAttribute("aria-label", "Invite link");
 
-    const copy = button("pill-button", () => {
-      navigator.clipboard?.writeText(link).catch(() => {});
-      linkField.select();
-    }, "Copy");
+    const copy = button(
+      "pill-button",
+      () => {
+        void navigator.clipboard.writeText(link);
+        linkField.select();
+      },
+      "Copy",
+    );
 
     const seats = lobby.seats.map((seat, index) => {
-      const portrait = el("div", "seat-portrait", seat.controller === "human" ? humanSilhouette() : botSilhouette());
+      const portrait = el(
+        "div",
+        "seat-portrait",
+        seat.controller === "human" ? humanSilhouette() : botSilhouette(),
+      );
+
       portrait.style.setProperty("--seat", `var(--color-seat-${(index % SEAT_COLOR_COUNT) + 1})`);
 
       const tags = [
@@ -1346,7 +1372,11 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     stage.append(
       el("div", "stage-title", "Online lobby"),
-      el("div", "stage-subtitle", `${humans} of 8 seats taken by players · the rest play when the host starts`),
+      el(
+        "div",
+        "stage-subtitle",
+        `${humans} of ${SEAT_COUNT} seats taken by players · the rest play when the host starts`,
+      ),
       el("div", "lobby-link", linkField, copy),
       el("div", "lobby-grid", ...seats),
       button("pill-button lobby-leave", () => endMatch(), "Leave"),
@@ -1372,15 +1402,15 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       return;
     }
 
-    renderConnection(session);
+    const activeSession = session;
+    renderConnection(activeSession);
 
     if (watch !== null) {
-      shortenRoundOverIfHoldEnded(watch, session.getView());
+      watch.serverMovedOn(requireView(activeSession));
 
       return;
     }
 
-    const activeSession = session;
     const view = activeSession.getView();
 
     if (view === null) {
@@ -1405,7 +1435,7 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       }
     }
 
-    if ((view.phase !== "preparing" && view.phase !== "reward") || view.you.eliminated) {
+    if (view.phase !== "preparing" || view.you.eliminated) {
       hidePlacementBoard();
     }
 
@@ -1417,19 +1447,14 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
       hideDraft();
     }
 
-    const latest = activeSession.getLatestRound();
-
     showMatch();
+    const latest = activeSession.getLatestRound();
 
     if (latest !== null && !watchedRounds.has(latest.round)) {
       watchedRounds.add(latest.round);
+      openRoundWatch(activeSession, view, latest);
 
-      if (latest.replay) {
-        renderTeamRail(view, activeSession);
-        openRoundWatch(latest);
-
-        return;
-      }
+      return;
     }
 
     const entering = view.phaseEpoch !== lastRenderedEpoch;
@@ -1440,34 +1465,34 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
 
     stage.replaceChildren();
+    stage.hidden = false;
     stage.classList.toggle("is-entering", entering);
-    stage.classList.toggle("is-reward", view.phase === "reward" && !view.you.eliminated);
-    battleLayer.classList.toggle("is-dimmed", view.phase === "reward" && !view.you.eliminated);
     actionButton.hidden = true;
     actionButton.onclick = null;
 
     const myId = view.you.playerId;
-
-    const myBattle =
-      view.phase === "preparing" ? battleOf(Object.values(view.currentRound?.battles ?? {}), myId) : null;
+    const myPairing = view.phase === "preparing" ? pairingOf(roundOf(view).pairings, myId) : null;
+    const opponentId = myPairing === null ? null : opponentOf(myPairing, myId);
 
     renderSeatRail(
       seatRail,
       view.players,
       rowsForView(
         view,
-        myBattle === null ? null : opponentOf(myBattle, myId),
+        (playerId) => playerId === opponentId,
         (playerId) => activeSession.isAway(playerId),
         (playerId) => activeSession.isThinking(playerId),
       ),
       myId,
     );
 
-    renderTeamRail(view, activeSession);
-    teamRail.hidden = view.you.heroBuilds.length === 0;
+    if (view.phase !== "draft") {
+      renderTeamRoster(teamRoster, view.you.heroIds, view.rules.draftPicks);
+      teamRail.hidden = view.you.heroIds.length === 0;
+    }
 
     if (view.you.eliminated && view.phase !== "finished") {
-      roundPlate.set(roundLabel(view.currentRound?.round ?? 0), "Spectating");
+      roundPlate.set(roundLabel(roundOf(view).round), "Spectating");
       stage.append(banner("crimson", "Eliminated", "You're watching the rest of the match"));
       setAction("Leave", () => endMatch(), false);
 
@@ -1475,6 +1500,10 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     }
 
     switch (view.phase) {
+      case "lobby":
+        roundPlate.set("Lobby", "Starting");
+        break;
+
       case "draft":
         renderDraft(view, activeSession);
         break;
@@ -1483,27 +1512,12 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
         renderPreparing(view, activeSession);
         break;
 
-      case "reward":
-        renderReward(view, activeSession);
+      case "round-result":
+        renderRoundOver(view, activeSession);
         break;
 
       case "finished":
-        renderFinished(view, activeSession);
-        break;
-
-      case "round-result":
-        roundPlate.set(roundLabel(view.currentRound?.round ?? 0), "Round over");
-        renderRoundResult(view, activeSession);
-        stage.append(el("div", "stage-subtitle", "Waiting for the other battles to finish"));
-
-        if (activeSession.getDeadline() !== null) {
-          startTimer(view.phaseEpoch, () => {});
-        }
-
-        break;
-
-      default:
-        roundPlate.set(roundLabel(view.currentRound?.round ?? 0), "Resolving");
+        renderFinished(view);
         break;
     }
   }
@@ -1521,11 +1535,9 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     watchedRounds.clear();
     announcedRounds.clear();
     finishAnnounced = false;
-    window.clearTimeout(winLineTimer);
     healthBeforeRound.clear();
     draftSubmittedEpoch = -1;
     lastRenderedEpoch = -1;
-    selectedPiece = null;
     menuNotice = null;
     session = next;
     sessionUnsubscribe = session.subscribe(render);
@@ -1596,7 +1608,6 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
     startOnline({ kind: "room", roomId });
   }
 
-  let disposed = false;
   const resumeToken = savedResumeToken();
 
   render();
@@ -1612,7 +1623,6 @@ export function createMatchScene(matchRoot: HTMLElement, options: MatchSceneOpti
 
     dispose() {
       disposed = true;
-      window.clearTimeout(winLineTimer);
       audio.setMusic(null);
       disposeRoundWatch();
       menuView?.dispose();

@@ -1,28 +1,16 @@
 export * from "./arenas/board-arena.js";
 
-export * from "./roster/bulwark.js";
+export * from "./heroes/paladin.js";
 
-export * from "./roster/frostweaver.js";
+export * from "./heroes/berserker.js";
 
-export * from "./roster/duskblade.js";
+export * from "./heroes/firebrand.js";
 
-export * from "./roster/pyromancer.js";
+export * from "./heroes/bubble-cleric.js";
 
-export * from "./roster/oathkeeper.js";
+export * from "./heroes/harpooner.js";
 
-export * from "./roster/ravager.js";
-
-export * from "./roster/hexbinder.js";
-
-export * from "./roster/blightmother.js";
-
-export * from "./roster/bonecaller.js";
-
-export * from "./roster/clockwright.js";
-
-export * from "./pieces/items.js";
-
-export * from "./pieces/gems.js";
+export * from "./heroes/training-dummy.js";
 
 export * from "./catalogue.js";
 
@@ -30,10 +18,10 @@ export * from "./formations.js";
 
 export * from "./validate-catalogue.js";
 
+export * from "./digest.js";
+
 export * from "./scenarios/lab-teams.js";
 
-export * from "./scenarios/duel.js";
-
-export * from "./scenarios/three-versus-three.js";
-
 export * from "./scenarios/custom-lab.js";
+
+export * from "./scenarios/lab-presets.js";

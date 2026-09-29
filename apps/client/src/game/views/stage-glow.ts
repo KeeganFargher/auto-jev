@@ -1,4 +1,11 @@
-import { HalfFloatType, Vector2, WebGLRenderTarget, type Camera, type Scene, type WebGLRenderer } from "three";
+import {
+  HalfFloatType,
+  Vector2,
+  WebGLRenderTarget,
+  type Camera,
+  type Scene,
+  type WebGLRenderer,
+} from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -22,7 +29,14 @@ export function createStageGlow(renderer: WebGLRenderer, scene: Scene, camera: C
   const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: MULTISAMPLES });
   const composer = new EffectComposer(renderer, target);
   const scenePass = new RenderPass(scene, camera);
-  const bloomPass = new UnrealBloomPass(new Vector2(1, 1), GLOW_STRENGTH, GLOW_RADIUS, GLOW_THRESHOLD);
+
+  const bloomPass = new UnrealBloomPass(
+    new Vector2(1, 1),
+    GLOW_STRENGTH,
+    GLOW_RADIUS,
+    GLOW_THRESHOLD,
+  );
+
   const outputPass = new OutputPass();
   composer.addPass(scenePass);
   composer.addPass(bloomPass);

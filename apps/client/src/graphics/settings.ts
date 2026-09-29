@@ -14,7 +14,13 @@ export const RENDER_RESOLUTIONS: readonly RenderResolution[] = ["sharp", "balanc
 
 export const SHADOW_QUALITIES: readonly ShadowQuality[] = ["soft", "simple"];
 
-export const DEFAULT_GRAPHICS: GraphicsSettings = { resolution: "sharp", shadows: "soft", glow: true, monitor: false, fightCamera: true };
+export const DEFAULT_GRAPHICS: GraphicsSettings = {
+  resolution: "sharp",
+  shadows: "soft",
+  glow: true,
+  monitor: false,
+  fightCamera: true,
+};
 
 const STORAGE_PREFIX = "jev-game.graphics";
 
@@ -30,7 +36,11 @@ const FIGHT_CAMERA_KEY = `${STORAGE_PREFIX}.fightCamera`;
 
 const MAX_DEVICE_PIXEL_RATIO = 2;
 
-const RESOLUTION_SCALE: Readonly<Record<RenderResolution, number>> = { sharp: 1, balanced: 0.75, fast: 0.5 };
+const RESOLUTION_SCALE: Readonly<Record<RenderResolution, number>> = {
+  sharp: 1,
+  balanced: 0.75,
+  fast: 0.5,
+};
 
 function isRenderResolution(value: string | null): value is RenderResolution {
   return RENDER_RESOLUTIONS.some((resolution) => resolution === value);

@@ -1,19 +1,37 @@
-import { createBattle, stepBattle, type BattleResult, type BattleSetup, type Catalogue } from "@jev-game/game";
-import { createPairings, recordPairingRound, createEmptyPairingHistory } from "./pairings.js";
+import { runBattle, type BattleEvent, type BattleSetup, type TeamId } from "@jev-game/game";
+import { battleDigest, gameCatalogue } from "@jev-game/content";
+import {
+  createEmptyPairingHistory,
+  createPairings,
+  recordPairingRound,
+  type Pairing,
+} from "./pairings.js";
 import type { PlayerId, RunId } from "./ids.js";
-import type { ControllerKind, PendingDecision, PlayerSeat, RoundBattle, RunState } from "./types.js";
-import { derivePairingSeed, deriveBattleSeed } from "./seed.js";
+import type { ControllerKind, PlayerSeat, RoundBattle, RoundState, RunState } from "./types.js";
+import { deriveBattleSeed, derivePairingSeed } from "./seed.js";
 import { createMatchBattleSetup } from "./battle-setup.js";
-import { generateHeroOffers } from "./offers.js";
-import { generateRewardDecisions } from "./rewards.js";
-import { equippedBuilds } from "./inventory.js";
-import { DEFAULT_RUN_RULES, type RunRules } from "./rules.js";
-import { activePairedPlayerIds, activePlayerIds, allRequiredSeatsReady, pairablePlayerIds } from "./readiness.js";
+import { draftPool } from "./draft.js";
+import { DEFAULT_RUN_RULES, lossCost, type RunRules } from "./rules.js";
+import {
+  activePlayerIds,
+  allSeatsReady,
+  pairablePlayerIds,
+  pairedPlayerIds,
+  requireRound,
+  requireSeat,
+} from "./readiness.js";
 
 export interface SeatSpec {
   playerId: PlayerId;
   displayName: string;
   controllerKind: ControllerKind;
+}
+
+export interface ResolvedBattle {
+  result: RoundBattle["result"];
+  winnerSurvivors: number | null;
+  presentationSeconds: number;
+  digest: string;
 }
 
 export function createRun(
@@ -22,6 +40,21 @@ export function createRun(
   seatSpecs: readonly SeatSpec[],
   rules: RunRules = DEFAULT_RUN_RULES,
 ): RunState {
+  const initialPlayerIds = seatSpecs.map((spec) => spec.playerId);
+  const pool = draftPool(gameCatalogue);
+
+  if (seatSpecs.length < 2) {
+    throw new Error(`A run needs at least 2 seats, got ${seatSpecs.length}`);
+  }
+
+  if (new Set(initialPlayerIds).size !== initialPlayerIds.length) {
+    throw new Error(`Run ${runId} has a player id twice: ${initialPlayerIds.join(", ")}`);
+  }
+
+  if (rules.draftPicks < 1 || rules.draftPicks > pool.length) {
+    throw new Error(`A draft of ${rules.draftPicks} heroes needs a pool of at least that many`);
+  }
+
   const players: Record<PlayerId, PlayerSeat> = {};
 
   for (const spec of seatSpecs) {
@@ -29,11 +62,8 @@ export function createRun(
       playerId: spec.playerId,
       displayName: spec.displayName,
       controllerKind: spec.controllerKind,
-      heroBuilds: [],
+      heroIds: [],
       formation: [],
-      items: [],
-      gems: [],
-      nextInstanceId: 1,
       runHealth: rules.startingHealth,
       eliminated: false,
       forfeited: false,
@@ -41,331 +71,235 @@ export function createRun(
     };
   }
 
-  const initialPlayerIds = seatSpecs.map((spec) => spec.playerId);
-
   return {
     runId,
     runSeed,
     phase: "lobby",
     phaseEpoch: 0,
-    roundCap: rules.roundCap,
     rules,
+    draftPool: pool,
     initialPlayerIds,
     players,
     pairingHistory: createEmptyPairingHistory(initialPlayerIds),
     currentRound: null,
     readyThresholdByPlayer: {},
-    heroOffersByPlayer: {},
     draftSelectionByPlayer: {},
-    pendingDecisionsByPlayer: {},
-    lastRoundLoserIds: [],
     winnerPlayerIds: null,
-    abortReason: null,
   };
 }
 
-function withReadyThreshold(state: RunState, requiredPlayerIds: readonly PlayerId[]): Record<PlayerId, number> {
+function thresholdsFor(state: RunState, playerIds: readonly PlayerId[]): Record<PlayerId, number> {
   const thresholds: Record<PlayerId, number> = {};
 
-  for (const playerId of requiredPlayerIds) {
-    thresholds[playerId] = state.players[playerId]?.decisionRevision ?? 0;
+  for (const playerId of playerIds) {
+    thresholds[playerId] = requireSeat(state, playerId).decisionRevision;
   }
 
   return thresholds;
 }
 
-function enterDraftPhase(state: RunState, catalogue: Catalogue): RunState {
-  const heroOffersByPlayer: Record<PlayerId, ReturnType<typeof generateHeroOffers>> = {};
-
-  for (const playerId of activePlayerIds(state)) {
-    heroOffersByPlayer[playerId] = generateHeroOffers(catalogue, state.runSeed, 0, playerId, state.rules.heroOfferCount);
-  }
-
+function enterDraft(state: RunState): RunState {
   return {
     ...state,
     phase: "draft",
     phaseEpoch: state.phaseEpoch + 1,
-    heroOffersByPlayer,
-    readyThresholdByPlayer: withReadyThreshold(state, activePlayerIds(state)),
+    readyThresholdByPlayer: thresholdsFor(state, activePlayerIds(state)),
   };
 }
 
-function enterPreparingPhase(state: RunState): RunState {
-  const active = pairablePlayerIds(state);
-  const pairingSeed = derivePairingSeed(state.runSeed);
-  const pairingResult = createPairings(active, state.pairingHistory, pairingSeed);
-  const round = state.pairingHistory.nextRound;
+function enterPreparing(state: RunState): RunState {
+  const pairing = createPairings(
+    pairablePlayerIds(state),
+    state.pairingHistory,
+    derivePairingSeed(state.runSeed),
+  );
 
-  const battles: Record<string, RoundBattle> = {};
+  const currentRound: RoundState = {
+    round: state.pairingHistory.nextRound,
+    pairings: pairing.pairings,
+    byePlayerId: pairing.byePlayerId,
+    battles: [],
+  };
 
-  for (const pairing of pairingResult.pairings) {
-    battles[pairing.battleId] = {
-      battleId: pairing.battleId,
-      teamAPlayerId: pairing.teamAPlayerId,
-      teamBPlayerId: pairing.teamBPlayerId,
-      setup: null,
-      result: null,
-      winnerSurvivors: null,
-    };
-  }
-
-  const nextState: RunState = {
+  return {
     ...state,
     phase: "preparing",
     phaseEpoch: state.phaseEpoch + 1,
-    pairingHistory: recordPairingRound(state.pairingHistory, pairingResult),
-    currentRound: { round, battles, byePlayerId: pairingResult.byePlayerId },
-    heroOffersByPlayer: {},
+    pairingHistory: recordPairingRound(state.pairingHistory, pairing),
+    currentRound,
     draftSelectionByPlayer: {},
-    pendingDecisionsByPlayer: {},
-  };
-
-  return {
-    ...nextState,
-    readyThresholdByPlayer: withReadyThreshold(nextState, activePairedPlayerIds(nextState)),
+    readyThresholdByPlayer: thresholdsFor(state, pairedPlayerIds(currentRound)),
   };
 }
 
-function enterBattlePhase(state: RunState, catalogue: Catalogue): RunState {
-  if (state.currentRound === null) {
-    return state;
-  }
+export function survivorCount(
+  setup: BattleSetup,
+  events: readonly BattleEvent[],
+  teamId: TeamId,
+): number {
+  const dead = new Set(events.flatMap((event) => (event.kind === "death" ? [event.unitId] : [])));
 
-  const battles: Record<string, RoundBattle> = {};
+  return setup.units.filter((unit) => unit.teamId === teamId && !dead.has(unit.unitId)).length;
+}
 
-  const { round } = state.currentRound;
+export function resolveBattle(setup: BattleSetup): ResolvedBattle {
+  const outcome = runBattle(setup, gameCatalogue);
+  const result = outcome.result;
 
-  for (const [battleId, battle] of Object.entries(state.currentRound.battles)) {
-    const teamA = state.players[battle.teamAPlayerId];
-    const teamB = state.players[battle.teamBPlayerId];
+  const winnerSurvivors =
+    result.kind === "win" ? survivorCount(setup, outcome.events, result.winningTeamId) : null;
 
-    if (teamA === undefined || teamB === undefined) {
-      continue;
-    }
-
-    const setup = createMatchBattleSetup(
-      deriveBattleSeed(state.runSeed, round, battleId),
-      { playerId: teamA.playerId, heroBuilds: equippedBuilds(teamA), formation: teamA.formation },
-      { playerId: teamB.playerId, heroBuilds: equippedBuilds(teamB), formation: teamB.formation },
-    );
-
-    const resolved = resolveBattle(setup, catalogue);
-    battles[battleId] = { ...battle, setup, result: resolved.result, winnerSurvivors: resolved.winnerSurvivors };
+  if (winnerSurvivors === 0) {
+    throw new Error(`Battle seed ${setup.seed} was won by a team with nobody left standing`);
   }
 
   return {
-    ...state,
-    phase: "battle",
-    phaseEpoch: state.phaseEpoch + 1,
-    currentRound: { ...state.currentRound, battles },
+    result,
+    winnerSurvivors,
+    presentationSeconds: outcome.timeline.totalSeconds,
+    digest: battleDigest(outcome.events),
   };
 }
 
-interface ResolvedBattle {
-  result: BattleResult;
-  winnerSurvivors: number | null;
+function fightPairing(state: RunState, round: number, pairing: Pairing): RoundBattle {
+  const teamA = requireSeat(state, pairing.teamAPlayerId);
+  const teamB = requireSeat(state, pairing.teamBPlayerId);
+
+  const setup = createMatchBattleSetup(
+    deriveBattleSeed(state.runSeed, round, pairing.battleId),
+    teamA,
+    teamB,
+  );
+
+  return { ...pairing, setup, ...resolveBattle(setup) };
 }
 
-export function resolveBattle(setup: BattleSetup, catalogue: Catalogue): ResolvedBattle {
-  const state = createBattle(setup, catalogue);
+function loserOf(battle: RoundBattle): PlayerId | null {
+  const result = battle.result;
 
-  while (state.result === null) {
-    stepBattle(state, catalogue);
+  if (result.kind === "draw") {
+    return null;
   }
 
-  const { result } = state;
-
-  if (result.kind !== "win") {
-    return { result, winnerSurvivors: null };
+  if (result.winningTeamId === battle.teamAPlayerId) {
+    return battle.teamBPlayerId;
   }
 
-  const winnerSurvivors = state.units.filter((unit) => unit.alive && unit.summonerUnitId === null && unit.teamId === result.winningTeamId).length;
+  if (result.winningTeamId === battle.teamBPlayerId) {
+    return battle.teamAPlayerId;
+  }
 
-  return { result, winnerSurvivors };
+  throw new Error(`${battle.battleId} was won by "${result.winningTeamId}", who was not in it`);
 }
 
-export function lossCost(rules: RunRules, winnerSurvivors: number | null): number {
-  return Math.min(rules.maxLossCost, 1 + (winnerSurvivors ?? 0));
-}
-
-function computeWinners(survivors: readonly PlayerSeat[], eliminatedThisRound: readonly PlayerSeat[]): PlayerId[] {
+function computeWinners(
+  survivors: readonly PlayerSeat[],
+  eliminatedThisRound: readonly PlayerSeat[],
+): PlayerId[] {
   if (survivors.length === 0) {
     const stayed = eliminatedThisRound.filter((seat) => !seat.forfeited);
 
     return (stayed.length > 0 ? stayed : eliminatedThisRound).map((seat) => seat.playerId);
   }
 
-  if (survivors.length === 1) {
-    return survivors.map((seat) => seat.playerId);
-  }
+  const bestHealth = Math.max(...survivors.map((seat) => seat.runHealth));
 
-  const maxHealth = Math.max(...survivors.map((seat) => seat.runHealth));
-  const winners: PlayerId[] = [];
-
-  for (const seat of survivors) {
-    if (seat.runHealth === maxHealth) {
-      winners.push(seat.playerId);
-    }
-  }
-
-  return winners;
+  return survivors.flatMap((seat) => (seat.runHealth === bestHealth ? [seat.playerId] : []));
 }
 
-export function forfeitSeat(state: RunState, playerId: PlayerId): RunState {
-  const seat = state.players[playerId];
-
-  if (seat === undefined || seat.eliminated || seat.forfeited) {
-    return state;
-  }
-
-  return { ...state, players: { ...state.players, [playerId]: { ...seat, forfeited: true } } };
-}
-
-function settleRound(state: RunState): RunState {
-  if (state.currentRound === null) {
-    return state;
-  }
-
-  const battles = Object.values(state.currentRound.battles);
-  const hasFailure = battles.some((battle) => battle.result?.kind === "failure");
-
-  if (hasFailure) {
-    return {
-      ...state,
-      phase: "finished",
-      phaseEpoch: state.phaseEpoch + 1,
-      abortReason: "a battle simulation failed to produce a valid result",
-    };
-  }
-
+function settleRound(state: RunState, round: RoundState): RunState {
   const players = { ...state.players };
-  const lastRoundLoserIds: PlayerId[] = [];
 
-  for (const battle of battles) {
-    if (battle.result === null || battle.result.kind !== "win") {
+  for (const battle of round.battles) {
+    const loserId = loserOf(battle);
+
+    if (loserId === null || battle.winnerSurvivors === null) {
       continue;
     }
 
-    const loserId =
-      battle.result.winningTeamId === battle.teamAPlayerId ? battle.teamBPlayerId : battle.teamAPlayerId;
+    const loser = requireSeat(state, loserId);
 
-    const loser = players[loserId];
-
-    if (loser !== undefined) {
-      players[loserId] = { ...loser, runHealth: loser.runHealth - lossCost(state.rules, battle.winnerSurvivors) };
-      lastRoundLoserIds.push(loserId);
-    }
+    players[loserId] = {
+      ...loser,
+      runHealth: loser.runHealth - lossCost(state.rules, battle.winnerSurvivors),
+    };
   }
 
   const eliminatedThisRound: PlayerSeat[] = [];
 
-  for (const [playerId, seat] of Object.entries(players)) {
+  for (const seat of Object.values(players)) {
     if (seat.eliminated || (seat.runHealth > 0 && !seat.forfeited)) {
       continue;
     }
 
-    const eliminated = { ...seat, runHealth: seat.forfeited ? 0 : Math.max(0, seat.runHealth), eliminated: true };
-    players[playerId] = eliminated;
+    const runHealth = seat.forfeited ? 0 : Math.max(0, seat.runHealth);
+    const eliminated = { ...seat, runHealth, eliminated: true };
+
+    players[seat.playerId] = eliminated;
     eliminatedThisRound.push(eliminated);
   }
 
   const survivors = Object.values(players).filter((seat) => !seat.eliminated);
-  const isFinalRound = state.currentRound.round + 1 >= state.rules.roundCap;
-  const matchOver = survivors.length <= 1 || isFinalRound;
+  const matchOver = survivors.length <= 1 || round.round + 1 >= state.rules.roundCap;
 
   return {
     ...state,
     phase: matchOver ? "finished" : "round-result",
     phaseEpoch: state.phaseEpoch + 1,
     players,
-    lastRoundLoserIds,
+    currentRound: round,
     winnerPlayerIds: matchOver ? computeWinners(survivors, eliminatedThisRound) : null,
   };
 }
 
-function enterRewardPhase(state: RunState, catalogue: Catalogue): RunState {
-  const pendingDecisionsByPlayer: Record<PlayerId, PendingDecision[]> = {};
-  const survivorIds = activePlayerIds(state);
-  const round = (state.currentRound?.round ?? 0) + 1;
+function resolveRound(state: RunState): RunState {
+  const round = requireRound(state);
+  const battles = round.pairings.map((pairing) => fightPairing(state, round.round, pairing));
 
-  for (const playerId of survivorIds) {
-    const seat = state.players[playerId];
-
-    if (seat === undefined) {
-      continue;
-    }
-
-    pendingDecisionsByPlayer[playerId] = generateRewardDecisions(
-      catalogue,
-      state.rules,
-      state.runSeed,
-      round,
-      seat,
-      state.lastRoundLoserIds.includes(playerId),
-    );
-  }
-
-  const nextState: RunState = {
-    ...state,
-    phase: "reward",
-    phaseEpoch: state.phaseEpoch + 1,
-    pendingDecisionsByPlayer,
-  };
-
-  return { ...nextState, readyThresholdByPlayer: withReadyThreshold(nextState, survivorIds) };
+  return settleRound(state, { ...round, battles });
 }
 
-export function advanceIfReady(state: RunState, catalogue: Catalogue): RunState {
+export function forfeitSeat(state: RunState, playerId: PlayerId): RunState {
+  const seat = requireSeat(state, playerId);
+
+  if (seat.eliminated || seat.forfeited) {
+    return state;
+  }
+
+  return { ...state, players: { ...state.players, [playerId]: { ...seat, forfeited: true } } };
+}
+
+export function advanceIfReady(state: RunState): RunState {
   switch (state.phase) {
     case "lobby":
-      return enterDraftPhase(state, catalogue);
+      return enterDraft(state);
 
     case "draft":
-      return allRequiredSeatsReady(state, activePlayerIds(state))
-        ? enterPreparingPhase(state)
-        : state;
+      return allSeatsReady(state, activePlayerIds(state)) ? enterPreparing(state) : state;
 
     case "preparing":
-      return allRequiredSeatsReady(state, activePairedPlayerIds(state))
-        ? enterBattlePhase(state, catalogue)
+      return allSeatsReady(state, pairedPlayerIds(requireRound(state)))
+        ? resolveRound(state)
         : state;
-
-    case "battle":
-      return settleRound(state);
 
     case "round-result":
-      return enterRewardPhase(state, catalogue);
-
-    case "reward":
-      return allRequiredSeatsReady(state, activePlayerIds(state))
-        ? enterPreparingPhase(state)
-        : state;
+      return enterPreparing(state);
 
     case "finished":
       return state;
-
-    default: {
-      const exhaustive: never = state.phase;
-
-      return exhaustive;
-    }
   }
 }
 
-export function pumpRun(state: RunState, catalogue: Catalogue): RunState {
+export function pumpRun(state: RunState): RunState {
   let current = state;
 
   for (;;) {
-    const next = advanceIfReady(current, catalogue);
+    const next = advanceIfReady(current);
 
-    if (next.phaseEpoch === current.phaseEpoch) {
+    if (next.phaseEpoch === current.phaseEpoch || next.phase === "finished") {
       return next;
     }
 
     current = next;
-
-    if (current.phase === "finished") {
-      return current;
-    }
   }
 }

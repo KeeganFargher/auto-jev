@@ -20,7 +20,11 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-export function button(className: string, onClick: () => void, ...children: Child[]): HTMLButtonElement {
+export function button(
+  className: string,
+  onClick: () => void,
+  ...children: Child[]
+): HTMLButtonElement {
   const node = el("button", className, ...children);
   node.type = "button";
   node.addEventListener("click", onClick);

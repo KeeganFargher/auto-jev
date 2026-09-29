@@ -212,7 +212,16 @@ function createPoolTexture(): CanvasTexture {
   canvas.width = size;
   canvas.height = size;
   const context = canvas.getContext("2d")!;
-  const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+
+  const gradient = context.createRadialGradient(
+    size / 2,
+    size / 2,
+    0,
+    size / 2,
+    size / 2,
+    size / 2,
+  );
+
   gradient.addColorStop(0, "rgb(255 255 255 / 1)");
   gradient.addColorStop(0.4, "rgb(255 255 255 / 0.45)");
   gradient.addColorStop(1, "rgb(255 255 255 / 0)");
@@ -271,7 +280,11 @@ function spreadStep(count: number): number {
   return count > 1 ? Math.min(STAGGER_SECONDS, MAX_SPREAD_SECONDS / (count - 1)) : 0;
 }
 
-function screenRanks(units: readonly UnitState[], side: ViewSide, centreLine: number): Map<string, number> {
+function screenRanks(
+  units: readonly UnitState[],
+  side: ViewSide,
+  centreLine: number,
+): Map<string, number> {
   const direction = side === "south" ? 1 : -1;
 
   const ordered = [...units].sort(
@@ -291,7 +304,15 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
 
   stage.showBoard(grid, options.viewSide, options.insets);
 
-  const beamGeometry = new CylinderGeometry(BEAM_RADIUS * BEAM_FLARE, BEAM_RADIUS, BEAM_HEIGHT, 28, 1, true);
+  const beamGeometry = new CylinderGeometry(
+    BEAM_RADIUS * BEAM_FLARE,
+    BEAM_RADIUS,
+    BEAM_HEIGHT,
+    28,
+    1,
+    true,
+  );
+
   beamGeometry.translate(0, BEAM_HEIGHT / 2, 0);
   const poolGeometry = new CircleGeometry(POOL_RADIUS, 32);
   const ringGeometry = new RingGeometry(RING_INNER_RADIUS, RING_OUTER_RADIUS, 48);
@@ -435,7 +456,13 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
         playTeleport("out", stage.screenPan(traveller.rest));
       }
 
-      if (crossed(traveller.arriveAt === null ? null : traveller.arriveAt + TOUCHDOWN_SECONDS, from, to)) {
+      if (
+        crossed(
+          traveller.arriveAt === null ? null : traveller.arriveAt + TOUCHDOWN_SECONDS,
+          from,
+          to,
+        )
+      ) {
         playTeleport("in", stage.screenPan(traveller.rest));
       }
     }
@@ -475,17 +502,28 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
     }
 
     const telegraphed = traveller.telegraphFrom !== null;
-    const arriving = pulse(time - traveller.arriveAt, ARRIVE_SECONDS, telegraphed ? TELEGRAPH_LEVEL : 0);
+
+    const arriving = pulse(
+      time - traveller.arriveAt,
+      ARRIVE_SECONDS,
+      telegraphed ? TELEGRAPH_LEVEL : 0,
+    );
 
     if (arriving !== null) {
       return { ...arriving, upward: false };
     }
 
-    if (traveller.telegraphFrom === null || time < traveller.telegraphFrom || time >= traveller.arriveAt) {
+    if (
+      traveller.telegraphFrom === null ||
+      time < traveller.telegraphFrom ||
+      time >= traveller.arriveAt
+    ) {
       return DARK;
     }
 
-    const charge = easeInOut((time - traveller.telegraphFrom) / (traveller.arriveAt - traveller.telegraphFrom));
+    const charge = easeInOut(
+      (time - traveller.telegraphFrom) / (traveller.arriveAt - traveller.telegraphFrom),
+    );
 
     return { level: TELEGRAPH_LEVEL * charge, width: BEAM_OPEN_WIDTH, upward: false };
   }
@@ -544,7 +582,9 @@ export function createTeleportView(stage: BoardStage, options: TeleportViewOptio
 
     if (ring !== null) {
       const spreadProgress = easeOut(ring);
-      traveller.ring.scale.setScalar(reducedMotion ? 1 : lerp(RING_START_SCALE, RING_END_SCALE, spreadProgress));
+      traveller.ring.scale.setScalar(
+        reducedMotion ? 1 : lerp(RING_START_SCALE, RING_END_SCALE, spreadProgress),
+      );
       traveller.ring.material.opacity = RING_OPACITY * (1 - spreadProgress);
     }
   }

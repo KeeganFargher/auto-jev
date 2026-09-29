@@ -48,7 +48,10 @@ export function waterSurface(
     for (let index = 0; index < position.count; index += 1) {
       const x = rest[index * 3]!;
       const z = rest[index * 3 + 2]!;
-      const wave = Math.sin(x * 0.045 + seconds * 1.1) * 0.6 + Math.cos(z * 0.06 - seconds * 0.8) * 0.4;
+
+      const wave =
+        Math.sin(x * 0.045 + seconds * 1.1) * 0.6 + Math.cos(z * 0.06 - seconds * 0.8) * 0.4;
+
       position.setY(index, wave * swell);
     }
 
@@ -58,7 +61,11 @@ export function waterSurface(
   return surface;
 }
 
-export function mountEnvironment(stage: BoardStage, theme: EnvironmentTheme, grid: BoardGrid): MountedEnvironment {
+export function mountEnvironment(
+  stage: BoardStage,
+  theme: EnvironmentTheme,
+  grid: BoardGrid,
+): MountedEnvironment {
   stage.setTheme(theme.stage);
 
   const kit = createPropKit(theme.seed);

@@ -1,7 +1,11 @@
 import { strict as assert } from "node:assert";
-import { test } from "node:test";
+import { before, test } from "node:test";
+import { paladin } from "@jev-game/content";
 import { Mesh, type Material, type Object3D } from "three";
-import { createPlaceholderFigure } from "../src/game/views/hero-figures.js";
+import { createHeroFigure } from "../src/game/views/hero-figures.js";
+import { installHeroModels } from "./hero-models.js";
+
+before(installHeroModels);
 
 function meshes(root: Object3D): Mesh[] {
   const found: Mesh[] = [];
@@ -30,7 +34,7 @@ function seeThroughCasterIds(root: Object3D): number[] {
 }
 
 test("a figure stands on a contact shadow that never casts a shadow of its own", () => {
-  const figure = createPlaceholderFigure("bulwark");
+  const figure = createHeroFigure(paladin.id);
 
   assert.ok(meshes(figure.root).some(seeThrough), "the figure has no see-through contact shadow");
   assert.ok(casterIds(figure.root).length > 0);
@@ -39,7 +43,7 @@ test("a figure stands on a contact shadow that never casts a shadow of its own",
 });
 
 test("turning a figure's shadow off and on again restores only its solid parts", () => {
-  const figure = createPlaceholderFigure("bulwark");
+  const figure = createHeroFigure(paladin.id);
   const solid = casterIds(figure.root);
 
   figure.setCastsShadow(false);

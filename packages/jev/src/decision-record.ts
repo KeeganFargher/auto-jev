@@ -1,18 +1,14 @@
-import type { RunCommand, RunPhase } from "@jev-game/run";
+import type { RunCommand } from "@jev-game/run";
 import type { ProviderUsage } from "./provider/types.js";
 
 export type DecisionSource = "jev" | "offline" | "fallback";
 
-export type JevDecisionKind = "draft-pick" | "reward";
-
 export interface DecisionRecord {
   runId: string;
   playerId: string;
-  phase: RunPhase;
   phaseEpoch: number;
   decisionRevision: number;
-  round: number;
-  kind: JevDecisionKind;
+  pick: number;
   observationVersion: number;
   model: string | null;
   source: DecisionSource;

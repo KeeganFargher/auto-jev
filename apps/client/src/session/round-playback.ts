@@ -1,39 +1,58 @@
 import {
   recordBattle,
-  TICK_SECONDS,
   type BattleEvent,
   type BattleRecording,
   type BattleSnapshot,
   type Catalogue,
 } from "@jev-game/game";
+import { battleDigest } from "@jev-game/content";
 import { PLAYBACK_SPEED, type RoundBattle } from "@jev-game/run";
-
-export interface BattleFrame {
-  snapshot: BattleSnapshot;
-  isDone: boolean;
-}
+import { createBattleClock, type BattleClock } from "./battle-clock.js";
+import type { BattleMoment } from "./types.js";
 
 export interface RoundPlayback {
-  tick(): number;
   elapsedSeconds(): number;
-  secondsLeft(tickLimit: number): number;
   isDone(): boolean;
   hasEnded(battle: RoundBattle): boolean;
   advance(deltaSeconds: number): void;
   skipToEnd(): void;
-  frame(battle: RoundBattle): BattleFrame;
   openingSnapshot(battle: RoundBattle): BattleSnapshot;
-  eventsBetween(battle: RoundBattle, afterTick: number, uptoTick: number): BattleEvent[];
+  follow(battle: RoundBattle): BattleEvent[];
+  moment(): BattleMoment;
+  takeEvents(): BattleEvent[];
 }
 
-function endTickOf(battle: RoundBattle): number {
-  return battle.result?.endedAtTick ?? 0;
+function verifiedRecording(battle: RoundBattle, catalogue: Catalogue): BattleRecording {
+  const recording = recordBattle(battle.setup, catalogue);
+  const digest = battleDigest(recording.events);
+
+  if (digest !== battle.digest) {
+    throw new Error(
+      `Battle "${battle.battleId}" replayed differently on this client: digest ${digest}, server ${battle.digest}`,
+    );
+  }
+
+  if (recording.timeline.totalSeconds !== battle.presentationSeconds) {
+    throw new Error(
+      `Battle "${battle.battleId}" lasts ${recording.timeline.totalSeconds}s here but ${battle.presentationSeconds}s on the server`,
+    );
+  }
+
+  return recording;
 }
 
-export function createRoundPlayback(battles: readonly RoundBattle[], catalogue: Catalogue): RoundPlayback {
+export function createRoundPlayback(
+  battles: readonly RoundBattle[],
+  followed: RoundBattle,
+  catalogue: Catalogue,
+): RoundPlayback {
+  if (!battles.includes(followed)) {
+    throw new Error(`Battle "${followed.battleId}" is not part of this round`);
+  }
+
   const recordings = new Map<string, BattleRecording>();
-  const roundEndTick = battles.reduce((latest, battle) => Math.max(latest, endTickOf(battle)), 0);
-  let elapsedTicks = 0;
+  const totalSeconds = Math.max(...battles.map((battle) => battle.presentationSeconds));
+  let presentationSeconds = 0;
 
   function recordingFor(battle: RoundBattle): BattleRecording {
     const cached = recordings.get(battle.battleId);
@@ -42,65 +61,75 @@ export function createRoundPlayback(battles: readonly RoundBattle[], catalogue: 
       return cached;
     }
 
-    if (battle.setup === null) {
-      throw new Error(`battle "${battle.battleId}" has not started yet`);
-    }
-
-    const recording = recordBattle(battle.setup, catalogue);
+    const recording = verifiedRecording(battle, catalogue);
     recordings.set(battle.battleId, recording);
 
     return recording;
   }
 
-  function currentTick(): number {
-    return Math.floor(elapsedTicks);
+  function clockFor(battle: RoundBattle): BattleClock {
+    const clock = createBattleClock(recordingFor(battle));
+    clock.seek(Math.min(presentationSeconds, clock.totalSeconds()));
+
+    return clock;
+  }
+
+  let followedClock = clockFor(followed);
+
+  function syncFollowed(): void {
+    followedClock.seek(Math.min(presentationSeconds, followedClock.totalSeconds()));
   }
 
   return {
-    tick: currentTick,
-
     elapsedSeconds() {
-      return (elapsedTicks * TICK_SECONDS) / PLAYBACK_SPEED;
-    },
-
-    secondsLeft(tickLimit) {
-      return Math.max(0, ((tickLimit - elapsedTicks) * TICK_SECONDS) / PLAYBACK_SPEED);
+      return presentationSeconds / PLAYBACK_SPEED;
     },
 
     isDone() {
-      return elapsedTicks >= roundEndTick;
+      return presentationSeconds >= totalSeconds;
     },
 
     hasEnded(battle) {
-      return currentTick() >= endTickOf(battle);
+      return presentationSeconds >= battle.presentationSeconds;
     },
 
     advance(deltaSeconds) {
-      const step = (Math.max(0, deltaSeconds) / TICK_SECONDS) * PLAYBACK_SPEED;
-      elapsedTicks = Math.min(roundEndTick, elapsedTicks + step);
+      if (!Number.isFinite(deltaSeconds) || deltaSeconds < 0) {
+        throw new Error(`Round playback cannot advance by ${deltaSeconds}s`);
+      }
+
+      presentationSeconds = Math.min(
+        totalSeconds,
+        presentationSeconds + deltaSeconds * PLAYBACK_SPEED,
+      );
+      syncFollowed();
     },
 
     skipToEnd() {
-      elapsedTicks = roundEndTick;
-    },
-
-    frame(battle) {
-      const { frames } = recordingFor(battle);
-      const index = Math.max(0, Math.min(currentTick(), frames.length - 1));
-
-      return { snapshot: frames[index]!.snapshot, isDone: index >= frames.length - 1 };
+      presentationSeconds = totalSeconds;
+      syncFollowed();
     },
 
     openingSnapshot(battle) {
-      return recordingFor(battle).frames[0]!.snapshot;
+      return recordingFor(battle).frames[0].snapshot;
     },
 
-    eventsBetween(battle, afterTick, uptoTick) {
-      if (uptoTick <= afterTick) {
-        return [];
+    follow(battle) {
+      if (!battles.includes(battle)) {
+        throw new Error(`Battle "${battle.battleId}" is not part of this round`);
       }
 
-      return recordingFor(battle).events.filter((event) => event.tick > afterTick && event.tick <= uptoTick);
+      followedClock = clockFor(battle);
+
+      return followedClock.takeEvents();
+    },
+
+    moment() {
+      return followedClock.moment();
+    },
+
+    takeEvents() {
+      return followedClock.takeEvents();
     },
   };
 }

@@ -1,7 +1,5 @@
 export { default } from "./app.config.js";
 
-export * from "./rooms/arena.js";
-
 export * from "./rooms/match-room.js";
 
 export * from "./rooms/match-state.js";

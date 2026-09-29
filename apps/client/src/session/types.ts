@@ -1,35 +1,49 @@
-import type { BattleEvent, BattleRecording, BattleSnapshot, HeroDefinitionId } from "@jev-game/game";
-import type { LabPicksByHero } from "@jev-game/content";
-
-export type { LabPicksByHero };
-
-export type LabScenarioKind = "duel" | "three-vs-three" | "custom";
+import type {
+  BattleEvent,
+  BattleRecording,
+  BattleSnapshot,
+  HeroDefinitionId,
+} from "@jev-game/game";
 
 export interface LabTeams {
   a: readonly HeroDefinitionId[];
   b: readonly HeroDefinitionId[];
 }
 
-export interface BattleLabView {
-  snapshot: BattleSnapshot;
+export interface LabFight {
   seed: number;
-  scenario: LabScenarioKind;
+  teams: LabTeams;
+}
+
+export interface BattleMoment {
+  tick: number;
+  snapshot: BattleSnapshot;
+  next: BattleSnapshot;
+  timeScale: number;
+}
+
+export interface LabControls {
   isRunning: boolean;
+  isDone: boolean;
   speedMultiplier: number;
-  behindBySteps: number;
-  latestEvents: BattleEvent[];
+}
+
+export interface BattleLabView extends LabControls {
+  moment: BattleMoment;
+  fight: LabFight;
 }
 
 export interface BattleLabSession {
   getView(): BattleLabView;
-  peekSnapshot(): { seed: number; scenario: LabScenarioKind; teams: LabTeams; snapshot: BattleSnapshot };
-  getRecording(): BattleRecording | null;
+  controls(): LabControls;
+  fight(): LabFight;
+  recording(): BattleRecording;
+  takeEvents(): BattleEvent[];
   subscribe(listener: () => void): () => void;
   play(): void;
   pause(): void;
   stepOnce(): void;
   setSpeed(multiplier: number): void;
-  reset(seed: number, scenario?: LabScenarioKind, teamAPicksByHero?: LabPicksByHero, teams?: LabTeams): void;
   advanceRealTime(deltaSeconds: number): void;
   dispose(): void;
 }

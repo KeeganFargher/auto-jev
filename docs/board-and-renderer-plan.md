@@ -7,13 +7,19 @@ their own heroes, and a path to a larger roster later. Rationale for
 each choice lives in `docs/decisions.md` ("Board grid, placement and a
 Three.js renderer").
 
+Written before the 2026-09-28 pivot. `docs/models.md` and the
+`models:*` scripts it names were removed then and are at the
+`pre-pivot` tag. The KayKit import (`pnpm models:import`,
+`docs/pivot-plan.md` §7.6) replaces them, and the heroes are now KayKit
+models (`CREDITS.md`).
+
 ## Settled by the user
 
-| Question | Answer |
-| --- | --- |
-| Renderer | Three.js, not Godot |
-| Board | An Underlords-style grid; each player places their own heroes on their half |
-| Team size | Three heroes for now; must be easy to grow later (more heroes as the run goes on) |
+| Question   | Answer                                                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Renderer   | Three.js, not Godot                                                                                                            |
+| Board      | An Underlords-style grid; each player places their own heroes on their half                                                    |
+| Team size  | Three heroes for now; must be easy to grow later (more heroes as the run goes on)                                              |
 | Art source | Undecided. Probably AI-generated, maybe built through a Blender MCP. The renderer uses placeholder figures until models arrive |
 
 ## Stages
@@ -23,7 +29,7 @@ Three.js renderer").
 - The arena is an 8×8 board of 10-unit cells (80×80 world units).
   `ArenaDefinition` gained `columns` and `rows`; catalogue validation
   requires whole columns, an even number of rows and square cells.
-- Each player owns an 8×4 half. Cells are given in *own-half*
+- Each player owns an 8×4 half. Cells are given in _own-half_
   coordinates: `row 0` is the front line at the centre of the board,
   `row 3` the back. Team A plays the south half; team B's formation is
   rotated 180° onto the north half, as in Underlords, so both players

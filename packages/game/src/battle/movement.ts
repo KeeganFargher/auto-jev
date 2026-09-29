@@ -1,154 +1,209 @@
-import type { UnitId } from "../ids.js";
-import type { UnitState } from "./state.js";
-import { getEngageRange } from "./abilities.js";
-import { findDensestEnemyCluster } from "./targeting.js";
-import { clampToArena, directionTo, distance, isWithinRange, type Vector2 } from "../math/vector.js";
 import { TICK_SECONDS } from "../constants.js";
-
-export interface MovementProposal {
-  unitId: string;
-  position: Vector2;
-}
-
-export const SLOT_SPACING_UNITS = 7;
-
-export const MIN_GAP_UNITS = 6;
+import type { UnitId } from "../ids.js";
+import {
+  clampToArena,
+  directionTo,
+  distance,
+  isWithinRange,
+  length,
+  lerp,
+  normalize,
+  perpendicular,
+  rotate,
+  type Vector2,
+} from "../math/vector.js";
+import type { StepContext } from "./events.js";
+import { thickestGroup } from "./prediction.js";
+import { PANIC_SWAY, PANIC_WAVE_TICKS, SEPARATION_UNITS_PER_SECOND } from "./rules.js";
+import { rampageOf } from "./signatures/rampage.js";
+import {
+  fuseById,
+  isGrounded,
+  isImmovable,
+  isOnFloor,
+  isStunned,
+  type BattleState,
+  type PrimedState,
+  type UnitState,
+} from "./state.js";
+import { currentTarget, livingAllies, unitsInIdOrder, updateTarget } from "./targeting.js";
 
 const SLOT_OFFSETS = [0, -1, 1, -2, 2, -3, 3];
 
-const SEPARATION_UNITS_PER_SECOND = 20;
+const SLOT_GAP_UNITS = 1;
 
-const COLUMN_HALF_WIDTH_UNITS = 4;
-
-const COLUMN_DEPTH_UNITS = 15;
-
-const COLUMN_PENALTY = 2.5;
-
-function slotStepRadians(range: number): number {
-  return 2 * Math.asin(Math.min(1, SLOT_SPACING_UNITS / (2 * range)));
+function engageRange(unit: UnitState): number {
+  return unit.rampage === null ? unit.attack.rangeUnits : rampageOf(unit).grabReachUnits;
 }
 
-function isSlotTaken(slot: Vector2, unit: UnitState, target: UnitState, units: readonly UnitState[]): boolean {
-  return units.some(
-    (other) => other.alive && other.unitId !== unit.unitId && other.unitId !== target.unitId && distance(other.position, slot) < SLOT_SPACING_UNITS,
+function moveSpeed(state: BattleState, unit: UnitState): number {
+  const primed = unit.primed;
+  const rampage = unit.rampage === null ? 1 : rampageOf(unit).moveMultiplier;
+  const panic = primed === null ? 1 : fuseById(state, primed.fuseId).panicMoveMultiplier;
+
+  return unit.moveUnitsPerSecond * rampage * panic;
+}
+
+function canMove(state: BattleState, unit: UnitState): boolean {
+  return (
+    unit.alive && isGrounded(unit) && !isStunned(unit, state.tick) && unit.action.kind === "idle"
   );
 }
 
-function isInColumn(slot: Vector2, unit: UnitState, units: readonly UnitState[]): boolean {
+function stepToward(state: BattleState, from: Vector2, heading: Vector2, units: number): Vector2 {
+  return clampToArena(
+    { x: from.x + heading.x * units, y: from.y + heading.y * units },
+    state.arenaWidth,
+    state.arenaHeight,
+  );
+}
+
+function turn(heading: Vector2, cosine: number, sine: number, steps: number): Vector2 {
+  const signedSine = steps < 0 ? -sine : sine;
+  let turned = heading;
+
+  for (let count = 0; count < Math.abs(steps); count += 1) {
+    turned = rotate(turned, cosine, signedSine);
+  }
+
+  return turned;
+}
+
+function isSlotTaken(
+  slot: Vector2,
+  unit: UnitState,
+  target: UnitState,
+  units: readonly UnitState[],
+): boolean {
   return units.some(
     (other) =>
       other.alive &&
+      isOnFloor(other) &&
       other.unitId !== unit.unitId &&
-      Math.abs(other.position.x - slot.x) < COLUMN_HALF_WIDTH_UNITS &&
-      Math.abs(other.position.y - slot.y) < COLUMN_DEPTH_UNITS,
+      other.unitId !== target.unitId &&
+      distance(other.position, slot) < unit.radius + other.radius,
   );
 }
 
-function engageSlot(unit: UnitState, target: UnitState, range: number, units: readonly UnitState[], arenaWidth: number, arenaHeight: number): Vector2 | null {
-  const bearing = Math.atan2(unit.position.y - target.position.y, unit.position.x - target.position.x);
-  const step = slotStepRadians(range);
-  let best: Vector2 | null = null;
-  let bestCost = Number.POSITIVE_INFINITY;
+function engageSlot(
+  state: BattleState,
+  unit: UnitState,
+  target: UnitState,
+  reach: number,
+  units: readonly UnitState[],
+): Vector2 | null {
+  const bearing = directionTo(target.position, unit.position);
+  const spacing = Math.min(1, (2 * unit.radius + SLOT_GAP_UNITS) / (2 * reach));
+  const cosine = 1 - 2 * spacing * spacing;
+  const sine = 2 * spacing * Math.sqrt(1 - spacing * spacing);
 
   for (const offset of SLOT_OFFSETS) {
-    const angle = bearing + offset * step;
-    const around = { x: target.position.x + Math.cos(angle) * range, y: target.position.y + Math.sin(angle) * range };
-    const slot = clampToArena(around, arenaWidth, arenaHeight);
+    const slot = stepToward(state, target.position, turn(bearing, cosine, sine, offset), reach);
 
-    if (!isWithinRange(distance(slot, target.position), range) || isSlotTaken(slot, unit, target, units)) {
-      continue;
-    }
-
-    const cost = Math.abs(offset) + (isInColumn(slot, unit, units) ? COLUMN_PENALTY : 0);
-
-    if (cost < bestCost) {
-      best = slot;
-      bestCost = cost;
+    if (
+      isWithinRange(distance(slot, target.position), reach) &&
+      !isSlotTaken(slot, unit, target, units)
+    ) {
+      return slot;
     }
   }
 
-  return best;
+  return null;
 }
 
-export function proposeMovement(
-  unit: UnitState,
-  target: UnitState | null,
-  engageRangeUnits: number,
-  units: readonly UnitState[],
-  arenaWidth: number,
-  arenaHeight: number,
-): MovementProposal {
-  if (target === null || unit.control !== null) {
-    return { unitId: unit.unitId, position: unit.position };
+function steer(state: BattleState, unit: UnitState, units: readonly UnitState[]): Vector2 | null {
+  const target = currentTarget(state, unit);
+
+  if (target === null || !target.alive) {
+    return null;
   }
 
-  const distanceToTarget = distance(unit.position, target.position);
+  const reach = unit.radius + target.radius + engageRange(unit);
+  const span = distance(unit.position, target.position);
 
-  if (isWithinRange(distanceToTarget, engageRangeUnits)) {
-    return { unitId: unit.unitId, position: unit.position };
+  if (isWithinRange(span, reach)) {
+    return null;
   }
 
-  const slowMultiplier = unit.slow === null ? 1 : unit.slow.speedMultiplier;
-  const maxStep = unit.moveSpeedUnitsPerSecond * slowMultiplier * TICK_SECONDS;
-  const slot = engageRangeUnits > 0 ? engageSlot(unit, target, engageRangeUnits, units, arenaWidth, arenaHeight) : null;
+  const slot = engageSlot(state, unit, target, reach, units);
   const destination = slot ?? target.position;
-  const remaining = slot === null ? distanceToTarget - engageRangeUnits : distance(unit.position, slot);
-  const step = Math.min(maxStep, remaining);
-  const direction = directionTo(unit.position, destination);
+  const remaining = slot === null ? span - reach : distance(unit.position, slot);
+  const travel = Math.min(moveSpeed(state, unit) * TICK_SECONDS, remaining);
 
-  const proposed = {
-    x: unit.position.x + direction.x * step,
-    y: unit.position.y + direction.y * step,
-  };
-
-  return { unitId: unit.unitId, position: clampToArena(proposed, arenaWidth, arenaHeight) };
+  return stepToward(state, unit.position, directionTo(unit.position, destination), travel);
 }
 
-function canBePushed(unit: UnitState, busy: ReadonlySet<UnitId>): boolean {
-  return unit.moveSpeedUnitsPerSecond > 0 && !busy.has(unit.unitId);
+function panicHeading(state: BattleState, unit: UnitState, primed: PrimedState): Vector2 {
+  const friends = livingAllies(state, unit).filter(isOnFloor);
+  const group = thickestGroup(state, friends, unit.teamId, unit.position, unit.unitId);
+  const toward = group === null ? unit.facing : directionTo(unit.position, group.unit.position);
+  const base = toward.x === 0 && toward.y === 0 ? unit.facing : toward;
+  const phase = ((primed.explodeTick - state.tick) % PANIC_WAVE_TICKS) / PANIC_WAVE_TICKS;
+  const sway = (1 - 4 * Math.abs(phase - 0.5)) * PANIC_SWAY;
+  const side = perpendicular(base);
+
+  return normalize({ x: base.x + side.x * sway, y: base.y + side.y * sway });
 }
 
-function addPush(pushes: Map<UnitId, Vector2>, unitId: UnitId, direction: Vector2, amount: number): void {
+function panicStep(state: BattleState, unit: UnitState, primed: PrimedState): Vector2 {
+  const heading = panicHeading(state, unit, primed);
+
+  return stepToward(state, unit.position, heading, moveSpeed(state, unit) * TICK_SECONDS);
+}
+
+function isPushable(unit: UnitState): boolean {
+  return !isImmovable(unit) && unit.motion.kind !== "skid";
+}
+
+function addPush(
+  pushes: Map<UnitId, Vector2>,
+  unitId: UnitId,
+  direction: Vector2,
+  amount: number,
+): void {
   const push = pushes.get(unitId) ?? { x: 0, y: 0 };
   pushes.set(unitId, { x: push.x + direction.x * amount, y: push.y + direction.y * amount });
 }
 
-function keepInRange(unit: UnitState, from: Vector2, to: Vector2, units: readonly UnitState[]): Vector2 {
-  const target = unit.targetUnitId === null ? undefined : units.find((candidate) => candidate.unitId === unit.targetUnitId);
-  const range = getEngageRange(unit);
+function keepInRange(state: BattleState, unit: UnitState, pushed: Vector2): Vector2 {
+  const target = currentTarget(state, unit);
 
-  if (target === undefined || range <= 0 || !isWithinRange(distance(from, target.position), range)) {
-    return to;
+  if (target === null || !target.alive) {
+    return pushed;
   }
 
-  const reach = distance(to, target.position);
+  const reach = unit.radius + target.radius + engageRange(unit);
 
-  if (reach <= range || reach === 0) {
-    return to;
+  if (!isWithinRange(distance(unit.position, target.position), reach)) {
+    return pushed;
   }
 
-  return {
-    x: target.position.x + ((to.x - target.position.x) * range) / reach,
-    y: target.position.y + ((to.y - target.position.y) * range) / reach,
-  };
+  const span = distance(pushed, target.position);
+
+  if (span <= reach) {
+    return pushed;
+  }
+
+  return lerp(target.position, pushed, reach / span);
 }
 
-export function separateUnits(units: readonly UnitState[], busy: ReadonlySet<UnitId>, arenaWidth: number, arenaHeight: number): void {
-  const alive = units.filter((unit) => unit.alive);
+function separateUnits(state: BattleState, units: readonly UnitState[]): void {
+  const floor = units.filter((unit) => unit.alive && isOnFloor(unit));
   const pushes = new Map<UnitId, Vector2>();
 
-  for (const [index, first] of alive.entries()) {
-    for (const second of alive.slice(index + 1)) {
+  for (const [index, first] of floor.entries()) {
+    for (const second of floor.slice(index + 1)) {
+      const minimum = first.radius + second.radius;
       const gap = distance(first.position, second.position);
-      const firstMoves = canBePushed(first, busy);
-      const secondMoves = canBePushed(second, busy);
+      const firstMoves = isPushable(first);
+      const secondMoves = isPushable(second);
 
-      if (gap >= MIN_GAP_UNITS || (!firstMoves && !secondMoves)) {
+      if (gap >= minimum || (!firstMoves && !secondMoves)) {
         continue;
       }
 
-      const away = gap > 0 ? directionTo(second.position, first.position) : { x: first.unitId < second.unitId ? -1 : 1, y: 0 };
-      const share = (MIN_GAP_UNITS - gap) * (firstMoves && secondMoves ? 0.5 : 1);
+      const away = gap > 0 ? directionTo(second.position, first.position) : { x: -1, y: 0 };
+      const share = (minimum - gap) * (firstMoves && secondMoves ? 0.5 : 1);
 
       if (firstMoves) {
         addPush(pushes, first.unitId, away, share);
@@ -163,69 +218,64 @@ export function separateUnits(units: readonly UnitState[], busy: ReadonlySet<Uni
   const limit = SEPARATION_UNITS_PER_SECOND * TICK_SECONDS;
   const settled = new Map<UnitId, Vector2>();
 
-  for (const unit of alive) {
+  for (const unit of floor) {
     const push = pushes.get(unit.unitId);
 
     if (push === undefined) {
       continue;
     }
 
-    const length = Math.hypot(push.x, push.y);
-    const scale = length > limit ? limit / length : 1;
-    const pushed = clampToArena({ x: unit.position.x + push.x * scale, y: unit.position.y + push.y * scale }, arenaWidth, arenaHeight);
-    settled.set(unit.unitId, keepInRange(unit, unit.position, pushed, units));
+    const span = length(push);
+    const factor = span > limit ? limit / span : 1;
+    const pushed = stepToward(state, unit.position, push, factor);
+    settled.set(unit.unitId, keepInRange(state, unit, pushed));
   }
 
-  for (const unit of alive) {
+  for (const unit of floor) {
     unit.position = settled.get(unit.unitId) ?? unit.position;
   }
 }
 
-export const FOLLOW_UNITS = 12;
+export function moveUnits(ctx: StepContext): void {
+  const state = ctx.state;
+  const units = unitsInIdOrder(state);
 
-export function proposeFollow(unit: UnitState, leader: UnitState, arenaWidth: number, arenaHeight: number): MovementProposal {
-  const gap = distance(unit.position, leader.position) - FOLLOW_UNITS;
-
-  if (unit.control !== null || gap <= 0) {
-    return { unitId: unit.unitId, position: unit.position };
+  for (const unit of units) {
+    if (unit.alive && isGrounded(unit) && !isStunned(unit, state.tick) && unit.primed === null) {
+      updateTarget(state, unit);
+    }
   }
 
-  const slowMultiplier = unit.slow === null ? 1 : unit.slow.speedMultiplier;
-  const step = Math.min(leader.moveSpeedUnitsPerSecond * slowMultiplier * TICK_SECONDS, gap);
-  const direction = directionTo(unit.position, leader.position);
+  const steps = new Map<UnitId, Vector2>();
 
-  return {
-    unitId: unit.unitId,
-    position: clampToArena({ x: unit.position.x + direction.x * step, y: unit.position.y + direction.y * step }, arenaWidth, arenaHeight),
-  };
-}
+  for (const unit of units) {
+    if (!canMove(state, unit)) {
+      continue;
+    }
 
-export const DRIFT_SPEED_FRACTION = 0.6;
+    const primed = unit.primed;
+    const next = primed === null ? steer(state, unit, units) : panicStep(state, unit, primed);
 
-const DRIFT_STOP_UNITS = 6;
-
-const DRIFT_SEARCH_UNITS = 999;
-
-const DRIFT_CLUSTER_UNITS = 15;
-
-export function proposeDrift(unit: UnitState, units: readonly UnitState[], arenaWidth: number, arenaHeight: number): MovementProposal {
-  const cluster = findDensestEnemyCluster(unit, units, DRIFT_SEARCH_UNITS, DRIFT_CLUSTER_UNITS);
-
-  if (cluster === null) {
-    return { unitId: unit.unitId, position: unit.position };
+    if (next !== null) {
+      steps.set(unit.unitId, next);
+    }
   }
 
-  const remaining = distance(unit.position, cluster.position) - DRIFT_STOP_UNITS;
+  for (const unit of units) {
+    const next = steps.get(unit.unitId);
 
-  if (remaining <= 0) {
-    return { unitId: unit.unitId, position: unit.position };
+    if (next === undefined) {
+      continue;
+    }
+
+    const heading = directionTo(unit.position, next);
+
+    if (heading.x !== 0 || heading.y !== 0) {
+      unit.facing = heading;
+    }
+
+    unit.position = next;
   }
 
-  const step = Math.min(unit.moveSpeedUnitsPerSecond * DRIFT_SPEED_FRACTION * TICK_SECONDS, remaining);
-  const direction = directionTo(unit.position, cluster.position);
-
-  return {
-    unitId: unit.unitId,
-    position: clampToArena({ x: unit.position.x + direction.x * step, y: unit.position.y + direction.y * step }, arenaWidth, arenaHeight),
-  };
+  separateUnits(state, units);
 }

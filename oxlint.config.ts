@@ -15,7 +15,10 @@ export default defineConfig({
     ".windsurf/**",
     "tools/oxlint/anti-slop/**",
   ],
-  jsPlugins: [{ name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" }],
+  jsPlugins: [
+    { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
+    { name: "determinism", specifier: "./tools/oxlint/determinism/index.ts" },
+  ],
   overrides: [
     {
       files: ["apps/client/**"],
@@ -31,7 +34,8 @@ export default defineConfig({
               },
               {
                 name: "@jev-game/jev",
-                message: "Jev runs on the server only; its provider credentials must never reach the browser bundle.",
+                message:
+                  "Jev runs on the server only; its provider credentials must never reach the browser bundle.",
               },
             ],
             patterns: [
@@ -61,8 +65,32 @@ export default defineConfig({
       },
     },
     {
-      files: ["packages/game/**"],
+      files: ["packages/game/test/**"],
       rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                regex: "^@jev-game/",
+                message:
+                  "Engine tests build their own catalogue so hero tuning never breaks them — no workspace imports.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      files: ["packages/content/src/**"],
+      rules: {
+        "determinism/no-inexact-math": "error",
+      },
+    },
+    {
+      files: ["packages/game/src/**"],
+      rules: {
+        "determinism/no-inexact-math": "error",
         "no-restricted-imports": [
           "error",
           {

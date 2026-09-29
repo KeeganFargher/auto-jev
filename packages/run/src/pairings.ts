@@ -46,7 +46,10 @@ export function createEmptyPairingHistory(initialPlayerIds: readonly PlayerId[])
   };
 }
 
-export function recordPairingRound(history: PairingHistory, result: PairingRoundResult): PairingHistory {
+export function recordPairingRound(
+  history: PairingHistory,
+  result: PairingRoundResult,
+): PairingHistory {
   const round = history.nextRound;
   const encounterCounts = { ...history.encounterCounts };
   const lastRoundOpponent: Record<PlayerId, PlayerId | null> = {};
@@ -185,7 +188,11 @@ function isBetterMatchingScore(a: MatchingScore, b: MatchingScore): boolean {
   return a.rank < b.rank;
 }
 
-function scoreMatching(matching: readonly [PlayerId, PlayerId][], history: PairingHistory, rank: number): MatchingScore {
+function scoreMatching(
+  matching: readonly [PlayerId, PlayerId][],
+  history: PairingHistory,
+  rank: number,
+): MatchingScore {
   let immediateRematches = 0;
   let totalEncounters = 0;
 

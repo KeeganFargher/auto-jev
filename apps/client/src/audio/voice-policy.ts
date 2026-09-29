@@ -37,7 +37,9 @@ export function decideVoice<V extends VoiceSlot>(
   const same = active.filter((voice) => voice.soundId === soundId);
 
   if (same.length >= rules.maxVoices) {
-    return rules.onLimit === "skip" ? { kind: "skip", reason: "limit" } : { kind: "steal", victim: oldest(same) };
+    return rules.onLimit === "skip"
+      ? { kind: "skip", reason: "limit" }
+      : { kind: "steal", victim: oldest(same) };
   }
 
   if (active.length >= globalLimit) {

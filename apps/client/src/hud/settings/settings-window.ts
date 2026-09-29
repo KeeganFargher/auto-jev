@@ -15,7 +15,8 @@ interface MountedTab {
 
 const TITLE_ID = "settings-window-title";
 
-const FOCUSABLE = "button:not([disabled]), input:not([disabled]), select, textarea, a[href], [tabindex]:not([tabindex='-1'])";
+const FOCUSABLE =
+  "button:not([disabled]), input:not([disabled]), select, textarea, a[href], [tabindex]:not([tabindex='-1'])";
 
 export function mountSettingsWindow(root: HTMLElement, tabs: readonly SettingsTab[]): void {
   let open = false;
@@ -37,7 +38,13 @@ export function mountSettingsWindow(root: HTMLElement, tabs: readonly SettingsTa
   const body = el("div", "settings-body");
 
   const mounted: MountedTab[] = tabs.map((tab, index) => {
-    const trigger = button("settings-tab", () => selectTab(index), tab.icon(), el("span", "", tab.label));
+    const trigger = button(
+      "settings-tab",
+      () => selectTab(index),
+      tab.icon(),
+      el("span", "", tab.label),
+    );
+
     trigger.id = `settings-tab-${tab.id}`;
     trigger.setAttribute("role", "tab");
     trigger.setAttribute("aria-controls", `settings-panel-${tab.id}`);
@@ -53,7 +60,14 @@ export function mountSettingsWindow(root: HTMLElement, tabs: readonly SettingsTa
     return { trigger, panel };
   });
 
-  const dialog = el("div", "settings-window", el("div", "settings-header", title, closeButton), tabList, body);
+  const dialog = el(
+    "div",
+    "settings-window",
+    el("div", "settings-header", title, closeButton),
+    tabList,
+    body,
+  );
+
   dialog.setAttribute("role", "dialog");
   dialog.setAttribute("aria-modal", "true");
   dialog.setAttribute("aria-labelledby", TITLE_ID);
@@ -90,7 +104,10 @@ export function mountSettingsWindow(root: HTMLElement, tabs: readonly SettingsTa
   }
 
   function trapFocus(event: KeyboardEvent): void {
-    const focusable = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((node) => node.offsetParent !== null);
+    const focusable = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
+      (node) => node.offsetParent !== null,
+    );
+
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
 
@@ -125,7 +142,11 @@ export function mountSettingsWindow(root: HTMLElement, tabs: readonly SettingsTa
       return;
     }
 
-    if (event.target instanceof Node && tabList.contains(event.target) && (event.key === "ArrowRight" || event.key === "ArrowLeft")) {
+    if (
+      event.target instanceof Node &&
+      tabList.contains(event.target) &&
+      (event.key === "ArrowRight" || event.key === "ArrowLeft")
+    ) {
       event.preventDefault();
       moveTab(event.key === "ArrowRight" ? 1 : -1);
     }

@@ -14,9 +14,12 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json && tsc -p test/tsconfig.json",
+    "test": "node --import tsx --test test/*.test.ts"
   },
   "devDependencies": {
+    "@types/node": "^22.13.13",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.2"
   }
 }

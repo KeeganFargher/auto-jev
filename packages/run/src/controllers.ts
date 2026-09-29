@@ -1,270 +1,178 @@
-import { SKILL_SLOTS, createRng, nextInt, sameFormation, type BoardCell, type Catalogue, type HeroBuild, type SkillSlot } from "@jev-game/game";
+import {
+  createRng,
+  nextInt,
+  sameFormation,
+  type BoardCell,
+  type HeroDefinitionId,
+} from "@jev-game/game";
 import { boardArena, centreOutColumns, defaultFormation } from "@jev-game/content";
-import type { PendingDecision, RunState } from "./types.js";
 import type { PlayerId } from "./ids.js";
-import { deriveControllerSeed, deriveDecisionSeed } from "./seed.js";
-import { gemCanGoOn, itemCanGoOn, piecesOnHero, stashedPieces } from "./inventory.js";
-import { defaultTrainSkill } from "./rewards.js";
+import type { RunState } from "./types.js";
+import { deriveControllerSeed } from "./seed.js";
 import { applyCommand, type RunCommand } from "./commands.js";
-import { isSeatReady } from "./readiness.js";
+import { isSeatReady, requireSeat } from "./readiness.js";
 import { getPlayerView, type PlayerView } from "./player-view.js";
 
-const MAX_BOT_COMMANDS_PER_PASS = 32;
+const MAX_POLICY_COMMANDS = 8;
 
-function pickRandomOffers(offerIds: readonly string[], seed: number, count: number): string[] {
+export type SeatPolicy = (view: PlayerView, controllerSeed: number) => RunCommand | null;
+
+function shuffled<T>(items: readonly T[], seed: number): T[] {
   const rng = createRng(seed);
-  const pool = [...offerIds];
-  const chosen: string[] = [];
+  const order = [...items];
 
-  for (let index = 0; index < count && pool.length > 0; index += 1) {
-    const pickIndex = nextInt(rng, pool.length);
-    chosen.push(pool[pickIndex]!);
-    pool.splice(pickIndex, 1);
-  }
-
-  return chosen;
-}
-
-function botFormation(heroBuilds: readonly HeroBuild[], seed: number): BoardCell[] {
-  const rng = createRng(seed);
-  const columns = centreOutColumns(boardArena.columns);
-
-  for (let index = columns.length - 1; index > 0; index -= 1) {
+  for (let index = order.length - 1; index > 0; index -= 1) {
     const swapIndex = nextInt(rng, index + 1);
-    [columns[index], columns[swapIndex]] = [columns[swapIndex]!, columns[index]!];
-  }
+    const current = order[index];
+    const swap = order[swapIndex];
 
-  return defaultFormation(heroBuilds.map((build) => build.heroId), columns);
-}
-
-function itemSlotFor(view: PlayerView, pieceId: string, catalogue: Catalogue): number | null {
-  let best: number | null = null;
-  let fewest = Number.POSITIVE_INFINITY;
-
-  for (let heroSlot = 0; heroSlot < view.you.heroBuilds.length; heroSlot += 1) {
-    const held = piecesOnHero(view.you.items, heroSlot).length;
-
-    if (held < fewest && itemCanGoOn(view.you, pieceId, heroSlot, view.rules, catalogue, null)) {
-      best = heroSlot;
-      fewest = held;
+    if (current === undefined || swap === undefined) {
+      throw new Error(`Shuffle index ${swapIndex} is outside ${order.length} items`);
     }
+
+    order[index] = swap;
+    order[swapIndex] = current;
   }
 
-  return best;
+  return order;
 }
 
-export interface GemPlacement {
-  heroSlot: number;
-  skill: SkillSlot;
+export function botFormation(heroIds: readonly HeroDefinitionId[], seed: number): BoardCell[] {
+  return defaultFormation(heroIds, shuffled(centreOutColumns(boardArena.columns), seed));
 }
 
-export function gemPlacementFor(view: PlayerView, gemId: string, catalogue: Catalogue): GemPlacement | null {
-  for (let heroSlot = 0; heroSlot < view.you.heroBuilds.length; heroSlot += 1) {
-    for (const skill of SKILL_SLOTS) {
-      if (gemCanGoOn(view.you, gemId, heroSlot, skill, catalogue, null)) {
-        return { heroSlot, skill };
-      }
-    }
-  }
-
-  return null;
-}
-
-function chooseOffer(view: PlayerView, decision: PendingDecision, offerIndex: number, catalogue: Catalogue): RunCommand | null {
-  const offer = decision.offers[offerIndex];
-
-  if (offer === undefined) {
-    return null;
-  }
-
-  let heroSlot: number | null = null;
-  let skill: SkillSlot | null = null;
-
-  if (offer.kind === "item" && offer.pieceId !== null) {
-    heroSlot = itemSlotFor(view, offer.pieceId, catalogue);
-  } else if (offer.kind === "gem" && offer.pieceId !== null) {
-    const placement = gemPlacementFor(view, offer.pieceId, catalogue);
-    heroSlot = placement?.heroSlot ?? null;
-    skill = placement?.skill ?? null;
-  } else if (offer.kind === "train" && offer.heroSlot !== null) {
-    const build = view.you.heroBuilds[offer.heroSlot];
-    skill = build === undefined ? null : defaultTrainSkill(build, catalogue);
-  }
+function commitDraft(
+  view: PlayerView,
+  controllerSeed: number,
+  selected: readonly HeroDefinitionId[],
+): RunCommand {
+  const rest = view.draftPool.filter((heroId) => !selected.includes(heroId));
+  const topUp = shuffled(rest, controllerSeed).slice(0, view.rules.draftPicks - selected.length);
 
   return {
-    kind: "choose-offer",
+    kind: "commit-draft",
     playerId: view.you.playerId,
-    decisionId: decision.decisionId,
-    offerId: offer.offerId,
-    heroSlot,
-    skill,
+    heroIds: [...selected, ...topUp],
     expectedRevision: view.you.decisionRevision,
   };
 }
 
-function equipStash(view: PlayerView, catalogue: Catalogue): RunCommand | null {
-  const { playerId, decisionRevision } = view.you;
+function confirmReady(view: PlayerView): RunCommand {
+  return {
+    kind: "confirm-ready",
+    playerId: view.you.playerId,
+    expectedRevision: view.you.decisionRevision,
+  };
+}
 
-  for (const item of stashedPieces(view.you.items)) {
-    const heroSlot = itemSlotFor(view, item.pieceId, catalogue);
-
-    if (heroSlot !== null) {
-      return { kind: "move-item", playerId, instanceId: item.instanceId, heroSlot, expectedRevision: decisionRevision };
-    }
+export function decideBotCommand(view: PlayerView, controllerSeed: number): RunCommand | null {
+  if (view.you.eliminated || view.you.ready) {
+    return null;
   }
 
-  for (const gem of stashedPieces(view.you.gems)) {
-    const placement = gemPlacementFor(view, gem.pieceId, catalogue);
+  switch (view.phase) {
+    case "draft":
+      return commitDraft(view, controllerSeed, []);
 
-    if (placement !== null) {
+    case "preparing": {
+      const formation = botFormation(view.you.heroIds, controllerSeed);
+
+      if (sameFormation(formation, view.you.formation)) {
+        return confirmReady(view);
+      }
+
       return {
-        kind: "socket-gem",
-        playerId,
-        instanceId: gem.instanceId,
-        heroSlot: placement.heroSlot,
-        skill: placement.skill,
-        expectedRevision: decisionRevision,
+        kind: "place-heroes",
+        playerId: view.you.playerId,
+        formation,
+        expectedRevision: view.you.decisionRevision,
       };
     }
-  }
 
-  return null;
-}
-
-function commitDraft(view: PlayerView, controllerSeed: number, selected: readonly string[]): RunCommand | null {
-  const picks = view.rules.draftPicks;
-  const unselected = view.heroOffers.map((offer) => offer.offerId).filter((offerId) => !selected.includes(offerId));
-  const chosen = [...selected, ...pickRandomOffers(unselected, controllerSeed, picks - selected.length)];
-
-  if (chosen.length !== picks) {
-    return null;
-  }
-
-  return { kind: "commit-draft", playerId: view.you.playerId, offerIds: chosen, expectedRevision: view.you.decisionRevision };
-}
-
-export function decideBotCommand(view: PlayerView, controllerSeed: number, catalogue: Catalogue): RunCommand | null {
-  const { playerId, decisionRevision, eliminated } = view.you;
-
-  if (eliminated) {
-    return null;
-  }
-
-  if (view.phase === "draft") {
-    return commitDraft(view, controllerSeed, []);
-  }
-
-  if (view.phase === "reward") {
-    const decision = view.pendingDecisions[0];
-
-    if (decision === undefined || decision.offers.length === 0) {
+    case "lobby":
+    case "round-result":
+    case "finished":
       return null;
-    }
-
-    const rng = createRng(deriveDecisionSeed(controllerSeed, decision.decisionId));
-
-    return chooseOffer(view, decision, nextInt(rng, decision.offers.length), catalogue);
   }
-
-  if (view.phase === "preparing") {
-    const equip = equipStash(view, catalogue);
-
-    if (equip !== null) {
-      return equip;
-    }
-
-    const formation = botFormation(view.you.heroBuilds, controllerSeed);
-
-    if (!sameFormation(formation, view.you.formation)) {
-      return { kind: "place-heroes", playerId, formation, expectedRevision: decisionRevision };
-    }
-
-    return { kind: "confirm-ready", playerId, expectedRevision: decisionRevision };
-  }
-
-  return null;
 }
 
-export function decideFallbackCommand(view: PlayerView, controllerSeed: number, catalogue: Catalogue): RunCommand | null {
-  if (view.phase === "draft") {
-    return view.you.eliminated ? null : commitDraft(view, controllerSeed, view.draftSelection);
+export function decideFallbackCommand(view: PlayerView, controllerSeed: number): RunCommand | null {
+  if (view.you.eliminated || view.you.ready) {
+    return null;
   }
 
-  if (view.phase === "preparing") {
-    return view.you.eliminated
-      ? null
-      : { kind: "confirm-ready", playerId: view.you.playerId, expectedRevision: view.you.decisionRevision };
+  switch (view.phase) {
+    case "draft":
+      return commitDraft(view, controllerSeed, view.draftSelection);
+
+    case "preparing":
+      return confirmReady(view);
+
+    case "lobby":
+    case "round-result":
+    case "finished":
+      return null;
   }
-
-  if (view.phase === "reward") {
-    const decision = view.pendingDecisions[0];
-
-    return view.you.eliminated || decision === undefined ? null : chooseOffer(view, decision, 0, catalogue);
-  }
-
-  return null;
 }
 
-type SeatPolicy = (view: PlayerView, controllerSeed: number, catalogue: Catalogue) => RunCommand | null;
-
-function applySeatPolicy(state: RunState, playerId: PlayerId, policy: SeatPolicy, catalogue: Catalogue): RunState {
+export function applySeatPolicy(state: RunState, playerId: PlayerId, policy: SeatPolicy): RunState {
+  const controllerSeed = deriveControllerSeed(state.runSeed, state.phaseEpoch, playerId);
   let current = state;
-  const controllerSeed = deriveControllerSeed(current.runSeed, current.currentRound?.round ?? 0, playerId);
 
-  for (let attempt = 0; attempt < MAX_BOT_COMMANDS_PER_PASS; attempt += 1) {
-    if (isSeatReady(current, playerId)) {
-      break;
-    }
-
-    const view = getPlayerView(current, playerId);
-    const command = view === null ? null : policy(view, controllerSeed, catalogue);
+  for (let step = 0; step < MAX_POLICY_COMMANDS; step += 1) {
+    const command = policy(getPlayerView(current, playerId), controllerSeed);
 
     if (command === null) {
-      break;
+      return current;
     }
 
-    const result = applyCommand(current, command, catalogue);
+    const result = applyCommand(current, command);
 
     if (!result.accepted) {
-      break;
+      throw new Error(
+        `Seat "${playerId}" sent ${command.kind}, which was refused: ${result.reason}`,
+      );
     }
 
     current = result.state;
   }
 
-  return current;
+  throw new Error(`Seat "${playerId}" was still deciding after ${MAX_POLICY_COMMANDS} commands`);
 }
 
-export function runFallbackCommands(state: RunState, playerIds: readonly PlayerId[], catalogue: Catalogue): RunState {
+export function runFallbackCommands(state: RunState, playerIds: readonly PlayerId[]): RunState {
   let current = state;
 
   for (const playerId of playerIds) {
-    const seat = current.players[playerId];
-
-    if (seat !== undefined && !seat.eliminated) {
-      current = applySeatPolicy(current, playerId, decideFallbackCommand, catalogue);
-    }
+    current = applySeatPolicy(current, playerId, decideFallbackCommand);
   }
 
   return current;
 }
 
-export function runBotCommands(state: RunState, catalogue: Catalogue): RunState {
+function botPolicyFor(state: RunState, playerId: PlayerId): SeatPolicy | null {
+  const seat = requireSeat(state, playerId);
+
+  switch (seat.controllerKind) {
+    case "random-bot":
+      return decideBotCommand;
+
+    case "jev":
+      return state.phase === "preparing" ? decideBotCommand : null;
+
+    case "human":
+      return seat.forfeited ? decideFallbackCommand : null;
+  }
+}
+
+export function runBotCommands(state: RunState): RunState {
   let current = state;
 
-  for (const seat of Object.values(current.players)) {
-    if (seat.eliminated || isSeatReady(current, seat.playerId)) {
-      continue;
-    }
+  for (const playerId of Object.keys(state.players)) {
+    const policy = botPolicyFor(current, playerId);
 
-    if (seat.controllerKind === "jev" && (current.phase === "draft" || current.phase === "reward")) {
-      continue;
-    }
-
-    if (seat.controllerKind !== "human") {
-      current = applySeatPolicy(current, seat.playerId, decideBotCommand, catalogue);
-    } else if (seat.forfeited) {
-      current = applySeatPolicy(current, seat.playerId, decideFallbackCommand, catalogue);
+    if (policy !== null && !isSeatReady(current, playerId)) {
+      current = applySeatPolicy(current, playerId, policy);
     }
   }
 

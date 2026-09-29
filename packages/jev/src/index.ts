@@ -12,15 +12,11 @@ export * from "./provider/limiter.js";
 
 export * from "./provider/environment.js";
 
-export * from "./observations/build-observation.js";
-
 export * from "./observations/describe.js";
 
-export * from "./decisions/option-keys.js";
+export * from "./observations/build-observation.js";
 
 export * from "./decisions/choose-hero.js";
-
-export * from "./decisions/choose-reward.js";
 
 export * from "./decision-record.js";
 

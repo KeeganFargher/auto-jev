@@ -39,7 +39,13 @@ function pillar(kit: PropKit, drums: number, broken: boolean): Group {
   const height = 4.4;
 
   for (let index = 0; index < drums; index += 1) {
-    const piece = place(drum(kit, 3.2, height, index % 2 === 0 ? STONE : "#a7a38e"), kit.between(-0.25, 0.25), index * height, kit.between(-0.25, 0.25), kit.between(0, 1));
+    const piece = place(
+      drum(kit, 3.2, height, index % 2 === 0 ? STONE : "#a7a38e"),
+      kit.between(-0.25, 0.25),
+      index * height,
+      kit.between(-0.25, 0.25),
+      kit.between(0, 1),
+    );
 
     if (broken && index === drums - 1) {
       piece.rotation.set(0.18, 0.4, -0.22);
@@ -82,7 +88,13 @@ function idol(kit: PropKit): Group {
     kit.solid(new BoxGeometry(3.4, 7, 3.6), stone, 0, 12.6, 6.8),
     kit.solid(new BoxGeometry(9, 1.6, 1.4), deep, 0, 7.4, 6.2),
     kit.solid(new BoxGeometry(17, 3, 13), kit.surface(STONE_DARK), 0, 24.4, 0),
-    kit.solid(new ConeGeometry(4.5, 5, 4), kit.surface("#b09a58", { metalness: 0.3, roughness: 0.5 }), 0, 28.4, 0),
+    kit.solid(
+      new ConeGeometry(4.5, 5, 4),
+      kit.surface("#b09a58", { metalness: 0.3, roughness: 0.5 }),
+      0,
+      28.4,
+      0,
+    ),
   );
 
   for (const x of [-3.9, 3.9]) {
@@ -94,14 +106,30 @@ function idol(kit: PropKit): Group {
 
   for (let index = 0; index < 4; index += 1) {
     const start = new Vector3(kit.between(-6, 6), 25.5, kit.between(4, 6.5));
-    head.add(strut(kit, start, start.clone().add(new Vector3(kit.between(-0.6, 0.6), -kit.between(6, 13), 0.4)), 0.28, 0.2, kit.surface("#4f8a3a"), 5));
+    head.add(
+      strut(
+        kit,
+        start,
+        start.clone().add(new Vector3(kit.between(-0.6, 0.6), -kit.between(6, 13), 0.4)),
+        0.28,
+        0.2,
+        kit.surface("#4f8a3a"),
+        5,
+      ),
+    );
   }
 
   return head;
 }
 
 function brazier(kit: PropKit, light: number): Group {
-  const bowl = kit.solid(new CylinderGeometry(2.6, 1.4, 1.8, 8, 1, true), kit.surface("#9b7a3a", { metalness: 0.45, roughness: 0.45, twoSided: true }), 0, 7.2, 0);
+  const bowl = kit.solid(
+    new CylinderGeometry(2.6, 1.4, 1.8, 8, 1, true),
+    kit.surface("#9b7a3a", { metalness: 0.45, roughness: 0.45, twoSided: true }),
+    0,
+    7.2,
+    0,
+  );
 
   return kit.group(
     kit.solid(new BoxGeometry(4.4, 1.2, 4.4), kit.surface(STONE_DARK), 0, 0.6, 0),
@@ -119,7 +147,17 @@ function jungleTree(kit: PropKit, height: number): Group {
 
   for (let index = 0; index < 4; index += 1) {
     const angle = (index / 4) * Math.PI * 2 + 0.4;
-    tree.add(strut(kit, new Vector3(Math.cos(angle) * height * 0.13, 0, Math.sin(angle) * height * 0.13), new Vector3(0, height * 0.16, 0), height * 0.035, height * 0.02, bark, 5));
+    tree.add(
+      strut(
+        kit,
+        new Vector3(Math.cos(angle) * height * 0.13, 0, Math.sin(angle) * height * 0.13),
+        new Vector3(0, height * 0.16, 0),
+        height * 0.035,
+        height * 0.02,
+        bark,
+        5,
+      ),
+    );
   }
 
   const blob = new IcosahedronGeometry(1, 1);
@@ -127,17 +165,44 @@ function jungleTree(kit: PropKit, height: number): Group {
   for (let index = 0; index < 5; index += 1) {
     const angle = (index / 5) * Math.PI * 2 + kit.between(0, 1);
     const size = height * kit.between(0.2, 0.28);
-    const lump = kit.solid(blob, kit.surface(kit.pick(CANOPY)), lean.x + Math.cos(angle) * height * 0.18, lean.y + kit.between(-1, 4), lean.z + Math.sin(angle) * height * 0.18);
+
+    const lump = kit.solid(
+      blob,
+      kit.surface(kit.pick(CANOPY)),
+      lean.x + Math.cos(angle) * height * 0.18,
+      lean.y + kit.between(-1, 4),
+      lean.z + Math.sin(angle) * height * 0.18,
+    );
+
     lump.scale.set(size, size * 0.72, size);
     tree.add(lump);
   }
 
-  tree.add(place(kit.solid(blob, kit.surface(kit.pick(CANOPY))), lean.x, lean.y + height * 0.12, lean.z, 0, height * 0.24));
+  tree.add(
+    place(
+      kit.solid(blob, kit.surface(kit.pick(CANOPY))),
+      lean.x,
+      lean.y + height * 0.12,
+      lean.z,
+      0,
+      height * 0.24,
+    ),
+  );
 
   for (let index = 0; index < 5; index += 1) {
     const x = lean.x + kit.between(-height * 0.25, height * 0.25);
     const z = lean.z + kit.between(-height * 0.25, height * 0.25);
-    tree.add(strut(kit, new Vector3(x, lean.y - 1, z), new Vector3(x + kit.between(-0.5, 0.5), lean.y - kit.between(7, 14), z), 0.22, 0.16, kit.surface("#4f8a3a"), 4));
+    tree.add(
+      strut(
+        kit,
+        new Vector3(x, lean.y - 1, z),
+        new Vector3(x + kit.between(-0.5, 0.5), lean.y - kit.between(7, 14), z),
+        0.22,
+        0.16,
+        kit.surface("#4f8a3a"),
+        4,
+      ),
+    );
   }
 
   return tree;
@@ -190,19 +255,53 @@ function waterfall(kit: PropKit, width: number, height: number): Group {
 
   for (let index = 0; index < 9; index += 1) {
     const side = index % 2 === 0 ? -1 : 1;
-    const boulder = kit.solid(rockGeometry(kit, kit.between(7, 11), 1.1, 1), kit.pick(cliffStone), side * kit.between(width * 0.55, width * 0.95), kit.between(0, height * 0.8), kit.between(-8, -2));
+
+    const boulder = kit.solid(
+      rockGeometry(kit, kit.between(7, 11), 1.1, 1),
+      kit.pick(cliffStone),
+      side * kit.between(width * 0.55, width * 0.95),
+      kit.between(0, height * 0.8),
+      kit.between(-8, -2),
+    );
+
     cliff.add(boulder);
   }
 
-  cliff.add(kit.solid(new BoxGeometry(width * 1.6, height, 10), kit.pick(cliffStone), 0, height / 2, -8));
+  cliff.add(
+    kit.solid(new BoxGeometry(width * 1.6, height, 10), kit.pick(cliffStone), 0, height / 2, -8),
+  );
 
   const flow = streamTexture(kit);
-  const fall = kit.solid(new PlaneGeometry(width, height, 1, 1), kit.surface("#ffffff", { map: flow, emissive: "#3fb7d6", glow: 0.25, opacity: 0.92 }), 0, height / 2, -2.6);
+
+  const fall = kit.solid(
+    new PlaneGeometry(width, height, 1, 1),
+    kit.surface("#ffffff", { map: flow, emissive: "#3fb7d6", glow: 0.25, opacity: 0.92 }),
+    0,
+    height / 2,
+    -2.6,
+  );
+
   fall.castShadow = false;
-  const basin = kit.solid(new CircleGeometry(width * 0.9, 20), kit.surface("#5cc7dc", { roughness: 0.2 }), 0, 0.3, 4);
+
+  const basin = kit.solid(
+    new CircleGeometry(width * 0.9, 20),
+    kit.surface("#5cc7dc", { roughness: 0.2 }),
+    0,
+    0.3,
+    4,
+  );
+
   basin.rotation.x = -Math.PI / 2;
   basin.castShadow = false;
-  const foam = kit.solid(new CircleGeometry(width * 0.45, 16), kit.surface("#ffffff", { opacity: 0.65 }), 0, 0.45, 0.5);
+
+  const foam = kit.solid(
+    new CircleGeometry(width * 0.45, 16),
+    kit.surface("#ffffff", { opacity: 0.65 }),
+    0,
+    0.45,
+    0.5,
+  );
+
   foam.rotation.x = -Math.PI / 2;
   foam.castShadow = false;
 
@@ -214,7 +313,14 @@ function waterfall(kit: PropKit, width: number, height: number): Group {
   cliff.add(fall, basin, foam);
 
   for (let index = 0; index < 5; index += 1) {
-    cliff.add(place(fern(kit, kit.between(4, 6)), kit.between(-width, width), kit.between(height * 0.6, height), kit.between(-6, -2)));
+    cliff.add(
+      place(
+        fern(kit, kit.between(4, 6)),
+        kit.between(-width, width),
+        kit.between(height * 0.6, height),
+        kit.between(-6, -2),
+      ),
+    );
   }
 
   return cliff;
@@ -229,7 +335,10 @@ function pyramid(kit: PropKit): Group {
     temple.add(kit.solid(new BoxGeometry(size, 9, size), stone[tier % 2]!, 0, tier * 9 + 4.5, 0));
   }
 
-  temple.add(kit.solid(new BoxGeometry(16, 12, 14), kit.surface("#6d6a5a"), 0, 60, 0), kit.solid(new BoxGeometry(12, 22, 3), kit.surface("#8a8672"), 0, 27, 45));
+  temple.add(
+    kit.solid(new BoxGeometry(16, 12, 14), kit.surface("#6d6a5a"), 0, 60, 0),
+    kit.solid(new BoxGeometry(12, 22, 3), kit.surface("#8a8672"), 0, 27, 45),
+  );
 
   return temple;
 }
@@ -257,7 +366,14 @@ function courtyard(kit: PropKit): Group {
         continue;
       }
 
-      const stoneTile = kit.solid(slab, kit.pick(tones), x + kit.between(-0.3, 0.3), 0.1 + kit.between(0, 0.2), z + kit.between(-0.3, 0.3));
+      const stoneTile = kit.solid(
+        slab,
+        kit.pick(tones),
+        x + kit.between(-0.3, 0.3),
+        0.1 + kit.between(0, 0.2),
+        z + kit.between(-0.3, 0.3),
+      );
+
       stoneTile.rotation.y = kit.between(-0.05, 0.05);
       plaza.add(stoneTile);
     }
@@ -321,7 +437,17 @@ export const ruinsTheme: EnvironmentTheme = {
     return kit.group(
       ground,
       place(courtyard(kit), 0, FLOOR, 0),
-      drift(kit, { count: 70, spread: 110, floor: 2, ceiling: 26, fall: 0, sway: 5, size: 1.6, tone: "#e9ff8a", glowing: true }),
+      drift(kit, {
+        count: 70,
+        spread: 110,
+        floor: 2,
+        ceiling: 26,
+        fall: 0,
+        sway: 5,
+        size: 1.6,
+        tone: "#e9ff8a",
+        glowing: true,
+      }),
       place(idol(kit), -70, FLOOR, -54, 0.75),
       place(pillar(kit, 5, false), -62, FLOOR, 4),
       place(pillar(kit, 3, true), -64, FLOOR, 40),

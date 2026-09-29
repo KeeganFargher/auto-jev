@@ -9,7 +9,11 @@ export function configureJevProvider(selection: ProviderSelection): void {
 export function jevProvider(): ProviderSelection {
   if (configured === null) {
     configured = providerFromEnvironment(process.env);
-    console.info(configured.kind === "provider" ? `[jev] bot seats: ${configured.label}` : `[jev] bot seats: baseline bots (${configured.reason})`);
+    console.info(
+      configured.kind === "provider"
+        ? `[jev] bot seats: ${configured.label}`
+        : `[jev] bot seats: baseline bots (${configured.reason})`,
+    );
   }
 
   return configured;

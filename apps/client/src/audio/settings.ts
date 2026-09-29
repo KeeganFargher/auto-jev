@@ -7,13 +7,17 @@ export interface AudioSettings {
   muted: boolean;
 }
 
-export const VOLUME_CHANNELS: readonly VolumeChannel[] = ["master", "music", "sfx", "dialogue"];
+export const VOLUME_CHANNELS: readonly VolumeChannel[] = ["master", "music", "sfx"];
 
 const STORAGE_PREFIX = "jev-game.audio";
 
 const MUTED_KEY = `${STORAGE_PREFIX}.muted`;
 
-const DEFAULT_VOLUMES: Readonly<Record<VolumeChannel, number>> = { master: 0.8, music: 0.6, sfx: 0.8, dialogue: 1 };
+const DEFAULT_VOLUMES: Readonly<Record<VolumeChannel, number>> = {
+  master: 0.8,
+  music: 0.6,
+  sfx: 0.8,
+};
 
 function volumeKey(channel: VolumeChannel): string {
   return `${STORAGE_PREFIX}.${channel}`;

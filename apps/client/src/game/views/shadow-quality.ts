@@ -8,7 +8,11 @@ export interface ShadowMapState {
 
 const SOFT_SHADOW_RADIUS = 4;
 
-export function applyShadowQuality(shadowMap: ShadowMapState, light: DirectionalLight, quality: ShadowQuality): void {
+export function applyShadowQuality(
+  shadowMap: ShadowMapState,
+  light: DirectionalLight,
+  quality: ShadowQuality,
+): void {
   shadowMap.enabled = true;
   shadowMap.type = PCFShadowMap;
   light.castShadow = quality === "soft";

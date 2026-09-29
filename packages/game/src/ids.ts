@@ -1,10 +1,6 @@
 export type HeroDefinitionId = string;
 
-export type AbilityDefinitionId = string;
-
 export type ArenaDefinitionId = string;
-
-export type UpgradeDefinitionId = string;
 
 export type UnitId = string;
 

@@ -1,12 +1,11 @@
 import type { PlayerId, PlayerView, PublicSeat, RoundBattle } from "@jev-game/run";
-import type { BoardCell, SkillSlot } from "@jev-game/game";
+import type { BoardCell } from "@jev-game/game";
 
 export interface ResolvedRound {
   round: number;
   battles: RoundBattle[];
   byePlayerId: PlayerId | null;
   seats: Record<PlayerId, PublicSeat>;
-  replay: boolean;
 }
 
 export type ConnectionState = "connecting" | "connected" | "reconnecting" | "lost";
@@ -39,21 +38,11 @@ export interface MatchSession {
   getLatestRound(): ResolvedRound | null;
   subscribe(listener: () => void): () => void;
   startMatch(): void;
-  selectHeroes(offerIds: readonly string[]): void;
-  pickHeroes(offerIds: readonly string[]): void;
-  chooseOffer(decisionId: string, offerId: string, heroSlot: number | null, skill: SkillSlot | null): void;
-  moveItem(instanceId: string, heroSlot: number | null): void;
-  socketGem(instanceId: string, heroSlot: number | null, skill: SkillSlot | null): void;
-  discardItem(instanceId: string): void;
+  selectHeroes(heroIds: readonly string[]): void;
+  pickHeroes(heroIds: readonly string[]): void;
   confirmReady(): void;
   markWatched(): void;
   placeHeroes(formation: readonly BoardCell[]): void;
   suspend(): void;
   dispose(): void;
-}
-
-export function battleFor(resolved: ResolvedRound, playerId: string): RoundBattle | null {
-  return (
-    resolved.battles.find((battle) => battle.teamAPlayerId === playerId || battle.teamBPlayerId === playerId) ?? null
-  );
 }

@@ -38,7 +38,9 @@ export function limitProvider(inner: JevProvider, concurrency: number): LimitedP
 
   function acquire(signal: AbortSignal): Promise<void> {
     if (signal.aborted) {
-      return Promise.reject(new JevProviderFailure("aborted", "the request was aborted before it started"));
+      return Promise.reject(
+        new JevProviderFailure("aborted", "the request was aborted before it started"),
+      );
     }
 
     if (active < concurrency) {

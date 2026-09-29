@@ -57,13 +57,20 @@ export function createCloudflareProvider(options: CloudflareProviderOptions): Je
       try {
         const response = await send(url, {
           method: "POST",
-          headers: { Authorization: `Bearer ${options.apiToken}`, "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${options.apiToken}`,
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             model: options.model,
             input: {
               state: question.state,
               questions: {
-                [DECISION_QUESTION]: { type: "choice", instructions: question.instructions, criteria: question.options },
+                [DECISION_QUESTION]: {
+                  type: "choice",
+                  instructions: question.instructions,
+                  criteria: question.options,
+                },
               },
             },
           }),
@@ -78,10 +85,16 @@ export function createCloudflareProvider(options: CloudflareProviderOptions): Je
         }
 
         if (timeout.aborted) {
-          throw new JevProviderFailure("timeout", `no answer within ${options.timeoutMilliseconds} ms`);
+          throw new JevProviderFailure(
+            "timeout",
+            `no answer within ${options.timeoutMilliseconds} ms`,
+          );
         }
 
-        throw new JevProviderFailure("connection", error instanceof Error ? error.message : "the request failed");
+        throw new JevProviderFailure(
+          "connection",
+          error instanceof Error ? error.message : "the request failed",
+        );
       }
 
       const body = readJson(text);
@@ -90,16 +103,27 @@ export function createCloudflareProvider(options: CloudflareProviderOptions): Je
         const failure = cloudflareErrorSchema.safeParse(body);
         const detail = failure.success ? (failure.data.errors[0]?.message ?? "") : "";
 
-        throw new JevProviderFailure(status === 429 ? "rate-limited" : "http-error", `HTTP ${status}: ${detail}`);
+        throw new JevProviderFailure(
+          status === 429 ? "rate-limited" : "http-error",
+          `HTTP ${status}: ${detail}`,
+        );
       }
 
       const parsed = cloudflareResponseSchema.safeParse(body);
 
       if (!parsed.success) {
-        throw new JevProviderFailure("invalid-response", `the Cloudflare response did not validate: ${parsed.error.message}`);
+        throw new JevProviderFailure(
+          "invalid-response",
+          `the Cloudflare response did not validate: ${parsed.error.message}`,
+        );
       }
 
-      return choiceFromEnvelope(parsed.data, DECISION_QUESTION, Object.keys(question.options), options.model);
+      return choiceFromEnvelope(
+        parsed.data,
+        DECISION_QUESTION,
+        Object.keys(question.options),
+        options.model,
+      );
     },
   };
 }

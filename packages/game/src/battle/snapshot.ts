@@ -1,6 +1,16 @@
-import type { ActiveEmitter, ActiveZone, BattleState, PendingImpact, UnitState } from "./state.js";
+import type { Vector2 } from "../math/vector.js";
 import type { BattleResult } from "./result.js";
-import { cloneRng, type RngState } from "../random/rng.js";
+import type {
+  BattleState,
+  BubbleState,
+  ChainState,
+  FlightPath,
+  LandingEffect,
+  Motion,
+  ProjectileState,
+  UnitAction,
+  UnitState,
+} from "./state.js";
 
 export interface BattleSnapshot {
   tick: number;
@@ -10,11 +20,96 @@ export interface BattleSnapshot {
   arenaColumns: number;
   arenaRows: number;
   units: UnitState[];
-  impacts: PendingImpact[];
-  zones: ActiveZone[];
-  emitters: ActiveEmitter[];
+  projectiles: ProjectileState[];
+  bubbles: BubbleState[];
+  chains: ChainState[];
   result: BattleResult | null;
-  rng: RngState;
+}
+
+function copyVector(vector: Vector2): Vector2 {
+  return { x: vector.x, y: vector.y };
+}
+
+function copyPath(path: FlightPath): FlightPath {
+  return {
+    from: copyVector(path.from),
+    bounce: path.bounce === null ? null : copyVector(path.bounce),
+    to: copyVector(path.to),
+    length: path.length,
+  };
+}
+
+function copyLanding(landing: LandingEffect): LandingEffect {
+  return { ...landing };
+}
+
+function copyMotion(motion: Motion): Motion {
+  switch (motion.kind) {
+    case "ground":
+      return { kind: "ground" };
+    case "flight":
+      return { ...motion, path: copyPath(motion.path), landing: copyLanding(motion.landing) };
+    case "float":
+      return { ...motion, offset: copyVector(motion.offset) };
+    case "skid":
+      return { ...motion, from: copyVector(motion.from), to: copyVector(motion.to) };
+    case "downed":
+      return { ...motion };
+  }
+}
+
+function copyAction(action: UnitAction): UnitAction {
+  switch (action.kind) {
+    case "hammerfall":
+    case "big-bubble":
+      return { ...action, center: copyVector(action.center) };
+    case "idle":
+    case "attack":
+    case "rampage-grow":
+    case "grab":
+    case "short-fuse":
+    case "yank":
+      return { ...action };
+  }
+}
+
+function copyUnit(unit: UnitState): UnitState {
+  return {
+    ...unit,
+    position: copyVector(unit.position),
+    facing: copyVector(unit.facing),
+    action: copyAction(unit.action),
+    motion: copyMotion(unit.motion),
+    burning: unit.burning === null ? null : { ...unit.burning },
+    primed: unit.primed === null ? null : { ...unit.primed },
+    rampage: unit.rampage === null ? null : { ...unit.rampage },
+  };
+}
+
+function copyProjectile(projectile: ProjectileState): ProjectileState {
+  return { ...projectile, from: copyVector(projectile.from), payload: { ...projectile.payload } };
+}
+
+function copyBubble(bubble: BubbleState): BubbleState {
+  const flight = bubble.flight;
+
+  return {
+    ...bubble,
+    center: copyVector(bubble.center),
+    memberUnitIds: [...bubble.memberUnitIds],
+    flight:
+      flight === null
+        ? null
+        : { ...flight, path: copyPath(flight.path), landing: copyLanding(flight.landing) },
+  };
+}
+
+function copyChain(chain: ChainState): ChainState {
+  return { ...chain, unitIds: [...chain.unitIds], pairs: [...chain.pairs] };
+}
+
+function copyResult(result: BattleResult): BattleResult {
+  return { ...result, damageDealt: { ...result.damageDealt } };
 }
 
 export function getBattleSnapshot(state: BattleState): BattleSnapshot {
@@ -25,45 +120,10 @@ export function getBattleSnapshot(state: BattleState): BattleSnapshot {
     arenaHeight: state.arenaHeight,
     arenaColumns: state.arenaColumns,
     arenaRows: state.arenaRows,
-    units: state.units.map((unit) => ({
-      ...unit,
-      position: { ...unit.position },
-      abilityCooldowns: { ...unit.abilityCooldowns },
-      shield: unit.shield === null ? null : { ...unit.shield, blessed: unit.shield.blessed === null ? null : { ...unit.shield.blessed } },
-      slow: unit.slow === null ? null : { ...unit.slow },
-      condition: unit.condition === null ? null : { ...unit.condition },
-      control: unit.control === null ? null : { ...unit.control },
-      taunt: unit.taunt === null ? null : { ...unit.taunt },
-      dots: unit.dots.map((dot) => ({ ...dot })),
-      speedBuffs: unit.speedBuffs.map((buff) => ({ ...buff })),
-      marks: unit.marks.map((mark) => ({ ...mark })),
-      chill: unit.chill === null ? null : { ...unit.chill },
-      pandemic: unit.pandemic === null ? null : { ...unit.pandemic, spread: unit.pandemic.spread === null ? null : { ...unit.pandemic.spread } },
-      link: unit.link === null ? null : { ...unit.link },
-      graveMark: unit.graveMark === null ? null : { ...unit.graveMark },
-      channel: unit.channel === null ? null : { ...unit.channel },
-      form: unit.form === null ? null : { ...unit.form, retaliatedAt: { ...unit.form.retaliatedAt } },
-      memory: {
-        ...unit.memory,
-        firstHitTargets: [...unit.memory.firstHitTargets],
-        attackCounts: { ...unit.memory.attackCounts },
-        attackCountedStrike: { ...unit.memory.attackCountedStrike },
-        siphonedAt: { ...unit.memory.siphonedAt },
-        ruthlessStunned: { ...unit.memory.ruthlessStunned },
-        spentTriggers: [...unit.memory.spentTriggers],
-        triggerReadyAt: { ...unit.memory.triggerReadyAt },
-        stacks: { ...unit.memory.stacks },
-        stacksGainedAt: { ...unit.memory.stacksGainedAt },
-        stackProgress: { ...unit.memory.stackProgress },
-        stored: { ...unit.memory.stored },
-        storedIncoming: { ...unit.memory.storedIncoming },
-        skillUses: { ...unit.memory.skillUses },
-      },
-    })),
-    impacts: state.impacts.map((impact) => ({ ...impact, center: { ...impact.center } })),
-    zones: state.zones.map((zone) => ({ ...zone, center: { ...zone.center } })),
-    emitters: state.emitters.map((emitter) => ({ ...emitter, position: { ...emitter.position }, velocity: { ...emitter.velocity } })),
-    result: state.result,
-    rng: cloneRng(state.rng),
+    units: state.units.map(copyUnit),
+    projectiles: state.projectiles.map(copyProjectile),
+    bubbles: state.bubbles.map(copyBubble),
+    chains: state.chains.map(copyChain),
+    result: state.result === null ? null : copyResult(state.result),
   };
 }

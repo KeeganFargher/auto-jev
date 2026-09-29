@@ -33,11 +33,17 @@ export function choiceFromEnvelope(
   const answer = choiceAnswerSchema.safeParse(envelope.answers[questionId]);
 
   if (!answer.success) {
-    throw new JevProviderFailure("invalid-response", `the "${questionId}" answer did not validate: ${answer.error.message}`);
+    throw new JevProviderFailure(
+      "invalid-response",
+      `the "${questionId}" answer did not validate: ${answer.error.message}`,
+    );
   }
 
   if (!optionKeys.includes(answer.data.choice)) {
-    throw new JevProviderFailure("unknown-option", `"${answer.data.choice}" is not one of the offered options`);
+    throw new JevProviderFailure(
+      "unknown-option",
+      `"${answer.data.choice}" is not one of the offered options`,
+    );
   }
 
   return {
@@ -45,7 +51,10 @@ export function choiceFromEnvelope(
     probabilities: answer.data.probabilities,
     confidence: answer.data.confidence,
     model: envelope.model ?? requestedModel,
-    usage: { inputTokens: envelope.usage?.input_tokens ?? 0, outputTokens: envelope.usage?.output_tokens ?? 0 },
+    usage: {
+      inputTokens: envelope.usage?.input_tokens ?? 0,
+      outputTokens: envelope.usage?.output_tokens ?? 0,
+    },
   };
 }
 
@@ -58,7 +67,10 @@ export function parseChoiceAnswer(
   const envelope = answerEnvelopeSchema.safeParse(result);
 
   if (!envelope.success) {
-    throw new JevProviderFailure("invalid-response", `the response envelope did not validate: ${envelope.error.message}`);
+    throw new JevProviderFailure(
+      "invalid-response",
+      `the response envelope did not validate: ${envelope.error.message}`,
+    );
   }
 
   return choiceFromEnvelope(envelope.data, questionId, optionKeys, requestedModel);

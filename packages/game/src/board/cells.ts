@@ -67,7 +67,11 @@ export function ownCellAt(grid: BoardGrid, side: BoardSide, point: Vector2): Boa
   return isOwnCell(grid, cell) ? cell : null;
 }
 
-export function isValidFormation(grid: BoardGrid, formation: readonly BoardCell[], heroCount: number): boolean {
+export function isValidFormation(
+  grid: BoardGrid,
+  formation: readonly BoardCell[],
+  heroCount: number,
+): boolean {
   if (formation.length !== heroCount) {
     return false;
   }
@@ -94,6 +98,8 @@ export function isValidFormation(grid: BoardGrid, formation: readonly BoardCell[
 export function sameFormation(first: readonly BoardCell[], second: readonly BoardCell[]): boolean {
   return (
     first.length === second.length &&
-    first.every((cell, index) => cell.column === second[index]?.column && cell.row === second[index]?.row)
+    first.every(
+      (cell, index) => cell.column === second[index]?.column && cell.row === second[index]?.row,
+    )
   );
 }

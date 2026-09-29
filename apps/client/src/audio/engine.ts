@@ -1,6 +1,5 @@
 import {
   BUSES,
-  DIALOGUE_DUCK_GAIN,
   GLOBAL_VOICE_LIMIT,
   MUSIC,
   MUSIC_CROSSFADE_SECONDS,
@@ -12,7 +11,11 @@ import {
   type SoundDefinition,
   type SoundId,
 } from "./catalogue.js";
-import { createAudioSettingsStore, type AudioSettings, type AudioSettingsStore } from "./settings.js";
+import {
+  createAudioSettingsStore,
+  type AudioSettings,
+  type AudioSettingsStore,
+} from "./settings.js";
 import { decideVoice, type VoiceSlot } from "./voice-policy.js";
 
 export interface PlayOptions {
@@ -58,10 +61,6 @@ const STEAL_FADE_SECONDS = 0.015;
 
 const BUS_SMOOTHING_SECONDS = 0.02;
 
-const DUCK_ATTACK_SECONDS = 0.15;
-
-const DUCK_RELEASE_SECONDS = 0.6;
-
 const MAX_PAN = 0.6;
 
 const UNLOCK_EVENTS: readonly string[] = ["pointerdown", "pointerup", "touchend", "keydown"];
@@ -82,18 +81,14 @@ export function createAudioEngine(): AudioEngine {
   const settings = createAudioSettingsStore();
   const context = new AudioContext({ latencyHint: "interactive" });
   const master = context.createGain();
-  const duck = context.createGain();
 
   const buses: Record<Bus, GainNode> = {
     music: context.createGain(),
     sfx: context.createGain(),
-    dialogue: context.createGain(),
   };
 
-  buses.music.connect(duck);
-  duck.connect(master);
+  buses.music.connect(master);
   buses.sfx.connect(master);
-  buses.dialogue.connect(master);
   master.connect(context.destination);
 
   const buffers = new Map<string, AudioBuffer>();
@@ -112,7 +107,11 @@ export function createAudioEngine(): AudioEngine {
     master.gain.setTargetAtTime(masterLevel, now, BUS_SMOOTHING_SECONDS);
 
     for (const bus of BUSES) {
-      buses[bus].gain.setTargetAtTime(perceptualGain(next.volumes[bus]), now, BUS_SMOOTHING_SECONDS);
+      buses[bus].gain.setTargetAtTime(
+        perceptualGain(next.volumes[bus]),
+        now,
+        BUS_SMOOTHING_SECONDS,
+      );
     }
   }
 
@@ -159,22 +158,6 @@ export function createAudioEngine(): AudioEngine {
     return task;
   }
 
-  function isDialoguePlaying(): boolean {
-    return voices.some((voice) => voice.bus === "dialogue");
-  }
-
-  function updateDuck(): void {
-    const now = context.currentTime;
-    duck.gain.cancelScheduledValues(now);
-    duck.gain.setValueAtTime(duck.gain.value, now);
-
-    if (isDialoguePlaying()) {
-      duck.gain.linearRampToValueAtTime(DIALOGUE_DUCK_GAIN, now + DUCK_ATTACK_SECONDS);
-    } else {
-      duck.gain.linearRampToValueAtTime(1, now + DUCK_RELEASE_SECONDS);
-    }
-  }
-
   function removeVoice(voice: Voice): void {
     const index = voices.indexOf(voice);
 
@@ -183,10 +166,6 @@ export function createAudioEngine(): AudioEngine {
     }
 
     voices.splice(index, 1);
-
-    if (voice.bus === "dialogue") {
-      updateDuck();
-    }
   }
 
   function fadeOutVoice(voice: Voice): void {
@@ -217,16 +196,19 @@ export function createAudioEngine(): AudioEngine {
       panner.connect(buses[definition.bus]);
     }
 
-    const voice: Voice = { soundId: id, startedAt: performance.now(), priority: definition.priority, bus: definition.bus, source, gain };
+    const voice: Voice = {
+      soundId: id,
+      startedAt: performance.now(),
+      priority: definition.priority,
+      bus: definition.bus,
+      source,
+      gain,
+    };
+
     source.addEventListener("ended", () => removeVoice(voice));
     voices.push(voice);
     source.start();
-
-    if (definition.bus === "dialogue") {
-      updateDuck();
-    } else {
-      lastEffectStartedAt = performance.now();
-    }
+    lastEffectStartedAt = performance.now();
 
     return buffer.duration / source.playbackRate.value;
   }
@@ -270,7 +252,10 @@ export function createAudioEngine(): AudioEngine {
 
     rampTrack(track, 0);
     window.clearTimeout(track.stopTimer);
-    track.stopTimer = window.setTimeout(() => track.element.pause(), MUSIC_CROSSFADE_SECONDS * 1000);
+    track.stopTimer = window.setTimeout(
+      () => track.element.pause(),
+      MUSIC_CROSSFADE_SECONDS * 1000,
+    );
   }
 
   function fadeInTrack(id: MusicId): void {
@@ -335,7 +320,15 @@ export function createAudioEngine(): AudioEngine {
       const now = performance.now();
       const definition: SoundDefinition = SOUNDS[id];
       const sameBus = voices.filter((voice) => voice.bus === definition.bus);
-      const decision = decideVoice(id, definition, sameBus, GLOBAL_VOICE_LIMIT, lastStartedAt.get(id), now);
+
+      const decision = decideVoice(
+        id,
+        definition,
+        sameBus,
+        GLOBAL_VOICE_LIMIT,
+        lastStartedAt.get(id),
+        now,
+      );
 
       if (decision.kind === "skip") {
         if (decision.reason === "cooldown") {
@@ -375,7 +368,11 @@ export function createAudioEngine(): AudioEngine {
 
     async preload(group) {
       const entries: [string, SoundDefinition][] = Object.entries(SOUNDS);
-      await Promise.all(entries.flatMap(([id, definition]) => (definition.group === group ? [load(id, definition)] : [])));
+      await Promise.all(
+        entries.flatMap(([id, definition]) =>
+          definition.group === group ? [load(id, definition)] : [],
+        ),
+      );
     },
 
     isUnlocked() {

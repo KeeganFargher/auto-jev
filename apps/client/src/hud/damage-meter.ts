@@ -1,12 +1,16 @@
-import { BASIC_ATTACK_ABILITY, type BattleEvent, type BattleSnapshot, type DamageDealtEvent } from "@jev-game/game";
+import type {
+  BattleEvent,
+  BattleSnapshot,
+  ComboLinkEvent,
+  DamageCause,
+  DamageEvent,
+  HealCause,
+  HealEvent,
+} from "@jev-game/game";
 import { button, el, setText } from "./dom.js";
-import { meterIcon } from "./icons.js";
-import { heroFaceArt } from "./icon-art.js";
-import { titleCase } from "./tips.js";
+import { heroIcon, meterIcon, type MeterMetric } from "./icons.js";
 import { attachTip, richText, tipCard, tipHint, tipSection, tipText } from "./tooltip.js";
-import { abilityDefinition, heroDefinition, heroName, upgradeDefinition } from "../game/catalogues.js";
-
-export type MeterMetric = "dealt" | "taken" | "healing" | "shielding";
+import { heroDefinition, heroName } from "../game/catalogues.js";
 
 export interface DamageMeter {
   readonly root: HTMLElement;
@@ -23,44 +27,47 @@ interface MeterEntry {
   totals: Record<MeterMetric, number>;
   sources: Record<MeterMetric, Map<string, number>>;
   crits: number;
-  combos: number;
-  comboBonus: number;
+  setups: number;
+  payoffs: number;
   row: HTMLElement;
   fill: HTMLElement;
   value: HTMLElement;
 }
 
-const METRICS: readonly MeterMetric[] = ["dealt", "taken", "healing", "shielding"];
+type SignatureCause = Exclude<DamageCause, "attack" | "splash">;
+
+const METRICS: readonly MeterMetric[] = ["dealt", "taken", "healing"];
 
 const METRIC_TITLES: Readonly<Record<MeterMetric, string>> = {
   dealt: "Damage dealt",
   taken: "Damage taken",
   healing: "Healing done",
-  shielding: "Shields given",
 };
 
 const METRIC_LABELS: Readonly<Record<MeterMetric, string>> = {
   dealt: "Damage",
   taken: "Taken",
   healing: "Healing",
-  shielding: "Shields",
 };
 
 const METRIC_HELP: Readonly<Record<MeterMetric, string>> = {
-  dealt: "Damage each hero dealt this fight, counting what enemy shields soaked up. A summon's damage counts for the hero that raised it.",
-  taken: "Damage each hero took this fight, counting what its own shields soaked up.",
-  healing: "HP each hero restored to itself and its allies this fight, lifesteal included. A summon's healing counts for the hero that raised it.",
-  shielding: "Shield points each hero put on itself and its allies this fight.",
+  dealt: "Damage each hero dealt to enemies this fight, fire and knock-on hits included.",
+  taken: "Damage each hero took this fight, from enemies and from friendly blasts.",
+  healing: "HP each hero restored to its allies this fight.",
 };
 
-const SOURCE_LABELS = new Map<string, string>([
-  ["lifesteal", "Lifesteal"],
-  ["leech", "Leech"],
-  ["combo-splash", "Combo splash"],
-  ["overload", "Overload splash"],
-  ["shatter", "Shatter shards"],
-  ["crush", "Crush"],
-]);
+const CAUSE_LABELS: Readonly<Record<SignatureCause, string>> = {
+  hammer: "Hammerfall",
+  throw: "Throws",
+  bowling: "Bowling",
+  blast: "Fuse blasts",
+  burn: "Burning",
+  yank: "Yank",
+};
+
+const HEAL_LABELS: Readonly<Record<Exclude<HealCause, "attack">, string>> = {
+  "safety-bubble": "Safety Bubble",
+};
 
 const STORAGE_KEY = "jev-game.meter-metric";
 
@@ -96,12 +103,30 @@ function percent(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
 }
 
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 function emptyTotals(): Record<MeterMetric, number> {
-  return { dealt: 0, taken: 0, healing: 0, shielding: 0 };
+  return { dealt: 0, taken: 0, healing: 0 };
 }
 
 function emptySources(): Record<MeterMetric, Map<string, number>> {
-  return { dealt: new Map(), taken: new Map(), healing: new Map(), shielding: new Map() };
+  return { dealt: new Map(), taken: new Map(), healing: new Map() };
+}
+
+function damageLabel(heroId: string, cause: DamageCause): string {
+  const attack = heroDefinition(heroId).attack;
+
+  if (cause === "attack") {
+    return attack.name;
+  }
+
+  return cause === "splash" ? `${attack.name} splash` : CAUSE_LABELS[cause];
+}
+
+function healLabel(heroId: string, cause: HealCause): string {
+  return cause === "attack" ? heroDefinition(heroId).attack.name : HEAL_LABELS[cause];
 }
 
 function sourceLine(label: string, amount: number, total: number): HTMLElement {
@@ -140,9 +165,7 @@ export function createDamageMeter(): DamageMeter {
   const rows = el("div", "meter-rows");
   const scroller = el("div", "meter-scroll", rows);
   const entries = new Map<string, MeterEntry>();
-  const owners = new Map<string, string>();
   const heroOfUnit = new Map<string, string>();
-  const summons = new Set<string>();
   let dirty = false;
   let renderedAt = Number.NEGATIVE_INFINITY;
   let trailing = 0;
@@ -152,14 +175,29 @@ export function createDamageMeter(): DamageMeter {
     const tab = button("meter-tab", () => choose(option), meterIcon(option));
     tab.dataset.metric = option;
     tab.setAttribute("aria-label", METRIC_TITLES[option]);
-    attachTip(tab, { key: `meter-tab:${option}`, side: "left", live: false, render: () => metricTip(option) });
+
+    attachTip(tab, {
+      key: `meter-tab:${option}`,
+      side: "left",
+      live: false,
+      render: () => metricTip(option),
+    });
+
     tabs.set(option, tab);
   }
 
-  const root = el("section", "hud-section meter", el("header", "hud-section-head", title, el("div", "meter-tabs", ...tabs.values())), scroller);
+  const root = el(
+    "section",
+    "hud-section meter",
+    el("header", "hud-section-head", title, el("div", "meter-tabs", ...tabs.values())),
+    scroller,
+  );
 
   function syncClip(): void {
-    scroller.classList.toggle("is-clipped", scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1);
+    scroller.classList.toggle(
+      "is-clipped",
+      scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 1,
+    );
   }
 
   scroller.addEventListener("scroll", syncClip, { passive: true });
@@ -178,6 +216,16 @@ export function createDamageMeter(): DamageMeter {
     }
   }
 
+  function heroOf(unitId: string): string {
+    const heroId = heroOfUnit.get(unitId);
+
+    if (heroId === undefined) {
+      throw new Error(`Damage meter has never seen unit ${unitId}`);
+    }
+
+    return heroId;
+  }
+
   function entryTip(entry: MeterEntry): HTMLElement {
     const total = entry.totals[metric];
     let teamTotal = 0;
@@ -186,31 +234,38 @@ export function createDamageMeter(): DamageMeter {
       teamTotal += other.totals[metric];
     }
 
-    const sorted = [...entry.sources[metric].entries()].sort((first, second) => second[1] - first[1]);
-    const lines: HTMLElement[] = [];
-    let rest = 0;
+    const sorted = [...entry.sources[metric].entries()].sort(
+      (first, second) => second[1] - first[1],
+    );
 
-    sorted.forEach(([label, amount], index) => {
-      if (index < TOP_SOURCES) {
-        lines.push(sourceLine(label, amount, total));
-      } else {
-        rest += amount;
-      }
-    });
+    const lines = sorted
+      .slice(0, TOP_SOURCES)
+      .map(([label, amount]) => sourceLine(label, amount, total));
+
+    const rest = sorted.slice(TOP_SOURCES).reduce((sum, [, amount]) => sum + amount, 0);
 
     if (rest > 0) {
       lines.push(sourceLine("Other", rest, total));
     }
 
-    const sections = [tipSection(metric === "taken" ? "Taken from" : "Sources", ...(lines.length === 0 ? [el("p", "tip-empty", "Nothing yet")] : lines))];
+    const sections = [
+      tipSection(
+        metric === "taken" ? "Taken from" : "Sources",
+        ...(lines.length === 0 ? [el("p", "tip-empty", "Nothing yet")] : lines),
+      ),
+    ];
 
-    if (metric === "dealt" && (entry.crits > 0 || entry.combos > 0)) {
-      const combos = entry.combos === 1 ? "1 combo" : `${entry.combos} combos`;
-
+    if (metric === "dealt" && entry.crits + entry.setups + entry.payoffs > 0) {
       sections.push(
         tipSection(
           null,
-          el("p", "tip-text", ...richText(`${entry.crits} critical hits · ${combos} detonated for +${formatAmount(entry.comboBonus)} bonus damage`)),
+          el(
+            "p",
+            "tip-text",
+            ...richText(
+              `${plural(entry.crits, "critical hit", "critical hits")} · set up ${plural(entry.setups, "combo", "combos")} · paid off ${entry.payoffs}`,
+            ),
+          ),
         ),
       );
     }
@@ -220,7 +275,7 @@ export function createDamageMeter(): DamageMeter {
     }
 
     const card = tipCard({
-      icon: heroFaceArt(entry.heroId),
+      icon: heroIcon(entry.heroId),
       accent: "var(--role)",
       title: heroName(entry.heroId),
       subtitle: `${formatAmount(total)} · ${percent(teamTotal <= 0 ? 0 : total / teamTotal)} of the team`,
@@ -240,7 +295,7 @@ export function createDamageMeter(): DamageMeter {
     const row = el(
       "div",
       "meter-row",
-      el("span", "meter-portrait", heroFaceArt(heroId)),
+      el("span", "meter-portrait", heroIcon(heroId)),
       el("span", "meter-name", heroName(heroId)),
       value,
       el("span", "meter-bar", fill),
@@ -255,14 +310,19 @@ export function createDamageMeter(): DamageMeter {
       totals: emptyTotals(),
       sources: emptySources(),
       crits: 0,
-      combos: 0,
-      comboBonus: 0,
+      setups: 0,
+      payoffs: 0,
       row,
       fill,
       value,
     };
 
-    attachTip(row, { key: `meter:${unitId}`, side: "left", live: true, render: () => entryTip(entry) });
+    attachTip(row, {
+      key: `meter:${unitId}`,
+      side: "left",
+      live: true,
+      render: () => entryTip(entry),
+    });
 
     return entry;
   }
@@ -322,12 +382,6 @@ export function createDamageMeter(): DamageMeter {
     render();
   }
 
-  function ownerEntry(unitId: string): MeterEntry | undefined {
-    const owner = owners.get(unitId);
-
-    return owner === undefined ? undefined : entries.get(owner);
-  }
-
   function add(entry: MeterEntry, which: MeterMetric, label: string, amount: number): void {
     if (amount <= 0) {
       return;
@@ -338,106 +392,82 @@ export function createDamageMeter(): DamageMeter {
     dirty = true;
   }
 
-  function summonLabel(heroId: string): string {
-    return heroDefinition(heroId)?.summon === true ? heroName(heroId) : `Risen ${heroName(heroId)}`;
-  }
-
-  function sourceLabel(unitId: string, abilityId: string): string {
-    const heroId = heroOfUnit.get(unitId);
-
-    if (heroId !== undefined && summons.has(unitId)) {
-      const hero = heroDefinition(heroId);
-      const named = hero?.summon === true && hero.basicAttackId !== abilityId ? abilityDefinition(abilityId)?.name : undefined;
-
-      return named ?? summonLabel(heroId);
-    }
-
-    if (abilityId === BASIC_ATTACK_ABILITY || (heroId !== undefined && heroDefinition(heroId)?.basicAttackId === abilityId)) {
-      return "Basic attack";
-    }
-
-    return abilityDefinition(abilityId)?.name ?? upgradeDefinition(abilityId)?.name ?? SOURCE_LABELS.get(abilityId) ?? titleCase(abilityId);
-  }
-
-  function attackerLabel(event: DamageDealtEvent): string {
-    if (event.sourceUnitId === event.targetUnitId) {
-      return "Self";
-    }
-
-    const heroId = heroOfUnit.get(event.sourceUnitId);
-
-    if (heroId === undefined) {
-      return titleCase(event.sourceUnitId);
-    }
-
-    return summons.has(event.sourceUnitId) ? summonLabel(heroId) : heroName(heroId);
-  }
-
-  function ingestDamage(event: DamageDealtEvent): void {
-    const amount = event.amount + event.shieldAbsorbed;
-    const attacker = ownerEntry(event.sourceUnitId);
+  function ingestDamage(event: DamageEvent): void {
+    const attacker = entries.get(event.sourceUnitId);
     const victim = entries.get(event.targetUnitId);
 
-    if (attacker !== undefined && !owners.has(event.targetUnitId)) {
-      add(attacker, "dealt", event.dot === undefined ? sourceLabel(event.sourceUnitId, event.abilityId) : titleCase(event.dot), amount);
+    if (attacker !== undefined && victim === undefined) {
+      add(attacker, "dealt", damageLabel(attacker.heroId, event.cause), event.amount);
 
-      if (event.crit === true) {
+      if (event.crit) {
         attacker.crits += 1;
       }
     }
 
     if (victim !== undefined) {
-      add(victim, "taken", attackerLabel(event), amount);
+      const label =
+        event.sourceUnitId === event.targetUnitId ? "Self" : heroName(heroOf(event.sourceUnitId));
+
+      add(victim, "taken", label, event.amount);
+    }
+  }
+
+  function ingestHeal(event: HealEvent): void {
+    const healer = entries.get(event.sourceUnitId);
+
+    if (healer !== undefined) {
+      add(healer, "healing", healLabel(healer.heroId, event.cause), event.amount);
+    }
+  }
+
+  function ingestCombo(event: ComboLinkEvent): void {
+    const setup = entries.get(event.setupUnitId);
+    const payoff = entries.get(event.payoffUnitId);
+
+    if (setup !== undefined) {
+      setup.setups += 1;
+      dirty = true;
+    }
+
+    if (payoff !== undefined) {
+      payoff.payoffs += 1;
+      dirty = true;
     }
   }
 
   function ingest(event: BattleEvent): void {
-    if (event.kind === "damage-dealt") {
-      ingestDamage(event);
+    switch (event.kind) {
+      case "damage": {
+        ingestDamage(event);
 
-      return;
-    }
-
-    if (event.kind === "healing-done" || event.kind === "shield-applied") {
-      const entry = ownerEntry(event.sourceUnitId);
-
-      if (entry !== undefined) {
-        add(entry, event.kind === "healing-done" ? "healing" : "shielding", sourceLabel(event.sourceUnitId, event.abilityId), event.amount);
+        return;
       }
 
-      return;
-    }
+      case "heal": {
+        ingestHeal(event);
 
-    if (event.kind === "unit-spawned") {
-      heroOfUnit.set(event.unitId, event.heroId);
-      summons.add(event.unitId);
-      const owner = owners.get(event.summonerUnitId);
-
-      if (owner !== undefined) {
-        owners.set(event.unitId, owner);
+        return;
       }
 
-      return;
-    }
+      case "combo-link": {
+        ingestCombo(event);
 
-    if (event.kind === "combo-detonated") {
-      const entry = ownerEntry(event.sourceUnitId);
-
-      if (entry !== undefined) {
-        entry.combos += 1;
-        entry.comboBonus += event.bonusDamage;
-        dirty = true;
+        return;
       }
 
-      return;
-    }
+      case "death": {
+        const entry = entries.get(event.unitId);
 
-    if (event.kind === "death" || event.kind === "revived") {
-      const entry = entries.get(event.unitId);
+        if (entry !== undefined) {
+          entry.alive = false;
+          dirty = true;
+        }
 
-      if (entry !== undefined) {
-        entry.alive = event.kind === "revived";
-        dirty = true;
+        return;
+      }
+
+      default: {
+        return;
       }
     }
   }
@@ -447,9 +477,7 @@ export function createDamageMeter(): DamageMeter {
     trailing = 0;
     dirty = false;
     entries.clear();
-    owners.clear();
     heroOfUnit.clear();
-    summons.clear();
     rows.replaceChildren();
     shownRows = -1;
     rows.style.height = "";
@@ -469,24 +497,16 @@ export function createDamageMeter(): DamageMeter {
       for (const unit of opening.units) {
         heroOfUnit.set(unit.unitId, unit.heroId);
 
-        if (unit.teamId === friendlyTeamId && unit.summonerUnitId === null) {
+        if (unit.teamId === friendlyTeamId) {
           const entry = makeEntry(unit.unitId, unit.heroId, order);
           order += 1;
           entries.set(unit.unitId, entry);
-          owners.set(unit.unitId, unit.unitId);
           rows.append(entry.row);
         }
       }
 
-      for (const unit of opening.units) {
-        if (unit.summonerUnitId !== null) {
-          summons.add(unit.unitId);
-          const owner = owners.get(unit.summonerUnitId);
-
-          if (owner !== undefined) {
-            owners.set(unit.unitId, owner);
-          }
-        }
+      if (entries.size === 0) {
+        throw new Error(`Damage meter found no units on team ${friendlyTeamId}`);
       }
 
       for (const event of history) {

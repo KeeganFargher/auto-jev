@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { PlayerView } from "@jev-game/run";
+import type { PlayerView, RunCommandRejectionReason } from "@jev-game/run";
 
-export const PROTOCOL_VERSION = 9;
+export const PROTOCOL_VERSION = 10;
 
 export const MATCH_ROOM_NAME = "match";
 
@@ -20,19 +20,13 @@ const boardCell = z.object({
   row: z.number().int().min(0).max(63),
 });
 
-const heroSlot = z.number().int().min(0).max(15).nullable();
-
-const skill = z.enum(["ability", "ultimate"]).nullable();
+const heroIds = z.array(identifier).max(8);
 
 export const commandIntent = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("select-heroes"), offerIds: z.array(identifier).max(16) }),
-  z.object({ kind: z.literal("commit-draft"), offerIds: z.array(identifier).max(16) }),
+  z.object({ kind: z.literal("select-heroes"), heroIds }),
+  z.object({ kind: z.literal("commit-draft"), heroIds }),
+  z.object({ kind: z.literal("place-heroes"), formation: z.array(boardCell).max(8) }),
   z.object({ kind: z.literal("confirm-ready") }),
-  z.object({ kind: z.literal("place-heroes"), formation: z.array(boardCell).max(16) }),
-  z.object({ kind: z.literal("choose-offer"), decisionId: identifier, offerId: identifier, heroSlot, skill }),
-  z.object({ kind: z.literal("move-item"), instanceId: identifier, heroSlot }),
-  z.object({ kind: z.literal("socket-gem"), instanceId: identifier, heroSlot, skill }),
-  z.object({ kind: z.literal("discard-item"), instanceId: identifier }),
 ]);
 
 export type CommandIntent = z.infer<typeof commandIntent>;
@@ -63,32 +57,23 @@ export type WatchedMessage = z.infer<typeof watchedMessage>;
 
 export const joinOptions = z.object({
   name: z.string().trim().max(MAX_DISPLAY_NAME_LENGTH).optional(),
-  protocolVersion: z.number().int().optional(),
+  protocolVersion: z.number().int(),
+  simHash: z.string().regex(/^[0-9a-f]{64}$/),
   solo: z.boolean().optional(),
 });
 
 export type JoinOptions = z.infer<typeof joinOptions>;
+
+export const createOptions = joinOptions.pick({ solo: true });
+
+export type CreateOptions = z.infer<typeof createOptions>;
 
 export type CommandRejectionReason =
   | "not-started"
   | "not-seated"
   | "stale-run"
   | "stale-epoch"
-  | "wrong-phase"
-  | "unknown-player"
-  | "already-eliminated"
-  | "already-decided"
-  | "unknown-offer"
-  | "duplicate-offer"
-  | "invalid-offer-count"
-  | "ineligible-upgrade"
-  | "invalid-formation"
-  | "stale-revision"
-  | "unknown-decision"
-  | "unknown-piece"
-  | "no-room"
-  | "team-full"
-  | "gem-does-not-fit";
+  | RunCommandRejectionReason;
 
 export interface AckMessage {
   commandId: string;

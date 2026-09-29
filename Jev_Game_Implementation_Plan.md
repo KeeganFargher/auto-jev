@@ -18,23 +18,23 @@ Confirmed round format: eight active players form four simultaneous two-player d
 
 The hero pool, approximately three starting heroes, later recruitment, economy and number of rounds are still ideas to explore. They are not settled requirements. The existing keyboard movement and prediction example demonstrates networking; it does not establish that the game needs direct movement controls.
 
-| Topic | Starting assumption | Status and point of review |
-| --- | --- | --- |
-| Platform | Desktop browser, TypeScript, pnpm, Phaser and Colyseus | Retain the existing stack; confirm installed versions in Phase 1 |
-| Combat | Automatic movement, targeting, attacks and abilities | Working game direction |
-| First arena | One flat 2D rectangular arena, circles for characters | Disposable presentation choice |
-| Team size | One versus one first; then experiment with three versus three | Tuning choice, never hard-coded into combat rules |
-| Player decisions | Pick heroes and upgrades between battles | Working direction; exact cadence remains open |
-| Jev role | Independently control every bot seat, choosing its heroes and upgrades | Required player type; provider integration arrives in Phase 7 |
-| Player seats | Up to eight; any mix of human and Jev players | User requirement; one human plus seven bots and two plus six are acceptance cases |
-| Round format | Up to four simultaneous duels; opponents rotate each round | Confirmed by the user |
-| Human joining | Join available seats before start, with bots filling the remainder | Initial policy; live takeover is an open later choice |
-| Simulation | Fixed ticks, seeded randomness, plain data | Architectural commitment |
-| Multiplayer | Authoritative server, private rooms first | Architectural commitment; public matchmaking deferred |
-| Dependencies | No imports from one app into another app | User constraint |
-| Content | Three contrasting heroes and a small upgrade pool | Learning material, not a production roster |
-| Economy | No currency in the first playable run | Temporary simplification; review in Phase 8 |
-| Run length | Three health per seat; elimination at zero; last survivor or eight-round cap | Provisional numbers and tie rules; lobby format is settled |
+| Topic            | Starting assumption                                                          | Status and point of review                                                        |
+| ---------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Platform         | Desktop browser, TypeScript, pnpm, Phaser and Colyseus                       | Retain the existing stack; confirm installed versions in Phase 1                  |
+| Combat           | Automatic movement, targeting, attacks and abilities                         | Working game direction                                                            |
+| First arena      | One flat 2D rectangular arena, circles for characters                        | Disposable presentation choice                                                    |
+| Team size        | One versus one first; then experiment with three versus three                | Tuning choice, never hard-coded into combat rules                                 |
+| Player decisions | Pick heroes and upgrades between battles                                     | Working direction; exact cadence remains open                                     |
+| Jev role         | Independently control every bot seat, choosing its heroes and upgrades       | Required player type; provider integration arrives in Phase 7                     |
+| Player seats     | Up to eight; any mix of human and Jev players                                | User requirement; one human plus seven bots and two plus six are acceptance cases |
+| Round format     | Up to four simultaneous duels; opponents rotate each round                   | Confirmed by the user                                                             |
+| Human joining    | Join available seats before start, with bots filling the remainder           | Initial policy; live takeover is an open later choice                             |
+| Simulation       | Fixed ticks, seeded randomness, plain data                                   | Architectural commitment                                                          |
+| Multiplayer      | Authoritative server, private rooms first                                    | Architectural commitment; public matchmaking deferred                             |
+| Dependencies     | No imports from one app into another app                                     | User constraint                                                                   |
+| Content          | Three contrasting heroes and a small upgrade pool                            | Learning material, not a production roster                                        |
+| Economy          | No currency in the first playable run                                        | Temporary simplification; review in Phase 8                                       |
+| Run length       | Three health per seat; elimination at zero; last survivor or eight-round cap | Provisional numbers and tie rules; lobby format is settled                        |
 
 Do not build a strategy map, platformer, faction economy or campaign based on the older game project. Reuse suitable art later without importing its systems.
 
@@ -54,15 +54,15 @@ Do not start with a generic ECS, scripting language, plugin framework, dependenc
 
 Create packages when their phase needs them. The full layout below is a destination map, not an instruction to generate empty folders today.
 
-| Package or app | Owns | Allowed workspace imports |
-| --- | --- | --- |
-| `packages/game` | Pure rules, domain types, seeded RNG, combat and run simulation | None |
-| `packages/content` | Concrete heroes, abilities, upgrades, scenarios and rulesets | `game` |
-| `packages/protocol` | Wire message validation, wire schemas and public room contracts | `game` where necessary |
-| `packages/jev` | Observation construction, provider adapter and decision handling | `game`; no app imports |
-| `packages/server-runtime` | Colyseus room implementation, actual server definition, sessions and bot orchestration | `game`, `content`, `protocol`, later `jev` |
-| `apps/server` | Environment validation, process start and shutdown | `server-runtime` |
-| `apps/client` | Phaser rendering, HUD, local laboratory and network client | `game`, browser-safe `content`, `protocol`; type-only `server-runtime/contract` |
+| Package or app            | Owns                                                                                   | Allowed workspace imports                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `packages/game`           | Pure rules, domain types, seeded RNG, combat and run simulation                        | None                                                                            |
+| `packages/content`        | Concrete heroes, abilities, upgrades, scenarios and rulesets                           | `game`                                                                          |
+| `packages/protocol`       | Wire message validation, wire schemas and public room contracts                        | `game` where necessary                                                          |
+| `packages/jev`            | Observation construction, provider adapter and decision handling                       | `game`; no app imports                                                          |
+| `packages/server-runtime` | Colyseus room implementation, actual server definition, sessions and bot orchestration | `game`, `content`, `protocol`, later `jev`                                      |
+| `apps/server`             | Environment validation, process start and shutdown                                     | `server-runtime`                                                                |
+| `apps/client`             | Phaser rendering, HUD, local laboratory and network client                             | `game`, browser-safe `content`, `protocol`; type-only `server-runtime/contract` |
 
 Every arrow implied by the last column means “imports from”. `content` imports definition types from `game`. `game` receives content as an argument and never imports the concrete catalogue. `jev` depends on the game; the game never depends on Jev. All packages are private workspace packages initially.
 
@@ -125,11 +125,11 @@ Phase 1 must prove declaration emission and inference with the installed SDK. Fi
 
 ### Three kinds of state
 
-| Kind | Owner | Examples |
-| --- | --- | --- |
-| Authoritative domain state | `game`, hosted by local laboratory or server | HP, positions, cooldowns, RNG state, round result |
-| Wire state | `protocol`, populated by `server-runtime` | Public unit fields, run phase, revision, connection status |
-| Presentation state | `apps/client` | Hover, selection, interpolation position, animations, open panels |
+| Kind                       | Owner                                        | Examples                                                          |
+| -------------------------- | -------------------------------------------- | ----------------------------------------------------------------- |
+| Authoritative domain state | `game`, hosted by local laboratory or server | HP, positions, cooldowns, RNG state, round result                 |
+| Wire state                 | `protocol`, populated by `server-runtime`    | Public unit fields, run phase, revision, connection status        |
+| Presentation state         | `apps/client`                                | Hover, selection, interpolation position, animations, open panels |
 
 Never place a Phaser sprite inside domain state. Never make Colyseus schema classes the only representation of battle state. Never read damage values back out of the HUD. Store derived values only where there is an explicit owner and invalidation rule.
 
@@ -169,44 +169,44 @@ apps/client/src/style.css
 
 All paths here are relative to `packages/game/src/`.
 
-| Path | Job | First phase |
-| --- | --- | --- |
-| `index.ts` | Deliberate public exports | 2 |
-| `definitions.ts` | Hero, attack, arena and ability definition types | 2, extended later |
-| `ids.ts` | Distinguish definition IDs from unit instance IDs | 2 |
-| `random/rng.ts` | Explicit seed and serialisable generator state | 2 |
-| `math/vector.ts` | Distance, normalisation and arena clamping actually needed | 2 |
-| `battle/state.ts` | Battle and unit instance data | 2 |
-| `battle/create-battle.ts` | Validate and instantiate a battle from a setup | 2 |
-| `battle/step-battle.ts` | One fixed simulation tick in a documented order | 2 |
-| `battle/result.ts` | Active, win, draw or simulation failure | 2 |
-| `battle/events.ts` | Typed observable battle events | 2 |
-| `battle/targeting.ts` | Legal candidates, target retention and tie-breaking | 2 |
-| `battle/movement.ts` | Automatic approach and stop behaviour | 2 |
-| `battle/attacks.ts` | Attack timing, range and basic attack proposals | 2 |
-| `battle/damage.ts` | Single damage application path | 2 |
-| `battle/snapshot.ts` | Read-only export of observable state | 2 |
-| `battle/recording.ts` | Versioned setup, events and playback samples | 3 |
-| `battle/abilities.ts` | Cast eligibility, targeting and ability scheduling | 3 |
-| `battle/effects.ts` | Resolve explicit damage, healing and status effects | 3 |
-| `battle/statuses.ts` | Timed statuses, expiry and stacking policies | 3 |
-| `battle/triggers.ts` | Bounded deterministic reactions | 4 |
-| `builds/state.ts` | Persistent hero build and selected upgrades | 4 |
-| `builds/compile-build.ts` | Compile definitions and choices into battle stats | 4 |
-| `builds/apply-upgrade.ts` | Validate and change a build | 4 |
-| `run/state.ts` | Lobby seats, controller kinds, choices, health, round and phase | 5 |
-| `run/pairings.ts` | Deterministic opponent rotation, rematch avoidance and byes | 5 |
-| `run/round.ts` | Freeze builds, create concurrent battles and settle the entire round once | 5 |
-| `run/standings.ts` | Eliminations, tied placements and match result | 5 |
-| `run/player-view.ts` | Own private choices plus allowed public lobby information | 5 |
-| `run/commands.ts` | Typed player intentions and rejection reasons | 5 |
-| `run/apply-command.ts` | Phase, ownership and revision validation | 5 |
-| `run/transitions.ts` | Legal state transitions and round settlement | 5 |
-| `run/offers.ts` | Seeded legal offers and exhausted-pool handling | 5 |
-| `run/legal-choices.ts` | Legal actions for humans and controllers | 5 |
-| `controllers/types.ts` | Game-facing observation and decision interfaces | 5 |
-| `controllers/random-controller.ts` | Reproducible baseline choice policy | 5 |
-| `controllers/heuristic-controller.ts` | Simple documented baseline priorities | 5 |
+| Path                                  | Job                                                                       | First phase       |
+| ------------------------------------- | ------------------------------------------------------------------------- | ----------------- |
+| `index.ts`                            | Deliberate public exports                                                 | 2                 |
+| `definitions.ts`                      | Hero, attack, arena and ability definition types                          | 2, extended later |
+| `ids.ts`                              | Distinguish definition IDs from unit instance IDs                         | 2                 |
+| `random/rng.ts`                       | Explicit seed and serialisable generator state                            | 2                 |
+| `math/vector.ts`                      | Distance, normalisation and arena clamping actually needed                | 2                 |
+| `battle/state.ts`                     | Battle and unit instance data                                             | 2                 |
+| `battle/create-battle.ts`             | Validate and instantiate a battle from a setup                            | 2                 |
+| `battle/step-battle.ts`               | One fixed simulation tick in a documented order                           | 2                 |
+| `battle/result.ts`                    | Active, win, draw or simulation failure                                   | 2                 |
+| `battle/events.ts`                    | Typed observable battle events                                            | 2                 |
+| `battle/targeting.ts`                 | Legal candidates, target retention and tie-breaking                       | 2                 |
+| `battle/movement.ts`                  | Automatic approach and stop behaviour                                     | 2                 |
+| `battle/attacks.ts`                   | Attack timing, range and basic attack proposals                           | 2                 |
+| `battle/damage.ts`                    | Single damage application path                                            | 2                 |
+| `battle/snapshot.ts`                  | Read-only export of observable state                                      | 2                 |
+| `battle/recording.ts`                 | Versioned setup, events and playback samples                              | 3                 |
+| `battle/abilities.ts`                 | Cast eligibility, targeting and ability scheduling                        | 3                 |
+| `battle/effects.ts`                   | Resolve explicit damage, healing and status effects                       | 3                 |
+| `battle/statuses.ts`                  | Timed statuses, expiry and stacking policies                              | 3                 |
+| `battle/triggers.ts`                  | Bounded deterministic reactions                                           | 4                 |
+| `builds/state.ts`                     | Persistent hero build and selected upgrades                               | 4                 |
+| `builds/compile-build.ts`             | Compile definitions and choices into battle stats                         | 4                 |
+| `builds/apply-upgrade.ts`             | Validate and change a build                                               | 4                 |
+| `run/state.ts`                        | Lobby seats, controller kinds, choices, health, round and phase           | 5                 |
+| `run/pairings.ts`                     | Deterministic opponent rotation, rematch avoidance and byes               | 5                 |
+| `run/round.ts`                        | Freeze builds, create concurrent battles and settle the entire round once | 5                 |
+| `run/standings.ts`                    | Eliminations, tied placements and match result                            | 5                 |
+| `run/player-view.ts`                  | Own private choices plus allowed public lobby information                 | 5                 |
+| `run/commands.ts`                     | Typed player intentions and rejection reasons                             | 5                 |
+| `run/apply-command.ts`                | Phase, ownership and revision validation                                  | 5                 |
+| `run/transitions.ts`                  | Legal state transitions and round settlement                              | 5                 |
+| `run/offers.ts`                       | Seeded legal offers and exhausted-pool handling                           | 5                 |
+| `run/legal-choices.ts`                | Legal actions for humans and controllers                                  | 5                 |
+| `controllers/types.ts`                | Game-facing observation and decision interfaces                           | 5                 |
+| `controllers/random-controller.ts`    | Reproducible baseline choice policy                                       | 5                 |
+| `controllers/heuristic-controller.ts` | Simple documented baseline priorities                                     | 5                 |
 
 Damage formulas belong in `battle/damage.ts`, not a generic maths package. Do not introduce `packages/types`, `packages/utils`, `packages/combat` or `packages/engine` alongside this package.
 
@@ -235,31 +235,31 @@ Start with only the bruiser, strike, arena and duel. Catalogue validation checks
 
 All paths below are relative to `apps/client/src/`.
 
-| Path | Job |
-| --- | --- |
-| `game/create-game.ts` | Configure Phaser and mount the canvas |
-| `game/scenes/BattleLabScene.ts` | Laboratory scene lifecycle and orchestration |
-| `game/scenes/MatchScene.ts` | Online/local run presentation once runs exist |
-| `game/views/UnitView.ts` | One unit's sprite or placeholder, label and health bar |
-| `game/views/ArenaView.ts` | Arena boundary and formation markers |
-| `game/views/BattleView.ts` | Create, update and dispose all battle views |
-| `game/fx/CombatFx.ts` | Translate cosmetic events into effects and sounds |
-| `session/types.ts` | Minimal display/read/action boundary used by screens |
-| `session/local-session.ts` | Host the same game functions locally |
-| `session/online-session.ts` | Map authoritative room data into the display boundary |
-| `network/connect-room.ts` | SDK connection and contract import |
-| `network/room-events.ts` | Subscription setup, deduplication and disposal |
-| `hud/battle-controls.ts` | Start, pause, step, speed and reset in the laboratory |
-| `hud/unit-inspector.ts` | Selected unit stats, timers and effects |
-| `hud/event-log.ts` | Filterable recent combat events |
-| `hud/hero-picker.ts` | Draft interaction |
-| `hud/upgrade-picker.ts` | Upgrade interaction |
-| `hud/run-summary.ts` | Own round result, remaining health and lobby standings |
-| `hud/lobby.ts` | Human joins, bot seats, readiness and match start |
-| `hud/pairings.ts` | Current opponent, other pairings and battle progress |
-| `hud/jev-decision.ts` | Actual recorded Jev selection and returned uncertainty |
-| `dev/scenario-editor.ts` | Lab-only setup changes and scenario import/export |
-| `dev/experiment-comparison.ts` | Compare saved results in Phase 8 |
+| Path                            | Job                                                    |
+| ------------------------------- | ------------------------------------------------------ |
+| `game/create-game.ts`           | Configure Phaser and mount the canvas                  |
+| `game/scenes/BattleLabScene.ts` | Laboratory scene lifecycle and orchestration           |
+| `game/scenes/MatchScene.ts`     | Online/local run presentation once runs exist          |
+| `game/views/UnitView.ts`        | One unit's sprite or placeholder, label and health bar |
+| `game/views/ArenaView.ts`       | Arena boundary and formation markers                   |
+| `game/views/BattleView.ts`      | Create, update and dispose all battle views            |
+| `game/fx/CombatFx.ts`           | Translate cosmetic events into effects and sounds      |
+| `session/types.ts`              | Minimal display/read/action boundary used by screens   |
+| `session/local-session.ts`      | Host the same game functions locally                   |
+| `session/online-session.ts`     | Map authoritative room data into the display boundary  |
+| `network/connect-room.ts`       | SDK connection and contract import                     |
+| `network/room-events.ts`        | Subscription setup, deduplication and disposal         |
+| `hud/battle-controls.ts`        | Start, pause, step, speed and reset in the laboratory  |
+| `hud/unit-inspector.ts`         | Selected unit stats, timers and effects                |
+| `hud/event-log.ts`              | Filterable recent combat events                        |
+| `hud/hero-picker.ts`            | Draft interaction                                      |
+| `hud/upgrade-picker.ts`         | Upgrade interaction                                    |
+| `hud/run-summary.ts`            | Own round result, remaining health and lobby standings |
+| `hud/lobby.ts`                  | Human joins, bot seats, readiness and match start      |
+| `hud/pairings.ts`               | Current opponent, other pairings and battle progress   |
+| `hud/jev-decision.ts`           | Actual recorded Jev selection and returned uncertainty |
+| `dev/scenario-editor.ts`        | Lab-only setup changes and scenario import/export      |
+| `dev/experiment-comparison.ts`  | Compare saved results in Phase 8                       |
 
 Use ordinary HTML and CSS for the initial laboratory panels alongside the Phaser canvas. Keep an existing UI framework if already present; do not add React just to display a few controls. Phaser owns scene lifecycle and rendering [S2]. Shutdown handlers must dispose subscriptions, DOM listeners, timers and views.
 
@@ -323,19 +323,19 @@ For this plan, use compiled workspace packages:
 
 Example script responsibilities, adapted to the actual installed tools:
 
-| Location | Script | Responsibility |
-| --- | --- | --- |
-| Root | `build` | `pnpm -r --if-present build` in dependency order |
-| Root | `dev` | Complete initial build, then `pnpm -r --parallel --if-present dev` |
-| Root | `typecheck` | Check every workspace package, with dependency declarations available |
-| Root | `lint` | Existing strict linter and dependency restrictions |
-| Packages | `build` | `tsc -p tsconfig.json` |
-| Packages | `dev` | `tsc -p tsconfig.json --watch` |
-| Server app | `dev` | `tsx watch` with workspace output watching |
-| Server app | `build` | `tsc -p tsconfig.json` |
-| Server app | `start` | `node dist/index.js` |
-| Client app | `dev` | `vite` |
-| Client app | `build` | Typecheck, then `vite build` |
+| Location   | Script      | Responsibility                                                        |
+| ---------- | ----------- | --------------------------------------------------------------------- |
+| Root       | `build`     | `pnpm -r --if-present build` in dependency order                      |
+| Root       | `dev`       | Complete initial build, then `pnpm -r --parallel --if-present dev`    |
+| Root       | `typecheck` | Check every workspace package, with dependency declarations available |
+| Root       | `lint`      | Existing strict linter and dependency restrictions                    |
+| Packages   | `build`     | `tsc -p tsconfig.json`                                                |
+| Packages   | `dev`       | `tsc -p tsconfig.json --watch`                                        |
+| Server app | `dev`       | `tsx watch` with workspace output watching                            |
+| Server app | `build`     | `tsc -p tsconfig.json`                                                |
+| Server app | `start`     | `node dist/index.js`                                                  |
+| Client app | `dev`       | `vite`                                                                |
+| Client app | `build`     | Typecheck, then `vite build`                                          |
 
 Do not copy dependency versions from the old chat. Preserve the lockfile and compatible installed versions. Inspect a bundler's actual purpose before removing it. If it currently compensates for source-only workspace exports, fix those exports and the build order before deleting the bundle step.
 
@@ -360,15 +360,15 @@ applyRunCommand(state, command, catalogue): CommandResult
 
 Initial fields:
 
-| Type | Required concepts |
-| --- | --- |
-| `BattleSetup` | Ruleset ID/version, seed, arena ID, team builds and spawn positions |
-| `BattleState` | Tick, tick limit, unit instances, RNG state, pending actions/effects, battle status |
-| `UnitState` | Unique instance ID, hero definition ID, team ID, position, HP, compiled stats, target, next attack tick |
-| `BattleStep` | Tick, ordered event list and current result/status |
-| `BattleEvent` | Battle ID, monotonic sequence, tick, event type and relevant actor/target/amount fields |
-| `BattleSnapshot` | Serializable observable state; no live mutable references |
-| `BattleResult` | Winner team or draw reason, duration, per-unit contribution; a separate failure case |
+| Type             | Required concepts                                                                                       |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `BattleSetup`    | Ruleset ID/version, seed, arena ID, team builds and spawn positions                                     |
+| `BattleState`    | Tick, tick limit, unit instances, RNG state, pending actions/effects, battle status                     |
+| `UnitState`      | Unique instance ID, hero definition ID, team ID, position, HP, compiled stats, target, next attack tick |
+| `BattleStep`     | Tick, ordered event list and current result/status                                                      |
+| `BattleEvent`    | Battle ID, monotonic sequence, tick, event type and relevant actor/target/amount fields                 |
+| `BattleSnapshot` | Serializable observable state; no live mutable references                                               |
+| `BattleResult`   | Winner team or draw reason, duration, per-unit contribution; a separate failure case                    |
 
 Use `HeroDefinitionId` for “bruiser” and `UnitId` for “the second bruiser on team B”. Multiple copies of the same hero must work. Use `null` explicitly for a target that can legitimately be absent; do not make required input fields optional and silently default them.
 
@@ -409,17 +409,17 @@ Other explicit rules:
 
 ## 7 Phase roadmap
 
-| Phase | What you can do at the end | Main question answered |
-| --- | --- | --- |
-| 1 | Run and build the existing demo with explicit boundaries | Can we change the project reliably? |
-| 2 | Watch and inspect a reproducible duel | Is the basic battle readable? |
-| 3 | Compare three heroes with different abilities | Do roles and positioning matter? |
-| 4 | Build combinations of upgrades | Are build choices interesting? |
-| 5 | Play a local eight-seat run against seven baseline bots | Do rotating opponents and build choices make a good loop? |
-| 6 | Two humans and six baseline bots complete one shared run | Do mixed seats and simultaneous battles work online? |
-| 7 | One human plus seven Jev players, or two humans plus six | Do independent Jev opponents make interesting choices? |
-| 8 | Run focused experiments and retain the best variation | Which game do we actually want? |
-| 9 | Share a stable private playtest build | Can someone else play without assistance? |
+| Phase | What you can do at the end                               | Main question answered                                    |
+| ----- | -------------------------------------------------------- | --------------------------------------------------------- |
+| 1     | Run and build the existing demo with explicit boundaries | Can we change the project reliably?                       |
+| 2     | Watch and inspect a reproducible duel                    | Is the basic battle readable?                             |
+| 3     | Compare three heroes with different abilities            | Do roles and positioning matter?                          |
+| 4     | Build combinations of upgrades                           | Are build choices interesting?                            |
+| 5     | Play a local eight-seat run against seven baseline bots  | Do rotating opponents and build choices make a good loop? |
+| 6     | Two humans and six baseline bots complete one shared run | Do mixed seats and simultaneous battles work online?      |
+| 7     | One human plus seven Jev players, or two humans plus six | Do independent Jev opponents make interesting choices?    |
+| 8     | Run focused experiments and retain the best variation    | Which game do we actually want?                           |
+| 9     | Share a stable private playtest build                    | Can someone else play without assistance?                 |
 
 Phase numbers describe dependencies, not fixed-duration sprints. Later phases are provisional. Do not automatically continue into the next phase before its gameplay question has been reviewed. A completed phase can lead to another experiment in the same phase instead of more infrastructure.
 
@@ -705,15 +705,15 @@ TypeSafe exposes Choice, Score and Noul over supplied state. Choice returns an o
 
 ### What Jev controls and what the human controls
 
-| Decision or operation | Human seat | Jev seat | Authority |
-| --- | --- | --- | --- |
-| Hero pick | User selects an offered hero | Choice selects one legal offer | Domain command validation |
-| Upgrade pick | User selects an offered upgrade | Choice selects one legal offer | Domain command validation |
-| Formation if enabled | User chooses legal slots | Choice selects a legal formation candidate | Domain command validation |
-| Readiness | User confirms or deadline applies | Controller marks ready when required choices finish | Run phase barrier |
-| Movement, targeting and attacks | Automatic hero behaviour | The same automatic hero behaviour | Deterministic battle engine |
-| Damage, cooldowns, health and winner | No direct control | No direct control | Deterministic engine and round settlement |
-| Opponent rotation and eliminations | No direct control | No direct control | Run scheduler |
+| Decision or operation                | Human seat                        | Jev seat                                            | Authority                                 |
+| ------------------------------------ | --------------------------------- | --------------------------------------------------- | ----------------------------------------- |
+| Hero pick                            | User selects an offered hero      | Choice selects one legal offer                      | Domain command validation                 |
+| Upgrade pick                         | User selects an offered upgrade   | Choice selects one legal offer                      | Domain command validation                 |
+| Formation if enabled                 | User chooses legal slots          | Choice selects a legal formation candidate          | Domain command validation                 |
+| Readiness                            | User confirms or deadline applies | Controller marks ready when required choices finish | Run phase barrier                         |
+| Movement, targeting and attacks      | Automatic hero behaviour          | The same automatic hero behaviour                   | Deterministic battle engine               |
+| Damage, cooldowns, health and winner | No direct control                 | No direct control                                   | Deterministic engine and round settlement |
+| Opponent rotation and eliminations   | No direct control                 | No direct control                                   | Run scheduler                             |
 
 The initial game is an auto battler: you actively play the draft/build/upgrade decisions and watch their consequences in combat. This plan does not assume direct keyboard combat. Mid-battle actions remain an optional experiment if you later want more direct agency.
 
@@ -771,18 +771,18 @@ Create `scripts/compare-builds.ts` and the small comparison view only once manua
 
 Choose one experiment at a time:
 
-| Experiment | Smallest implementation | Observe before deciding |
-| --- | --- | --- |
-| One, three or five heroes | Three scenario presets and appropriate starting slots | Readability, decision load, role clarity and battle duration |
-| Recruitment | One between-round choice to add/replace a hero with an explicit capacity rule | Whether new heroes enrich the build or dilute attachment |
-| Simple economy | A run currency, priced offers and one explicit buy command | Whether saving/spending creates a decision worth the added UI |
-| Rerolls | One limited reroll resource, replace-offer command and deterministic offer stream | Whether it creates planning or merely fixes poor offers |
-| Formation | A few legal discrete positions before battle | Whether positioning visibly changes outcomes |
-| Battlefield collision | Deterministic separation for current small unit counts | Whether clarity improves without frustrating movement |
-| More explosive combinations | Two targeted trigger upgrades with clear limits | Whether surprising outcomes remain understandable |
-| Shorter battles | A ruleset changing HP/damage, with all else fixed | Watching time, information loss and run pace |
-| Mid-battle agency | One explicit optional intervention in a separate ruleset | Whether interaction improves the game enough to justify changing playback/network assumptions |
-| Jev as adviser | Surface its suggested upgrade without applying it | Whether the comparison is a compelling use case |
+| Experiment                  | Smallest implementation                                                           | Observe before deciding                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| One, three or five heroes   | Three scenario presets and appropriate starting slots                             | Readability, decision load, role clarity and battle duration                                  |
+| Recruitment                 | One between-round choice to add/replace a hero with an explicit capacity rule     | Whether new heroes enrich the build or dilute attachment                                      |
+| Simple economy              | A run currency, priced offers and one explicit buy command                        | Whether saving/spending creates a decision worth the added UI                                 |
+| Rerolls                     | One limited reroll resource, replace-offer command and deterministic offer stream | Whether it creates planning or merely fixes poor offers                                       |
+| Formation                   | A few legal discrete positions before battle                                      | Whether positioning visibly changes outcomes                                                  |
+| Battlefield collision       | Deterministic separation for current small unit counts                            | Whether clarity improves without frustrating movement                                         |
+| More explosive combinations | Two targeted trigger upgrades with clear limits                                   | Whether surprising outcomes remain understandable                                             |
+| Shorter battles             | A ruleset changing HP/damage, with all else fixed                                 | Watching time, information loss and run pace                                                  |
+| Mid-battle agency           | One explicit optional intervention in a separate ruleset                          | Whether interaction improves the game enough to justify changing playback/network assumptions |
+| Jev as adviser              | Surface its suggested upgrade without applying it                                 | Whether the comparison is a compelling use case                                               |
 
 Do not implement all rows. For each experiment, write a hypothesis, change one major variable, play a small comparable set of runs, retain useful scenario seeds and write the decision. Restore or delete unsuccessful experimental mechanics instead of leaving permanent feature flags everywhere.
 
@@ -878,25 +878,25 @@ These sources ground framework behaviour. The phase sequence, folder layout, com
 
 Both repositories were read through GitHub at the revisions below. The review covered selected combat, movement, random, logging, playback and licence files; neither game was built or played for this review. Conclusions about usefulness are code-review judgements, not benchmark results.
 
-| Reference | Reviewed revision | Use in this project |
-| --- | --- | --- |
-| [TinyWar](https://github.com/tvdboom/tinywar/tree/d8a06bbefba0c1900c60ca8edf49c6328dad348b) | `d8a06bbefba0c1900c60ca8edf49c6328dad348b` | Automatic engagement, movement/separation and legible attack timing |
+| Reference                                                                                          | Reviewed revision                          | Use in this project                                                        |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
+| [TinyWar](https://github.com/tvdboom/tinywar/tree/d8a06bbefba0c1900c60ca8edf49c6328dad348b)        | `d8a06bbefba0c1900c60ca8edf49c6328dad348b` | Automatic engagement, movement/separation and legible attack timing        |
 | [Mana Battle](https://github.com/lfarroco/mana-game/tree/eec8c1be86fba8cc76ef0ba188af011d208001ee) | `eec8c1be86fba8cc76ef0ba188af011d208001ee` | Pure TypeScript combat, events, playback, statuses and reaction safeguards |
 
 ### Mana Battle as the primary structural reference
 
 Its documented architecture separates combat simulation in `core/` from Phaser playback. Reading the runner, simulation wrapper and playback controller supports that separation. Its game is a trigger-based board/core battle, so its targeting and win conditions do not directly describe moving heroes in an arena.
 
-| Source to read | Concrete observation | Adaptation and phase |
-| --- | --- | --- |
-| [CombatSimulation.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/CombatSimulation.ts) | Builds disposable combat state, runs a bounded loop and collects a recording | Separate persistent builds from battle instances; expose a headless runner in Phase 2 |
-| [Random.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/math/Random.ts) | Seeded operations return the next seed explicitly | Choose and version a small RNG; keep state advancement explicit in Phase 2 |
-| [CombatRunner.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/CombatRunner.ts) | Separates due events, unit charging, statuses, reactions and outcome evaluation; caps work and logs | Use a documented tick pipeline and separate duration/work/log limits in Phases 2 to 4 |
-| [CombatLogger.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/CombatLogger.ts) | Typed cast, hit, status and outcome records carry relevant IDs and values | Use an event union and causal metadata in Phase 3; add movement samples for our moving arena |
-| [StatusEffectSystem.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/StatusEffectSystem.ts) | Status ticks log HP and shield changes, including damage absorbed by shields | Ensure status effects and ordinary hits use the same damage path and publish complete state changes in Phase 3 |
-| [TriggerSystem.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/TriggerSystem/TriggerSystem.ts) | Dispatches effect kinds, resolves targets and filters eligible reactions | Start with a small effect union and explicit predicates in Phase 4; do not port its whole vocabulary |
-| [dealDamage.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/TriggerSystem/effects/dealDamage.ts) | Distinguishes cast from deferred hit; reaction provenance prevents retaliation loops | Add serialisable scheduled impacts only when needed; preserve trigger provenance and specify pre/post-damage timing |
-| [CombatPlaybackController.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/phaser/src/Screens/Battleground/Phases/Combat/CombatPlaybackController.ts) | Schedules recorded presentation events and limits cosmetic work per frame | Keep playback separate; reduce decorative effects under load without dropping authoritative results |
+| Source to read                                                                                                                                                                               | Concrete observation                                                                                | Adaptation and phase                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [CombatSimulation.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/CombatSimulation.ts)                                               | Builds disposable combat state, runs a bounded loop and collects a recording                        | Separate persistent builds from battle instances; expose a headless runner in Phase 2                               |
+| [Random.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/math/Random.ts)                                                                     | Seeded operations return the next seed explicitly                                                   | Choose and version a small RNG; keep state advancement explicit in Phase 2                                          |
+| [CombatRunner.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/CombatRunner.ts)                                                       | Separates due events, unit charging, statuses, reactions and outcome evaluation; caps work and logs | Use a documented tick pipeline and separate duration/work/log limits in Phases 2 to 4                               |
+| [CombatLogger.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/CombatLogger.ts)                                                       | Typed cast, hit, status and outcome records carry relevant IDs and values                           | Use an event union and causal metadata in Phase 3; add movement samples for our moving arena                        |
+| [StatusEffectSystem.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/Combat/StatusEffectSystem.ts)                                           | Status ticks log HP and shield changes, including damage absorbed by shields                        | Ensure status effects and ordinary hits use the same damage path and publish complete state changes in Phase 3      |
+| [TriggerSystem.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/TriggerSystem/TriggerSystem.ts)                                              | Dispatches effect kinds, resolves targets and filters eligible reactions                            | Start with a small effect union and explicit predicates in Phase 4; do not port its whole vocabulary                |
+| [dealDamage.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/core/src/TriggerSystem/effects/dealDamage.ts)                                            | Distinguishes cast from deferred hit; reaction provenance prevents retaliation loops                | Add serialisable scheduled impacts only when needed; preserve trigger provenance and specify pre/post-damage timing |
+| [CombatPlaybackController.ts](https://github.com/lfarroco/mana-game/blob/eec8c1be86fba8cc76ef0ba188af011d208001ee/phaser/src/Screens/Battleground/Phases/Combat/CombatPlaybackController.ts) | Schedules recorded presentation events and limits cosmetic work per frame                           | Keep playback separate; reduce decorative effects under load without dropping authoritative results                 |
 
 Important deliberate differences:
 
@@ -911,11 +911,11 @@ Important deliberate differences:
 
 TinyWar uses Rust and Bevy. Its code is useful for reviewing combat behaviour, but direct code transfer into this TypeScript simulation would require a deliberate translation.
 
-| Source to read | Concrete observation | Adaptation and phase |
-| --- | --- | --- |
-| [movement.rs](https://github.com/tvdboom/tinywar/blob/d8a06bbefba0c1900c60ca8edf49c6328dad348b/src/core/mechanics/movement.rs) | Movement selects attack/heal interactions, uses nearby tile buckets and applies separation when units overlap | Use simple legal targeting in Phase 2; revisit deterministic separation in Phase 8 if overlap is a real problem |
-| [combat.rs](https://github.com/tvdboom/tinywar/blob/d8a06bbefba0c1900c60ca8edf49c6328dad348b/src/core/mechanics/combat.rs) | Damage calculation is identifiable separately from message-based application; supports distinct projectile modes | Retain one damage resolver; use explicit source/target and impact events in Phases 2 and 3 |
-| [effects.rs](https://github.com/tvdboom/tinywar/blob/d8a06bbefba0c1900c60ca8edf49c6328dad348b/src/core/mechanics/effects.rs) | Visual effect messages lead to particles and sounds, including handling an entity that is not yet present | Keep cosmetic dispatch separate; buffer briefly or discard stale visual events according to explicit client rules |
+| Source to read                                                                                                                 | Concrete observation                                                                                             | Adaptation and phase                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [movement.rs](https://github.com/tvdboom/tinywar/blob/d8a06bbefba0c1900c60ca8edf49c6328dad348b/src/core/mechanics/movement.rs) | Movement selects attack/heal interactions, uses nearby tile buckets and applies separation when units overlap    | Use simple legal targeting in Phase 2; revisit deterministic separation in Phase 8 if overlap is a real problem   |
+| [combat.rs](https://github.com/tvdboom/tinywar/blob/d8a06bbefba0c1900c60ca8edf49c6328dad348b/src/core/mechanics/combat.rs)     | Damage calculation is identifiable separately from message-based application; supports distinct projectile modes | Retain one damage resolver; use explicit source/target and impact events in Phases 2 and 3                        |
+| [effects.rs](https://github.com/tvdboom/tinywar/blob/d8a06bbefba0c1900c60ca8edf49c6328dad348b/src/core/mechanics/effects.rs)   | Visual effect messages lead to particles and sounds, including handling an entity that is not yet present        | Keep cosmetic dispatch separate; buffer briefly or discard stale visual events according to explicit client rules |
 
 TinyWar's `resolve_attack` responds to animation cycle completion. Do not port that authority relationship. Represent wind-up/release/recovery in domain ticks and make animation follow those events. This keeps browser speed, missing sprites and disabled effects from changing the fight.
 

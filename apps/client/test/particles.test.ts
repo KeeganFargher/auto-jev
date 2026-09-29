@@ -1,7 +1,13 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { Color, InterleavedBufferAttribute, Mesh, Scene, ShaderMaterial, Vector3 } from "three";
-import { claimSlots, coneDirection, createParticleSystem, createTrail, type ParticleStyle } from "../src/game/views/particles.js";
+import {
+  claimSlots,
+  coneDirection,
+  createParticleSystem,
+  createTrail,
+  type ParticleStyle,
+} from "../src/game/views/particles.js";
 
 const EMBER: ParticleStyle = {
   blend: "glow",
@@ -45,7 +51,10 @@ test("sprayed directions are unit length and stay inside the cone", () => {
   for (let index = 0; index < 500; index += 1) {
     coneDirection(axis, 0.4, Math.random(), Math.random(), sprayed);
     assert.ok(Math.abs(sprayed.length() - 1) < 1e-9);
-    assert.ok(sprayed.angleTo(axis) <= 0.4 + 1e-9, `angle ${sprayed.angleTo(axis)} leaves the cone`);
+    assert.ok(
+      sprayed.angleTo(axis) <= 0.4 + 1e-9,
+      `angle ${sprayed.angleTo(axis)} leaves the cone`,
+    );
   }
 });
 
@@ -75,7 +84,10 @@ test("clearing hides every live particle but not ones emitted afterwards", () =>
 
 test("a style without drag is refused, since the motion divides by it", () => {
   const particles = createParticleSystem(new Scene());
-  assert.throws(() => particles.emit({ ...EMBER, drag: 0 }, new Vector3(), new Vector3(0, 1, 0), 1), /drag/);
+  assert.throws(
+    () => particles.emit({ ...EMBER, drag: 0 }, new Vector3(), new Vector3(0, 1, 0), 1),
+    /drag/,
+  );
   particles.dispose();
 });
 
@@ -169,4 +181,3 @@ test("trail particles land a spacing apart along the path, carrying the remainde
   assert.deepEqual(placed, [1, 2, 3, 4]);
   particles.dispose();
 });
-

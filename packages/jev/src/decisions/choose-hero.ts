@@ -1,70 +1,49 @@
-import type { Catalogue } from "@jev-game/game";
+import type { HeroDefinitionId } from "@jev-game/game";
 import type { PlayerView } from "@jev-game/run";
-import type { ChoiceQuestionInput } from "../provider/types.js";
-import { buildObservation, type RoundOutcome } from "../observations/build-observation.js";
-import { describeTraitChange, describeTraits, heroName, heroSummary, traitsOf } from "../observations/describe.js";
-import { optionKey } from "./option-keys.js";
+import type { ChoiceAnswer, ChoiceQuestionInput } from "../provider/types.js";
+import { buildObservation } from "../observations/build-observation.js";
+import { heroName, heroSummary } from "../observations/describe.js";
 
 export interface DraftQuestion {
   question: ChoiceQuestionInput;
-  offerIdByOption: Map<string, string>;
-}
-
-function pickedHeroIds(view: PlayerView, pickedOfferIds: readonly string[]): string[] {
-  const heroIds: string[] = [];
-
-  for (const offerId of pickedOfferIds) {
-    const offer = view.heroOffers.find((candidate) => candidate.offerId === offerId);
-
-    if (offer !== undefined) {
-      heroIds.push(offer.heroId);
-    }
-  }
-
-  return heroIds;
+  heroIds: HeroDefinitionId[];
 }
 
 export function draftQuestion(
   view: PlayerView,
-  catalogue: Catalogue,
-  pickedOfferIds: readonly string[],
-  history: readonly RoundOutcome[],
-): DraftQuestion | null {
-  const remaining = view.heroOffers.filter((offer) => !pickedOfferIds.includes(offer.offerId));
-
-  if (remaining.length === 0) {
-    return null;
-  }
-
-  const picked = pickedHeroIds(view, pickedOfferIds);
-  const before = traitsOf(picked, catalogue);
-  const options: Record<string, string> = {};
-  const offerIdByOption = new Map<string, string>();
-
-  for (const offer of remaining) {
-    const key = optionKey(heroName(catalogue, offer.heroId), new Set(offerIdByOption.keys()));
-    const change = picked.length === 0 ? [] : describeTraitChange(before, traitsOf([...picked, offer.heroId], catalogue));
-    const synergy = change.length === 0 ? "" : ` With your picks it ${change.join(" and ")}.`;
-
-    options[key] = `${heroSummary(catalogue, offer.heroId)}${synergy}`;
-    offerIdByOption.set(key, offer.offerId);
-  }
-
+  picked: readonly HeroDefinitionId[],
+): DraftQuestion {
   const picks = view.rules.draftPicks;
+  const heroIds = view.draftPool.filter((heroId) => !picked.includes(heroId));
+
+  if (picked.length >= picks || heroIds.length === 0) {
+    throw new Error(`${view.you.playerId} has no draft pick left to ask about`);
+  }
 
   return {
     question: {
       state: {
-        ...buildObservation(view, catalogue, history),
+        ...buildObservation(view),
         draft: {
-          picked: picked.map((heroId) => heroName(catalogue, heroId)),
+          picked: picked.map(heroName),
           picksLeft: picks - picked.length,
-          synergiesSoFar: describeTraits(before, catalogue),
         },
       },
-      instructions: `Draft pick ${picked.length + 1} of ${picks}. Choose the hero to add to your team. The heroes fight on their own, so choose the hero that makes the strongest team together with the heroes in \`draft.picked\`.`,
-      options,
+      instructions: `Draft pick ${picked.length + 1} of ${picks}. Choose the hero to add to your team. The heroes fight on their own, so choose the hero whose signature best sets up, or pays off, the heroes in \`draft.picked\`.`,
+      options: Object.fromEntries(heroIds.map((heroId) => [heroId, heroSummary(heroId)])),
     },
-    offerIdByOption,
+    heroIds,
   };
+}
+
+export function chosenHero(step: DraftQuestion, answer: ChoiceAnswer): HeroDefinitionId {
+  const heroId = step.heroIds.find((candidate) => candidate === answer.choice);
+
+  if (heroId === undefined) {
+    throw new Error(
+      `The provider chose "${answer.choice}", which is not one of ${step.heroIds.join(", ")}`,
+    );
+  }
+
+  return heroId;
 }

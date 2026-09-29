@@ -12,6 +12,7 @@ import {
   type Material,
   type Scene,
 } from "three";
+import { craterTexture } from "./crater-texture.js";
 
 export interface MaterialPool<T extends Material> {
   take(): T;
@@ -36,9 +37,26 @@ function pool<T extends Material>(template: T): MaterialPool<T> {
 }
 
 export const effectMaterials = {
-  glow: pool(new MeshBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false, side: DoubleSide, forceSinglePass: true })),
-  flash: pool(new MeshBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false })),
-  flame: pool(new MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: DoubleSide })),
+  glow: pool(
+    new MeshBasicMaterial({
+      transparent: true,
+      blending: AdditiveBlending,
+      depthWrite: false,
+      side: DoubleSide,
+      forceSinglePass: true,
+    }),
+  ),
+  flash: pool(
+    new MeshBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false }),
+  ),
+  flame: pool(
+    new MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
+    }),
+  ),
   trail: pool(
     new MeshBasicMaterial({
       vertexColors: true,
@@ -49,21 +67,36 @@ export const effectMaterials = {
       forceSinglePass: true,
     }),
   ),
-  scorch: pool(new MeshBasicMaterial({ transparent: true, depthWrite: false })),
   veil: pool(new MeshBasicMaterial({ transparent: true, depthWrite: false, side: DoubleSide })),
   core: pool(new MeshBasicMaterial()),
   rock: pool(new MeshStandardMaterial({ flatShading: true, roughness: 0.95 })),
-  fadingRock: pool(new MeshStandardMaterial({ flatShading: true, roughness: 0.95, transparent: true })),
+  forged: pool(new MeshStandardMaterial({ flatShading: true })),
+  decal: pool(
+    new MeshBasicMaterial({
+      map: craterTexture(),
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    }),
+  ),
+  fadingRock: pool(
+    new MeshStandardMaterial({ flatShading: true, roughness: 0.95, transparent: true }),
+  ),
   solid: pool(new MeshStandardMaterial({ roughness: 0.5 })),
-  fadingSolid: pool(new MeshStandardMaterial({ roughness: 0.5, transparent: true, side: DoubleSide })),
-  arc: pool(new LineBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false })),
+  arc: pool(
+    new LineBasicMaterial({ transparent: true, blending: AdditiveBlending, depthWrite: false }),
+  ),
 };
 
 export function releaseEffectMaterial(material: Material): void {
   const giveBack = lent.get(material);
 
   if (giveBack === undefined) {
-    throw new Error(`effect material ${material.type} ${material.uuid} was not taken from the pool, or was already released`);
+    throw new Error(
+      `effect material ${material.type} ${material.uuid} was not taken from the pool, or was already released`,
+    );
   }
 
   lent.delete(material);
@@ -99,7 +132,12 @@ export function warmEffectMaterials(scene: Scene): () => void {
 
   for (const kind of Object.values(effectMaterials)) {
     const material = kind.take();
-    const drawn = material instanceof LineBasicMaterial ? new Line(stroke, material) : new Mesh(surface, material);
+
+    const drawn =
+      material instanceof LineBasicMaterial
+        ? new Line(stroke, material)
+        : new Mesh(surface, material);
+
     drawn.scale.setScalar(WARM_SCALE);
     drawn.frustumCulled = false;
     group.add(drawn);

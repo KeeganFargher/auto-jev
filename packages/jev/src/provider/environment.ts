@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { createTypeSafeProvider, DEFAULT_JEV_MODEL, DEFAULT_REQUEST_TIMEOUT_MILLISECONDS } from "./client.js";
+import {
+  createTypeSafeProvider,
+  DEFAULT_JEV_MODEL,
+  DEFAULT_REQUEST_TIMEOUT_MILLISECONDS,
+} from "./client.js";
 import { CLOUDFLARE_JEV_MODEL, createCloudflareProvider } from "./cloudflare.js";
 import { DEFAULT_PROVIDER_CONCURRENCY, limitProvider, type LimitedProvider } from "./limiter.js";
 import { createOfflineProvider } from "./offline.js";
@@ -30,7 +34,9 @@ export type ProviderSelection =
   | { kind: "provider"; provider: LimitedProvider; label: string }
   | { kind: "none"; reason: string };
 
-export function providerFromEnvironment(environment: Readonly<Record<string, string | undefined>>): ProviderSelection {
+export function providerFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>>,
+): ProviderSelection {
   const parsed = environmentSchema.safeParse(environment);
 
   if (!parsed.success) {
@@ -43,7 +49,10 @@ export function providerFromEnvironment(environment: Readonly<Record<string, str
   if (settings.JEV_PROVIDER === "offline") {
     return {
       kind: "provider",
-      provider: limitProvider(createOfflineProvider(settings.JEV_OFFLINE_SEED ?? 1, OFFLINE_DELAY_MILLISECONDS), concurrency),
+      provider: limitProvider(
+        createOfflineProvider(settings.JEV_OFFLINE_SEED ?? 1, OFFLINE_DELAY_MILLISECONDS),
+        concurrency,
+      ),
       label: "Offline stub (not Jev)",
     };
   }
@@ -52,7 +61,10 @@ export function providerFromEnvironment(environment: Readonly<Record<string, str
   const apiKey = settings.TYPESAFE_API_KEY;
   const accountId = settings.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = settings.CLOUDFLARE_API_TOKEN;
-  const wantsCloudflare = settings.JEV_PROVIDER === "cloudflare" || (settings.JEV_PROVIDER === undefined && apiKey === undefined);
+
+  const wantsCloudflare =
+    settings.JEV_PROVIDER === "cloudflare" ||
+    (settings.JEV_PROVIDER === undefined && apiKey === undefined);
 
   if (!wantsCloudflare) {
     if (apiKey === undefined) {
@@ -62,15 +74,33 @@ export function providerFromEnvironment(environment: Readonly<Record<string, str
     const model = settings.JEV_MODEL ?? DEFAULT_JEV_MODEL;
     const provider = createTypeSafeProvider({ apiKey, model, timeoutMilliseconds, fetch: null });
 
-    return { kind: "provider", provider: limitProvider(provider, concurrency), label: `Jev (${model})` };
+    return {
+      kind: "provider",
+      provider: limitProvider(provider, concurrency),
+      label: `Jev (${model})`,
+    };
   }
 
   if (accountId === undefined || apiToken === undefined) {
-    return { kind: "none", reason: "neither TYPESAFE_API_KEY nor CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are set" };
+    return {
+      kind: "none",
+      reason: "neither TYPESAFE_API_KEY nor CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are set",
+    };
   }
 
   const model = settings.JEV_MODEL ?? CLOUDFLARE_JEV_MODEL;
-  const provider = createCloudflareProvider({ accountId, apiToken, model, timeoutMilliseconds, fetch: null });
 
-  return { kind: "provider", provider: limitProvider(provider, concurrency), label: `Jev (${model} via Cloudflare)` };
+  const provider = createCloudflareProvider({
+    accountId,
+    apiToken,
+    model,
+    timeoutMilliseconds,
+    fetch: null,
+  });
+
+  return {
+    kind: "provider",
+    provider: limitProvider(provider, concurrency),
+    label: `Jev (${model} via Cloudflare)`,
+  };
 }

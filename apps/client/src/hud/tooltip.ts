@@ -1,4 +1,5 @@
 import { el } from "./dom.js";
+import type { UnitStatusKind } from "./unit-status.js";
 
 type Child = Node | string | null;
 
@@ -50,27 +51,17 @@ const SIDE_ORDER: Readonly<Record<TipSide, readonly TipSide[]>> = {
   bottom: ["bottom", "top", "left", "right"],
 };
 
-const KEYWORD_CONDITIONS = new Map<string, string>([
-  ["Staggered", "staggered"],
-  ["Staggers", "staggered"],
-  ["Stagger", "staggered"],
-  ["Brittle", "brittle"],
-  ["Disoriented", "disoriented"],
-  ["Disorients", "disoriented"],
-  ["Disorient", "disoriented"],
-  ["Overload", "staggered"],
-  ["Shatter", "brittle"],
-  ["Crush", "disoriented"],
-]);
-
-const KEYWORD_SCHOOLS = new Map<string, string>([
-  ["Might", "might"],
-  ["Arcana", "arcana"],
-  ["Cunning", "cunning"],
+const STATUS_WORDS: ReadonlyMap<string, UnitStatusKind> = new Map<string, UnitStatusKind>([
+  ["primed", "primed"],
+  ["burning", "burning"],
+  ["floating", "floating"],
+  ["airborne", "airborne"],
+  ["downed", "downed"],
+  ["stunned", "stunned"],
 ]);
 
 const TOKEN_PATTERN =
-  /([+\-−×]?\d+(?:\.\d+)?(?:%|×| s\b| cells?\b| HP\b| mana\b)?|\b(?:Staggered|Staggers|Stagger|Brittle|Disoriented|Disorients|Disorient|Overload|Shatter|Crush|Might|Arcana|Cunning)\b)/g;
+  /([+\-−×]?\d+(?:\.\d+)?(?:%|×| s\b| cells?\b| HP\b| mana\b)?|\b(?:primed|burning|floating|airborne|downed|stunned)\b)/gi;
 
 const sources = new WeakMap<Element, TipSource>();
 
@@ -136,7 +127,9 @@ function clearPending(): void {
 function edgeRect(target: HTMLElement): DOMRect {
   const edge = target.closest("[data-tip-edge]");
 
-  return edge instanceof HTMLElement ? edge.getBoundingClientRect() : target.getBoundingClientRect();
+  return edge instanceof HTMLElement
+    ? edge.getBoundingClientRect()
+    : target.getBoundingClientRect();
 }
 
 function spotFor(side: TipSide, rect: DOMRect, edge: DOMRect, width: number, height: number): Spot {
@@ -165,7 +158,14 @@ function clampInto(value: number, low: number, high: number): number {
   return Math.min(Math.max(value, low), Math.max(low, high));
 }
 
-function fits(side: TipSide, spot: Spot, width: number, height: number, viewportWidth: number, viewportHeight: number): boolean {
+function fits(
+  side: TipSide,
+  spot: Spot,
+  width: number,
+  height: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): boolean {
   if (side === "left" || side === "right") {
     return spot.x >= MARGIN && spot.x + width <= viewportWidth - MARGIN;
   }
@@ -251,11 +251,17 @@ function relocate(key: string): HTMLElement | null {
   if (trigger === "focus") {
     const focused = document.activeElement;
 
-    return focused instanceof HTMLElement && sources.has(focused) && focused.dataset.tip === key ? focused : null;
+    return focused instanceof HTMLElement && sources.has(focused) && focused.dataset.tip === key
+      ? focused
+      : null;
   }
 
   for (const candidate of document.querySelectorAll(`[data-tip="${CSS.escape(key)}"]`)) {
-    if (candidate instanceof HTMLElement && sources.has(candidate) && candidate.getClientRects().length > 0) {
+    if (
+      candidate instanceof HTMLElement &&
+      sources.has(candidate) &&
+      candidate.getClientRects().length > 0
+    ) {
       return candidate;
     }
   }
@@ -506,19 +512,14 @@ export function richText(text: string): Child[] {
       parts.push(text.slice(cursor, start));
     }
 
-    const condition = KEYWORD_CONDITIONS.get(token);
-    const school = KEYWORD_SCHOOLS.get(token);
+    const status = STATUS_WORDS.get(token.toLowerCase());
 
-    if (condition !== undefined) {
-      const keyword = el("span", "tip-key", token);
-      keyword.dataset.condition = condition;
-      parts.push(keyword);
-    } else if (school !== undefined) {
-      const keyword = el("span", "tip-key", token);
-      keyword.dataset.school = school;
-      parts.push(keyword);
-    } else {
+    if (status === undefined) {
       parts.push(el("b", "tip-num", token));
+    } else {
+      const keyword = el("span", "tip-key", token);
+      keyword.dataset.status = status;
+      parts.push(keyword);
     }
 
     cursor = start + token.length;
@@ -557,7 +558,12 @@ export function tipCard(card: TipCard): HTMLElement {
 }
 
 export function tipSection(label: string | null, ...children: Child[]): HTMLElement {
-  return el("div", "tip-section", label === null ? null : el("div", "tip-label", label), ...children);
+  return el(
+    "div",
+    "tip-section",
+    label === null ? null : el("div", "tip-label", label),
+    ...children,
+  );
 }
 
 export function tipText(text: string): HTMLElement {

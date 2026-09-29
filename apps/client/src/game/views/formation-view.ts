@@ -1,11 +1,22 @@
 import { Mesh, MeshBasicMaterial, PlaneGeometry, Vector3 } from "three";
-import { boardCellCenter, ownCellAt, ownCellToBoardCell, sideRows, type BoardCell, type BoardGrid } from "@jev-game/game";
+import {
+  boardCellCenter,
+  ownCellAt,
+  ownCellToBoardCell,
+  sideRows,
+  type BoardCell,
+  type BoardGrid,
+} from "@jev-game/game";
 import type { BoardStage, ViewportInsets } from "./board-stage.js";
-import { createHeroFigure, levelFigureScale, type HeroFigure } from "./hero-figures.js";
+import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
+
+export type FormationCursor = "auto" | "grab" | "grabbing";
 
 export interface FormationView {
+  press(clientX: number, clientY: number): FormationCursor;
+  move(clientX: number, clientY: number): FormationCursor;
+  release(clientX: number, clientY: number, commit: boolean): void;
   setFormation(formation: readonly BoardCell[]): void;
-  setLevels(levels: readonly number[]): void;
   setLocked(locked: boolean): void;
   dispose(): void;
 }
@@ -14,7 +25,6 @@ export interface FormationViewOptions {
   grid: BoardGrid;
   insets: ViewportInsets;
   heroIds: readonly string[];
-  heroLevels: readonly number[];
   formation: readonly BoardCell[];
   onChange: (formation: BoardCell[]) => void;
 }
@@ -35,22 +45,19 @@ const CELL_INSET = 0.9;
 
 const FACING_ENEMY = Math.PI;
 
-const LEVEL_UP_SECONDS = 0.7;
-
-const LEVEL_UP_SWELL = 0.35;
-
 interface PlacedHero {
   figure: HeroFigure;
   position: Vector3;
-  level: number;
-  levelUp: number;
 }
 
 function sameCell(first: BoardCell, second: BoardCell): boolean {
   return first.column === second.column && first.row === second.row;
 }
 
-export function createFormationView(stage: BoardStage, options: FormationViewOptions): FormationView {
+export function createFormationView(
+  stage: BoardStage,
+  options: FormationViewOptions,
+): FormationView {
   const { grid } = options;
   const size = grid.width / grid.columns;
   let formation = options.formation.map((cell) => ({ ...cell }));
@@ -74,7 +81,12 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
 
   const highlight = new Mesh(
     cellGeometry,
-    new MeshBasicMaterial({ color: VALID_COLOR, transparent: true, opacity: 0.55, depthWrite: false }),
+    new MeshBasicMaterial({
+      color: VALID_COLOR,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+    }),
   );
 
   highlight.rotation.x = -Math.PI / 2;
@@ -92,7 +104,10 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
     stage.scene.add(figure.root);
     const cell = formation[slot];
 
-    return { figure, position: cell === undefined ? new Vector3() : cellCenter(cell), level: options.heroLevels[slot] ?? 1, levelUp: 0 };
+    return {
+      figure,
+      position: cell === undefined ? new Vector3() : cellCenter(cell),
+    };
   });
 
   function pickSlot(clientX: number, clientY: number): number | null {
@@ -125,55 +140,52 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
     return point === null ? null : ownCellAt(grid, "south", point);
   }
 
-  function handlePointerDown(event: PointerEvent): void {
-    const slot = locked ? null : pickSlot(event.clientX, event.clientY);
+  function press(clientX: number, clientY: number): FormationCursor {
+    const slot = locked ? null : pickSlot(clientX, clientY);
 
     if (slot === null) {
-      return;
+      return "auto";
     }
 
     dragSlot = slot;
     hoverCell = formation[slot] ?? null;
-    stage.canvas.setPointerCapture(event.pointerId);
-    stage.canvas.style.cursor = "grabbing";
-    event.preventDefault();
+
+    return "grabbing";
   }
 
-  function handlePointerMove(event: PointerEvent): void {
+  function move(clientX: number, clientY: number): FormationCursor {
     if (dragSlot === null) {
-      stage.canvas.style.cursor = locked || pickSlot(event.clientX, event.clientY) === null ? "" : "grab";
-
-      return;
+      return locked || pickSlot(clientX, clientY) === null ? "auto" : "grab";
     }
 
-    hoverCell = cellUnder(event.clientX, event.clientY);
-    const ground = stage.groundPointAt(event.clientX, event.clientY);
+    hoverCell = cellUnder(clientX, clientY);
+    const ground = stage.groundPointAt(clientX, clientY);
     const hero = heroes[dragSlot];
 
     if (hero !== undefined && ground !== null) {
       const target = stage.toScene(
-        { x: Math.min(grid.width, Math.max(0, ground.x)), y: Math.min(grid.height, Math.max(0, ground.y)) },
+        {
+          x: Math.min(grid.width, Math.max(0, ground.x)),
+          y: Math.min(grid.height, Math.max(0, ground.y)),
+        },
         0,
       );
 
       hero.position.set(target.x, 0, target.z);
     }
+
+    return "grabbing";
   }
 
-  function finishDrag(event: PointerEvent, commit: boolean): void {
+  function release(clientX: number, clientY: number, commit: boolean): void {
     if (dragSlot === null) {
       return;
     }
 
     const slot = dragSlot;
-    const dropCell = commit && !locked ? cellUnder(event.clientX, event.clientY) : null;
+    const dropCell = commit && !locked ? cellUnder(clientX, clientY) : null;
     dragSlot = null;
     hoverCell = null;
-    stage.canvas.style.cursor = "";
-
-    if (stage.canvas.hasPointerCapture(event.pointerId)) {
-      stage.canvas.releasePointerCapture(event.pointerId);
-    }
 
     const current = formation[slot];
 
@@ -193,19 +205,6 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
     options.onChange(next.map((cell) => ({ ...cell })));
   }
 
-  function handlePointerUp(event: PointerEvent): void {
-    finishDrag(event, true);
-  }
-
-  function handlePointerCancel(event: PointerEvent): void {
-    finishDrag(event, false);
-  }
-
-  stage.canvas.addEventListener("pointerdown", handlePointerDown);
-  stage.canvas.addEventListener("pointermove", handlePointerMove);
-  stage.canvas.addEventListener("pointerup", handlePointerUp);
-  stage.canvas.addEventListener("pointercancel", handlePointerCancel);
-
   const stopFrames = stage.onFrame((deltaSeconds) => {
     const blend = 1 - Math.exp(-SETTLE_SMOOTHING * deltaSeconds);
 
@@ -220,8 +219,6 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
       const lift = dragging ? LIFT_UNITS : 0;
       const height = hero.figure.root.position.y + (lift - hero.figure.root.position.y) * blend;
       hero.figure.root.position.set(hero.position.x, height, hero.position.z);
-      hero.levelUp = Math.max(0, hero.levelUp - deltaSeconds / LEVEL_UP_SECONDS);
-      hero.figure.root.scale.setScalar(levelFigureScale(hero.level) * (1 + LEVEL_UP_SWELL * Math.sin(hero.levelUp * Math.PI)));
       hero.figure.setMoving(dragging);
       hero.figure.update(deltaSeconds);
     });
@@ -240,6 +237,10 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
   });
 
   return {
+    press,
+    move,
+    release,
+
     setFormation(next) {
       if (dragSlot !== null) {
         return;
@@ -248,35 +249,17 @@ export function createFormationView(stage: BoardStage, options: FormationViewOpt
       formation = next.map((cell) => ({ ...cell }));
     },
 
-    setLevels(levels) {
-      heroes.forEach((hero, slot) => {
-        const level = levels[slot] ?? hero.level;
-
-        if (level > hero.level) {
-          hero.levelUp = 1;
-        }
-
-        hero.level = level;
-      });
-    },
-
     setLocked(isLocked) {
       locked = isLocked;
 
       if (locked) {
         dragSlot = null;
         hoverCell = null;
-        stage.canvas.style.cursor = "";
       }
     },
 
     dispose() {
       stopFrames();
-      stage.canvas.removeEventListener("pointerdown", handlePointerDown);
-      stage.canvas.removeEventListener("pointermove", handlePointerMove);
-      stage.canvas.removeEventListener("pointerup", handlePointerUp);
-      stage.canvas.removeEventListener("pointercancel", handlePointerCancel);
-      stage.canvas.style.cursor = "";
 
       for (const hero of heroes) {
         hero.figure.dispose();

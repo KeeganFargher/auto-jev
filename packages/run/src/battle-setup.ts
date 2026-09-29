@@ -1,40 +1,58 @@
 import {
+  DEFAULT_TICK_LIMIT,
   isValidFormation,
   ownCellCenter,
   type BattleSetup,
   type BoardCell,
   type BoardSide,
-  type HeroBuild,
+  type HeroDefinitionId,
   type UnitSetup,
 } from "@jev-game/game";
-import { boardArena, defaultFormation } from "@jev-game/content";
+import { boardArena } from "@jev-game/content";
 import type { PlayerId } from "./ids.js";
+
+export const MATCH_RULESET_ID = "run-match";
+
+export const MATCH_RULESET_VERSION = 3;
 
 export interface TeamPlacement {
   playerId: PlayerId;
-  heroBuilds: readonly HeroBuild[];
+  heroIds: readonly HeroDefinitionId[];
   formation: readonly BoardCell[];
 }
 
 function teamUnits(team: TeamPlacement, side: BoardSide): UnitSetup[] {
-  const formation = isValidFormation(boardArena, team.formation, team.heroBuilds.length)
-    ? team.formation
-    : defaultFormation(team.heroBuilds.map((build) => build.heroId));
+  if (team.heroIds.length === 0) {
+    throw new Error(`Player "${team.playerId}" goes to battle with no heroes`);
+  }
 
-  return team.heroBuilds.map((build, index) => ({
-    unitId: `${team.playerId}-${index}`,
-    teamId: team.playerId,
-    build,
-    spawn: ownCellCenter(boardArena, side, formation[index]!),
-  }));
+  if (!isValidFormation(boardArena, team.formation, team.heroIds.length)) {
+    throw new Error(`Player "${team.playerId}" goes to battle with an invalid formation`);
+  }
+
+  return team.heroIds.map((heroId, index) => {
+    const unitId = `${team.playerId}-${index + 1}`;
+    const cell = team.formation[index];
+
+    if (cell === undefined) {
+      throw new Error(`No formation cell for ${unitId}`);
+    }
+
+    return { unitId, teamId: team.playerId, heroId, spawn: ownCellCenter(boardArena, side, cell) };
+  });
 }
 
-export function createMatchBattleSetup(seed: number, teamA: TeamPlacement, teamB: TeamPlacement): BattleSetup {
+export function createMatchBattleSetup(
+  seed: number,
+  teamA: TeamPlacement,
+  teamB: TeamPlacement,
+): BattleSetup {
   return {
-    rulesetId: "run-match",
-    rulesetVersion: 2,
+    rulesetId: MATCH_RULESET_ID,
+    rulesetVersion: MATCH_RULESET_VERSION,
     seed,
     arenaId: boardArena.id,
+    tickLimit: DEFAULT_TICK_LIMIT,
     units: [...teamUnits(teamA, "south"), ...teamUnits(teamB, "north")],
   };
 }

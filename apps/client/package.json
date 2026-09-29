@@ -18,13 +18,18 @@
     "@jev-game/game": "workspace:*",
     "@jev-game/protocol": "workspace:*",
     "@jev-game/run": "workspace:*",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "three": "^0.186.0"
   },
   "devDependencies": {
     "@jev-game/server-runtime": "workspace:*",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.13.13",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "~6.0.2",

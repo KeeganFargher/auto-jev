@@ -1,10 +1,9 @@
 import { Vector3 } from "three";
-import type { BoardGrid } from "@jev-game/game";
+import type { BoardGrid, HeroDefinitionId } from "@jev-game/game";
+import { berserker, firebrand, paladin } from "@jev-game/content";
 import type { BoardStage, StageShot, ViewportInsets } from "./board-stage.js";
 import { easeOut } from "./easing.js";
 import { createHeroFigure, type HeroFigure } from "./hero-figures.js";
-import { isModelId } from "../../models/catalogue.js";
-import { models } from "../../models/library.js";
 
 export interface MenuViewOptions {
   grid: BoardGrid;
@@ -16,7 +15,7 @@ export interface MenuView {
 }
 
 interface MenuHero {
-  heroId: string;
+  heroId: HeroDefinitionId;
   x: number;
   z: number;
   turn: number;
@@ -43,9 +42,9 @@ const ORBIT_PERIOD_SECONDS = 56;
 const HERO_COLOR = "#e6dcc3";
 
 const HEROES: readonly MenuHero[] = [
-  { heroId: "ravager", x: -3, z: 1, turn: 0.35 },
-  { heroId: "bulwark", x: 12, z: 12, turn: -0.1 },
-  { heroId: "pyromancer", x: 27, z: 1, turn: -0.45 },
+  { heroId: berserker.id, x: -3, z: 1, turn: 0.35 },
+  { heroId: paladin.id, x: 12, z: 12, turn: -0.1 },
+  { heroId: firebrand.id, x: 27, z: 1, turn: -0.45 },
 ];
 
 const RISE_FROM = -16;
@@ -53,8 +52,6 @@ const RISE_FROM = -16;
 const RISE_SECONDS = 0.6;
 
 const STAGGER_SECONDS = 0.12;
-
-const MODEL_WAIT_SECONDS = 1.5;
 
 export function createMenuView(stage: BoardStage, options: MenuViewOptions): MenuView {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -70,18 +67,6 @@ export function createMenuView(stage: BoardStage, options: MenuViewOptions): Men
 
   stage.frame(shot);
 
-  const loads = HEROES.flatMap((hero) =>
-    isModelId(hero.heroId) && models.state(hero.heroId) !== "ready" && models.state(hero.heroId) !== "failed"
-      ? [models.load(hero.heroId)]
-      : [],
-  );
-
-  let waiting = loads.length > 0;
-
-  void Promise.allSettled(loads).then(() => {
-    waiting = false;
-  });
-
   const figures: HeroFigure[] = HEROES.map((hero) => {
     const figure = createHeroFigure(hero.heroId);
     figure.setTeamColor(HERO_COLOR);
@@ -93,7 +78,6 @@ export function createMenuView(stage: BoardStage, options: MenuViewOptions): Men
     return figure;
   });
 
-  let waited = 0;
   let risen = 0;
   let clock = 0;
 
@@ -101,12 +85,6 @@ export function createMenuView(stage: BoardStage, options: MenuViewOptions): Men
     if (!reducedMotion) {
       clock += deltaSeconds;
       stage.setOrbit(ORBIT_SWING * Math.sin((clock / ORBIT_PERIOD_SECONDS) * Math.PI * 2));
-    }
-
-    if (waiting && waited < MODEL_WAIT_SECONDS) {
-      waited += deltaSeconds;
-
-      return;
     }
 
     risen += deltaSeconds;

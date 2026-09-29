@@ -4,4 +4,9 @@ import { coveTheme } from "./cove.js";
 import { frostTheme } from "./frost.js";
 import { ruinsTheme } from "./ruins.js";
 
-export const ENVIRONMENT_THEMES: readonly EnvironmentTheme[] = [coveTheme, ruinsTheme, frostTheme, bazaarTheme];
+export const ENVIRONMENT_THEMES: readonly EnvironmentTheme[] = [
+  coveTheme,
+  ruinsTheme,
+  frostTheme,
+  bazaarTheme,
+];

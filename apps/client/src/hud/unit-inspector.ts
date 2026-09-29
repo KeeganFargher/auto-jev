@@ -1,293 +1,160 @@
-import { TICK_RATE, type ConditionKind, type ControlKind, type DotKind, type UnitState } from "@jev-game/game";
-import { el } from "./dom.js";
-import { conditionIcon, meterIcon, statusIcon } from "./icons.js";
-import { buildCard, cardStats, fillStats, formatCount, type CardParts } from "./hero-card.js";
-import { conditionName, titleCase } from "./tips.js";
+import { TICK_RATE, type BattleSnapshot, type UnitState } from "@jev-game/game";
+import { el, setText } from "./dom.js";
+import { statusIcon } from "./icons.js";
+import { buildCard, formatCount, type CardParts } from "./hero-card.js";
+import { attachTip, tipCard, tipSection, tipText } from "./tooltip.js";
+import {
+  UNIT_STATUS_INFO,
+  statusEndTick,
+  unitStatuses,
+  type UnitStatusKind,
+} from "./unit-status.js";
+import { heroDefinition } from "../game/catalogues.js";
 
 export interface UnitInspectorView {
-  update(unit: UnitState | null, tick: number): void;
+  show(snapshot: BattleSnapshot, unit: UnitState): void;
+  hide(): void;
   dispose(): void;
 }
 
-type StatusTone = "buff" | "debuff" | "mark";
-
-interface UnitStatus {
-  key: string;
-  label: string;
-  tone: StatusTone;
-  condition: ConditionKind | null;
-  icon(): SVGSVGElement;
+interface StatusTimer {
+  status: UnitStatusKind;
+  label: HTMLElement;
 }
 
 interface Inspected {
   unitId: string;
+  heroId: string;
   parts: CardParts;
   statusKey: string;
-  statusLabels: HTMLElement[];
+  timers: StatusTimer[];
 }
 
-const CONTROL_NAMES: Readonly<Record<ControlKind, string>> = {
-  stunned: "Stunned",
-  frozen: "Frozen",
-  "knocked-down": "Knocked down",
-  hexed: "Hexed",
-};
-
-const DOT_NAMES: Readonly<Record<DotKind, string>> = {
-  burn: "Burn",
-  poison: "Poison",
-};
-
-function secondsLeft(expiresAtTick: number, tick: number): string {
-  return `${Math.max(0, (expiresAtTick - tick) / TICK_RATE).toFixed(1)}s`;
+function fraction(value: number, max: number): string {
+  return String(Math.max(0, Math.min(1, value / max)));
 }
 
-function unitStatuses(unit: UnitState, tick: number): UnitStatus[] {
-  const statuses: UnitStatus[] = [];
-
-  if (!unit.alive) {
-    return statuses;
-  }
-
-  const { condition, control, taunt, slow, chill, pandemic, graveMark, shield, form } = unit;
-
-  if (condition !== null) {
-    statuses.push({
-      key: `condition:${condition.condition}`,
-      label: `${conditionName(condition.condition)} ${secondsLeft(condition.expiresAtTick, tick)}`,
-      tone: "mark",
-      condition: condition.condition,
-      icon: () => conditionIcon(condition.condition),
-    });
-  }
-
-  if (control !== null) {
-    statuses.push({
-      key: `control:${control.control}`,
-      label: `${CONTROL_NAMES[control.control]} ${secondsLeft(control.expiresAtTick, tick)}`,
-      tone: "debuff",
-      condition: null,
-      icon: () => statusIcon(control.control),
-    });
-  }
-
-  if (taunt !== null) {
-    statuses.push({
-      key: "taunted",
-      label: `Taunted ${secondsLeft(taunt.expiresAtTick, tick)}`,
-      tone: "debuff",
-      condition: null,
-      icon: () => statusIcon("taunted"),
-    });
-  }
-
-  if (slow !== null) {
-    statuses.push({
-      key: "slowed",
-      label: `Slowed ${Math.round((1 - slow.speedMultiplier) * 100)}%`,
-      tone: "debuff",
-      condition: null,
-      icon: () => statusIcon("frozen"),
-    });
-  }
-
-  if (chill !== null) {
-    statuses.push({
-      key: "chill",
-      label: `Chill ×${chill.stacks} ${secondsLeft(chill.expiresAtTick, tick)}`,
-      tone: "debuff",
-      condition: null,
-      icon: () => statusIcon("chill"),
-    });
-  }
-
-  for (const dot of unit.dots) {
-    statuses.push({
-      key: `dot:${dot.dot}`,
-      label: `${DOT_NAMES[dot.dot]} ×${dot.stacks}`,
-      tone: "debuff",
-      condition: null,
-      icon: () => statusIcon(dot.dot),
-    });
-  }
-
-  if (pandemic !== null) {
-    statuses.push({
-      key: "pandemic",
-      label: `Pandemic ${secondsLeft(pandemic.expiresAtTick, tick)}`,
-      tone: "debuff",
-      condition: null,
-      icon: () => statusIcon("pandemic"),
-    });
-  }
-
-  if (graveMark !== null) {
-    statuses.push({
-      key: "grave-marked",
-      label: `Grave-marked ${secondsLeft(graveMark.expiresAtTick, tick)}`,
-      tone: "debuff",
-      condition: null,
-      icon: () => statusIcon("grave-marked"),
-    });
-  }
-
-  if (unit.link !== null) {
-    statuses.push({ key: "linked", label: "Linked", tone: "debuff", condition: null, icon: () => statusIcon("linked") });
-
-    if (unit.link.puppetUntilTick !== 0) {
-      statuses.push({
-        key: "puppeted",
-        label: `Puppeted ${secondsLeft(unit.link.puppetUntilTick, tick)}`,
-        tone: "debuff",
-        condition: null,
-        icon: () => statusIcon("puppeted"),
-      });
-    }
-  }
-
-  if (shield !== null && shield.amount > 0) {
-    statuses.push({
-      key: shield.blessed === null ? "shield" : "blessed",
-      label: `${shield.blessed === null ? "Shield" : "Blessed shield"} ${formatCount(shield.amount)}`,
-      tone: "buff",
-      condition: null,
-      icon: () => meterIcon("shielding"),
-    });
-  }
-
-  if (unit.invulnerableUntilTick !== 0) {
-    statuses.push({ key: "invulnerable", label: "Invulnerable", tone: "buff", condition: null, icon: () => statusIcon("invulnerable") });
-  }
-
-  if (unit.untargetableUntilTick !== 0) {
-    statuses.push({ key: "untargetable", label: "Untargetable", tone: "buff", condition: null, icon: () => statusIcon("untargetable") });
-  }
-
-  if (unit.channel !== null) {
-    statuses.push({ key: "channeling", label: "Channeling", tone: "buff", condition: null, icon: () => statusIcon("channeling") });
-  }
-
-  if (form !== null) {
-    const kind = `form:${form.definition.key}`;
-
-    statuses.push({
-      key: kind,
-      label: `${titleCase(form.definition.key)} ${form.definition.endsWhenShieldBreaks === true ? "until its shield breaks" : secondsLeft(form.endsAtTick, tick)}`,
-      tone: "buff",
-      condition: null,
-      icon: () => statusIcon(kind),
-    });
-  }
-
-  return statuses;
+function secondsLeft(endTick: number, tick: number): string {
+  return `${Math.max(0, (endTick - tick) / TICK_RATE).toFixed(1)}s`;
 }
 
-function syncStatuses(inspected: Inspected, statuses: readonly UnitStatus[]): void {
-  const key = statuses.map((status) => status.key).join("|");
+function statusTip(status: UnitStatusKind): HTMLElement {
+  const info = UNIT_STATUS_INFO[status];
 
-  if (key !== inspected.statusKey) {
-    inspected.statusKey = key;
-    inspected.statusLabels = [];
-
-    const chips = statuses.map((status) => {
-      const label = el("span", "unit-status-label", status.label);
-      inspected.statusLabels.push(label);
-      const chip = el("span", `unit-status is-${status.tone}`, status.icon(), label);
-      chip.dataset.status = status.key;
-
-      if (status.condition !== null) {
-        chip.dataset.condition = status.condition;
-      }
-
-      return chip;
-    });
-
-    inspected.parts.statuses.replaceChildren(...chips);
-    inspected.parts.statuses.hidden = chips.length === 0;
-
-    return;
-  }
-
-  statuses.forEach((status, index) => {
-    const label = inspected.statusLabels[index];
-
-    if (label !== undefined && label.textContent !== status.label) {
-      label.textContent = status.label;
-    }
+  return tipCard({
+    icon: statusIcon(status),
+    accent: null,
+    title: info.label,
+    subtitle: null,
+    tag: info.buff ? "Buff" : "Debuff",
+    sections: [tipSection(null, tipText(info.description))],
   });
 }
 
-function leadFor(unit: UnitState, friendlyTeamId: string): string {
-  const side = unit.teamId === friendlyTeamId ? "Ally" : "Enemy";
+function statusChip(unitId: string, status: UnitStatusKind, timer: HTMLElement): HTMLElement {
+  const info = UNIT_STATUS_INFO[status];
 
-  return unit.summonerUnitId === null ? side : `${side} summon`;
+  const chip = el(
+    "span",
+    `unit-status ${info.buff ? "is-buff" : "is-debuff"}`,
+    statusIcon(status),
+    el("span", "unit-status-label", info.label),
+    timer,
+  );
+
+  chip.dataset.status = status;
+  attachTip(chip, {
+    key: `inspector:${unitId}:${status}`,
+    side: "left",
+    live: false,
+    render: () => statusTip(status),
+  });
+
+  return chip;
 }
 
-export function createUnitInspectorView(container: HTMLElement, friendlyTeamId: string): UnitInspectorView {
-  let inspected: Inspected | null = null;
-  let shownUnit: UnitState | null = null;
-  let shownTick = -1;
+function syncStatuses(inspected: Inspected, snapshot: BattleSnapshot, unit: UnitState): void {
+  const statuses = unitStatuses(snapshot, unit);
+  const key = statuses.join("|");
 
-  function clear(): void {
+  if (key !== inspected.statusKey) {
+    inspected.statusKey = key;
+    inspected.timers = statuses.map((status) => ({
+      status,
+      label: el("span", "unit-status-timer"),
+    }));
+
+    inspected.parts.statuses.replaceChildren(
+      ...inspected.timers.map((timer) => statusChip(unit.unitId, timer.status, timer.label)),
+    );
+
+    inspected.parts.statuses.hidden = statuses.length === 0;
+  }
+
+  for (const timer of inspected.timers) {
+    setText(timer.label, secondsLeft(statusEndTick(snapshot, unit, timer.status), snapshot.tick));
+  }
+}
+
+export function createUnitInspectorView(
+  container: HTMLElement,
+  friendlyTeamId: string,
+): UnitInspectorView {
+  let inspected: Inspected | null = null;
+
+  function hide(): void {
+    if (inspected === null && container.hidden) {
+      return;
+    }
+
     inspected = null;
-    shownUnit = null;
     container.replaceChildren();
     container.hidden = true;
   }
 
+  function inspect(unit: UnitState): Inspected {
+    if (inspected !== null && inspected.unitId === unit.unitId) {
+      if (inspected.heroId !== unit.heroId) {
+        throw new Error(
+          `Unit ${unit.unitId} changed hero from ${inspected.heroId} to ${unit.heroId}`,
+        );
+      }
+
+      return inspected;
+    }
+
+    const friendly = unit.teamId === friendlyTeamId;
+    const parts = buildCard(heroDefinition(unit.heroId), [friendly ? "Ally" : "Enemy"], true);
+    parts.root.classList.add("is-live");
+    parts.root.dataset.team = friendly ? "friendly" : "enemy";
+    container.replaceChildren(parts.root);
+    container.hidden = false;
+    inspected = { unitId: unit.unitId, heroId: unit.heroId, parts, statusKey: "", timers: [] };
+
+    return inspected;
+  }
+
   return {
-    update(unit, tick) {
-      if (unit === shownUnit && tick === shownTick) {
-        return;
+    show(snapshot, unit) {
+      const shown = inspect(unit);
+      const parts = shown.parts;
+      parts.hpFill.style.setProperty("--fill", fraction(unit.hp, unit.maxHp));
+      setText(parts.hpValue, `${formatCount(unit.hp)} / ${formatCount(unit.maxHp)}`);
+
+      if (unit.signature !== null) {
+        parts.manaFill.style.setProperty("--fill", fraction(unit.mana, unit.maxMana));
+        setText(parts.manaValue, `${Math.floor(unit.mana)} / ${unit.maxMana}`);
       }
 
-      shownUnit = unit;
-      shownTick = tick;
-
-      if (unit === null) {
-        if (inspected !== null || !container.hidden) {
-          clear();
-        }
-
-        return;
-      }
-
-      const stats = cardStats(unit, unit.heroId, unit.attackSpeedBonus);
-
-      if (inspected?.unitId !== unit.unitId) {
-        const parts = buildCard(unit.heroId, unit.build, stats, { lead: leadFor(unit, friendlyTeamId), slot: null, hint: null, live: true });
-        parts.root.classList.add("is-live");
-        parts.root.dataset.team = unit.teamId === friendlyTeamId ? "friendly" : "enemy";
-        inspected = { unitId: unit.unitId, parts, statusKey: "", statusLabels: [] };
-        container.replaceChildren(parts.root);
-        container.hidden = false;
-      }
-
-      const { parts } = inspected;
-      const hpRatio = unit.maxHp > 0 ? Math.max(0, Math.min(1, unit.hp / unit.maxHp)) : 0;
-      const shieldRatio = unit.shield === null || unit.maxHp <= 0 ? 0 : Math.min(1 - hpRatio, unit.shield.amount / unit.maxHp);
-      parts.hpFill.style.setProperty("--fill", String(hpRatio));
-      parts.hpShield.style.setProperty("--from", String(hpRatio));
-      parts.hpShield.style.setProperty("--fill", String(shieldRatio));
-      parts.hpShield.classList.toggle("is-blessed", unit.shield !== null && unit.shield.blessed !== null);
-      parts.hpValue.textContent = `${formatCount(Math.max(0, unit.hp))} / ${formatCount(unit.maxHp)}`;
-      parts.mana.hidden = unit.maxMana <= 0;
-
-      if (unit.maxMana > 0) {
-        parts.manaFill.style.setProperty("--fill", String(Math.max(0, Math.min(1, unit.mana / unit.maxMana))));
-        parts.manaValue.textContent = `${Math.floor(unit.mana)} / ${unit.maxMana}`;
-      }
-
-      if (stats !== null) {
-        fillStats(parts, stats, unit.damageDealt);
-      }
-
+      setText(parts.dealt, formatCount(unit.damageDealt));
       parts.root.classList.toggle("is-dead", !unit.alive);
-      syncStatuses(inspected, unitStatuses(unit, tick));
+      syncStatuses(shown, snapshot, unit);
     },
 
+    hide,
+
     dispose() {
-      clear();
+      hide();
     },
   };
 }

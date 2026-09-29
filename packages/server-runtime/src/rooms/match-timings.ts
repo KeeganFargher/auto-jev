@@ -3,8 +3,6 @@ import { DEFAULT_RUN_RULES, type RunRules } from "@jev-game/run";
 export interface MatchTimings {
   draftSeconds: number;
   preparingSeconds: number;
-  rewardSeconds: number;
-  milestoneRewardSeconds: number;
   reconnectGraceSeconds: number;
   roundHoldScale: number;
   clockMilliseconds: number;
@@ -13,8 +11,6 @@ export interface MatchTimings {
 export const DEFAULT_MATCH_TIMINGS: MatchTimings = {
   draftSeconds: 30,
   preparingSeconds: 25,
-  rewardSeconds: 20,
-  milestoneRewardSeconds: 35,
   reconnectGraceSeconds: 30,
   roundHoldScale: 1,
   clockMilliseconds: 200,

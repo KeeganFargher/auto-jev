@@ -1,92 +1,37 @@
-import type {
-  BattleResult,
-  BattleSetup,
-  BoardCell,
-  HeroBuild,
-  HeroDefinitionId,
-  Rarity,
-  SkillSlot,
-  UpgradeDefinitionId,
-} from "@jev-game/game";
-import type { BattleId, PlayerId, RunId } from "./ids.js";
-import type { PairingHistory } from "./pairings.js";
+import type { BattleResult, BattleSetup, BoardCell, HeroDefinitionId } from "@jev-game/game";
+import type { PlayerId, RunId } from "./ids.js";
+import type { Pairing, PairingHistory } from "./pairings.js";
 import type { RunRules } from "./rules.js";
 
-export type ControllerKind = "human" | "random-bot" | "heuristic-bot" | "jev";
-
-export interface OwnedPiece {
-  instanceId: string;
-  pieceId: UpgradeDefinitionId;
-  heroSlot: number | null;
-}
-
-export interface OwnedGem extends OwnedPiece {
-  skill: SkillSlot | null;
-}
+export type ControllerKind = "human" | "random-bot" | "jev";
 
 export interface PlayerSeat {
   playerId: PlayerId;
   displayName: string;
   controllerKind: ControllerKind;
-  heroBuilds: HeroBuild[];
+  heroIds: HeroDefinitionId[];
   formation: BoardCell[];
-  items: OwnedPiece[];
-  gems: OwnedGem[];
-  nextInstanceId: number;
   runHealth: number;
   eliminated: boolean;
   forfeited: boolean;
   decisionRevision: number;
 }
 
-export type RunPhase =
-  | "lobby"
-  | "draft"
-  | "preparing"
-  | "battle"
-  | "round-result"
-  | "reward"
-  | "finished";
+export type RunPhase = "lobby" | "draft" | "preparing" | "round-result" | "finished";
 
-export interface HeroOffer {
-  offerId: string;
-  heroId: HeroDefinitionId;
-}
-
-export type RewardOfferKind = "item" | "gem" | "level" | "recruit" | "train";
-
-export interface RewardOffer {
-  offerId: string;
-  kind: RewardOfferKind;
-  pieceId: UpgradeDefinitionId | null;
-  heroId: HeroDefinitionId | null;
-  heroSlot: number | null;
-  rarity: Rarity | null;
-}
-
-export type DecisionKind = "item" | "gem" | "level" | "recruit";
-
-export interface PendingDecision {
-  decisionId: string;
-  kind: DecisionKind;
-  heroSlot: number | null;
-  level: number | null;
-  offers: RewardOffer[];
-}
-
-export interface RoundBattle {
-  battleId: BattleId;
-  teamAPlayerId: PlayerId;
-  teamBPlayerId: PlayerId;
-  setup: BattleSetup | null;
-  result: BattleResult | null;
+export interface RoundBattle extends Pairing {
+  setup: BattleSetup;
+  result: BattleResult;
   winnerSurvivors: number | null;
+  presentationSeconds: number;
+  digest: string;
 }
 
 export interface RoundState {
   round: number;
-  battles: Record<BattleId, RoundBattle>;
+  pairings: Pairing[];
   byePlayerId: PlayerId | null;
+  battles: RoundBattle[];
 }
 
 export interface RunState {
@@ -94,17 +39,13 @@ export interface RunState {
   runSeed: number;
   phase: RunPhase;
   phaseEpoch: number;
-  roundCap: number;
   rules: RunRules;
+  draftPool: HeroDefinitionId[];
   initialPlayerIds: PlayerId[];
   players: Record<PlayerId, PlayerSeat>;
   pairingHistory: PairingHistory;
   currentRound: RoundState | null;
   readyThresholdByPlayer: Record<PlayerId, number>;
-  heroOffersByPlayer: Record<PlayerId, HeroOffer[]>;
-  draftSelectionByPlayer: Record<PlayerId, string[]>;
-  pendingDecisionsByPlayer: Record<PlayerId, PendingDecision[]>;
-  lastRoundLoserIds: PlayerId[];
+  draftSelectionByPlayer: Record<PlayerId, HeroDefinitionId[]>;
   winnerPlayerIds: PlayerId[] | null;
-  abortReason: string | null;
 }

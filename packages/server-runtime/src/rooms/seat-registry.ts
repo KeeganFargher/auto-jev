@@ -34,7 +34,11 @@ export function createSeats(count: number, botLabel: string): SeatSlot[] {
   }));
 }
 
-export function claimBotSeat(seats: readonly SeatSlot[], sessionId: string, name: string | undefined): SeatSlot | null {
+export function claimBotSeat(
+  seats: readonly SeatSlot[],
+  sessionId: string,
+  name: string | undefined,
+): SeatSlot | null {
   const seat = seats.find((candidate) => candidate.controller === "bot");
 
   if (seat === undefined) {

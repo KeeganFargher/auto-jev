@@ -17,7 +17,12 @@ type Point = [number, number, number];
 
 const FROND_SEGMENTS = 6;
 
-export function frondGeometry(length: number, width: number, rise: number, droop: number): BufferGeometry {
+export function frondGeometry(
+  length: number,
+  width: number,
+  rise: number,
+  droop: number,
+): BufferGeometry {
   const positions: number[] = [];
 
   function spine(step: number): Point {
@@ -51,7 +56,12 @@ export function frondGeometry(length: number, width: number, rise: number, droop
   return geometry;
 }
 
-export function rockGeometry(kit: PropKit, radius: number, flatten: number, detail = 1): BufferGeometry {
+export function rockGeometry(
+  kit: PropKit,
+  radius: number,
+  flatten: number,
+  detail = 1,
+): BufferGeometry {
   const geometry = new IcosahedronGeometry(radius, detail);
   const position = geometry.getAttribute("position");
   const scales = new Map<string, number>();
@@ -91,7 +101,13 @@ export function islandGeometry(
   wobble: number,
 ): BufferGeometry {
   const geometry = new CylinderGeometry(radius, radius * flare, height, 56, 2);
-  const phases = [kit.between(0, Math.PI * 2), kit.between(0, Math.PI * 2), kit.between(0, Math.PI * 2)];
+
+  const phases = [
+    kit.between(0, Math.PI * 2),
+    kit.between(0, Math.PI * 2),
+    kit.between(0, Math.PI * 2),
+  ];
+
   const position = geometry.getAttribute("position");
 
   for (let index = 0; index < position.count; index += 1) {
@@ -132,7 +148,13 @@ export interface TerrainOptions {
 }
 
 export function terrainGeometry(kit: PropKit, options: TerrainOptions): BufferGeometry {
-  const geometry = new PlaneGeometry(options.size, options.size, options.segments, options.segments);
+  const geometry = new PlaneGeometry(
+    options.size,
+    options.size,
+    options.segments,
+    options.segments,
+  );
+
   geometry.rotateX(-Math.PI / 2);
 
   const position = geometry.getAttribute("position");

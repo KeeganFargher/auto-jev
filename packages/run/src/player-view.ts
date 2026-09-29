@@ -1,17 +1,7 @@
-import type { BoardCell, HeroBuild } from "@jev-game/game";
+import type { BoardCell, HeroDefinitionId } from "@jev-game/game";
 import type { PlayerId, RunId } from "./ids.js";
-import { isSeatReady } from "./readiness.js";
-import type {
-  ControllerKind,
-  HeroOffer,
-  OwnedGem,
-  OwnedPiece,
-  PendingDecision,
-  PlayerSeat,
-  RoundState,
-  RunPhase,
-  RunState,
-} from "./types.js";
+import { isSeatReady, requireSeat } from "./readiness.js";
+import type { ControllerKind, PlayerSeat, RoundState, RunPhase, RunState } from "./types.js";
 import type { RunRules } from "./rules.js";
 
 export interface PublicSeat {
@@ -23,10 +13,8 @@ export interface PublicSeat {
 }
 
 export interface OwnSeat extends PublicSeat {
-  heroBuilds: HeroBuild[];
+  heroIds: HeroDefinitionId[];
   formation: BoardCell[];
-  items: OwnedPiece[];
-  gems: OwnedGem[];
   decisionRevision: number;
   ready: boolean;
 }
@@ -35,16 +23,13 @@ export interface PlayerView {
   runId: RunId;
   phase: RunPhase;
   phaseEpoch: number;
-  roundCap: number;
   rules: RunRules;
   you: OwnSeat;
   players: Record<PlayerId, PublicSeat>;
   currentRound: RoundState | null;
-  heroOffers: HeroOffer[];
-  draftSelection: string[];
-  pendingDecisions: PendingDecision[];
+  draftPool: HeroDefinitionId[];
+  draftSelection: HeroDefinitionId[];
   winnerPlayerIds: PlayerId[] | null;
-  abortReason: string | null;
 }
 
 function toPublicSeat(seat: PlayerSeat): PublicSeat {
@@ -57,13 +42,8 @@ function toPublicSeat(seat: PlayerSeat): PublicSeat {
   };
 }
 
-export function getPlayerView(state: RunState, playerId: PlayerId): PlayerView | null {
-  const seat = state.players[playerId];
-
-  if (seat === undefined) {
-    return null;
-  }
-
+export function getPlayerView(state: RunState, playerId: PlayerId): PlayerView {
+  const seat = requireSeat(state, playerId);
   const players: Record<PlayerId, PublicSeat> = {};
 
   for (const other of Object.values(state.players)) {
@@ -74,23 +54,18 @@ export function getPlayerView(state: RunState, playerId: PlayerId): PlayerView |
     runId: state.runId,
     phase: state.phase,
     phaseEpoch: state.phaseEpoch,
-    roundCap: state.roundCap,
     rules: state.rules,
     you: {
       ...toPublicSeat(seat),
-      heroBuilds: seat.heroBuilds,
+      heroIds: seat.heroIds,
       formation: seat.formation,
-      items: seat.items,
-      gems: seat.gems,
       decisionRevision: seat.decisionRevision,
       ready: isSeatReady(state, playerId),
     },
     players,
     currentRound: state.currentRound,
-    heroOffers: state.heroOffersByPlayer[playerId] ?? [],
+    draftPool: state.draftPool,
     draftSelection: state.draftSelectionByPlayer[playerId] ?? [],
-    pendingDecisions: state.pendingDecisionsByPlayer[playerId] ?? [],
     winnerPlayerIds: state.winnerPlayerIds,
-    abortReason: state.abortReason,
   };
 }

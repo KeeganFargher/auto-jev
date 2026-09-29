@@ -19,7 +19,9 @@ export function createFrameSampler(size: number, start: number): FrameSampler {
     },
 
     averageMs() {
-      return intervals.length === 0 ? 0 : intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
+      return intervals.length === 0
+        ? 0
+        : intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length;
     },
 
     worstMs() {
