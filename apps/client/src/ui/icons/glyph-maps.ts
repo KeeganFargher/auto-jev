@@ -1,8 +1,10 @@
 import {
   berserker,
   bubbleCleric,
+  burr,
   firebrand,
   harpooner,
+  mags,
   paladin,
   trainingDummy,
 } from "@jev-game/content";
@@ -11,6 +13,7 @@ import type { UnitStatusKind } from "../../game/unit-status.js";
 import {
   BOMB,
   BROKEN_HEART,
+  BROOM,
   BUBBLE,
   CROSSED_AXES,
   DOWN_ARROW,
@@ -18,8 +21,10 @@ import {
   HAMMER,
   HARPOON,
   HUDDLE,
+  MAGNET,
   MENDING_BUBBLE,
   PLUS,
+  SNOWFLAKE,
   STARS,
   SURGE,
   SWORD,
@@ -33,6 +38,8 @@ const HERO_GLYPHS: ReadonlyMap<HeroDefinitionId, string> = new Map([
   [firebrand.id, FLAME],
   [bubbleCleric.id, BUBBLE],
   [harpooner.id, HARPOON],
+  [mags.id, MAGNET],
+  [burr.id, BROOM],
   [trainingDummy.id, TARGET],
 ]);
 
@@ -42,6 +49,7 @@ export const STATUS_GLYPHS: Readonly<Record<UnitStatusKind, string>> = {
   floating: BUBBLE,
   airborne: UP_ARROW,
   downed: DOWN_ARROW,
+  frozen: SNOWFLAKE,
   stunned: STARS,
   rampage: SURGE,
   "safety-bubble": MENDING_BUBBLE,
@@ -52,6 +60,8 @@ export const WANT_GLYPHS: Readonly<Record<SetupWant, string>> = {
   floating: BUBBLE,
   burning: FLAME,
   grouped: HUDDLE,
+  downed: DOWN_ARROW,
+  frozen: SNOWFLAKE,
 };
 
 export type MeterMetric = "dealt" | "taken" | "healing";

@@ -23,6 +23,13 @@ export const STARS =
 export const BOMB =
   "M10.5 7.5a7 7 0 1 1 0 14 7 7 0 0 1 0-14ZM7.4 11.8a3.4 3.4 0 0 1 2.4-1.9l.3 1.5a1.9 1.9 0 0 0-1.3 1Z M14.6 6.6l1.7-1.7 2 2-1.7 1.7ZM19.6 1.2l.9 2 2 .9-2 .9-.9 2-.9-2-2-.9 2-.9Z";
 
+export const SNOWFLAKE =
+  "M11 1h2v22h-2ZM1 11h22v2H1ZM3.6 5 5 3.6 20.4 19 19 20.4ZM19 3.6 20.4 5 5 20.4 3.6 19Z";
+
+export const MAGNET = "M4 3h6v9a2 2 0 0 0 4 0V3h6v9a8 8 0 0 1-16 0Z";
+
+export const BROOM = "M19.5 2 22 4.5 13.5 13 11 10.5ZM10 11.5 12.5 14 8 22 2 16Z";
+
 export const DOWN_ARROW = "M12 22 4 13h5V2h6v11h5Z";
 
 export const UP_ARROW = "M12 2 20 11h-5v11H9V11H4Z";

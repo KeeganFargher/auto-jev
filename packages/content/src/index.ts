@@ -9,6 +9,8 @@ export * from "./heroes/firebrand.js";
 export * from "./heroes/bubble-cleric.js";
 
 export * from "./heroes/harpooner.js";
+export * from "./heroes/mags.js";
+export * from "./heroes/burr.js";
 
 export * from "./heroes/training-dummy.js";
 

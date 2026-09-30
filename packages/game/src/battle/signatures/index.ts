@@ -1,8 +1,12 @@
-import type { SignatureDefinition } from "../../definitions.js";
+import type { SetupWant, SignatureDefinition, SignatureKind } from "../../definitions.js";
 import { CAST_SLOW } from "../beats.js";
 import { emit, type StepContext } from "../events.js";
-import { READY_WAIT_TICKS } from "../rules.js";
+import { PATIENT_WAIT_TICKS, READY_WAIT_TICKS } from "../rules.js";
+import { hasWantedState, isCasting } from "../prediction.js";
 import type { UnitState } from "../state.js";
+import { livingAllies, livingEnemies } from "../targeting.js";
+import { advanceBlizzard, planBlizzard, startBlizzard } from "./blizzard.js";
+import { advanceCollectionDay, planCollectionDay, startCollectionDay } from "./collection-day.js";
 import { advanceBigBubble, planBigBubble, startBigBubble } from "./big-bubble.js";
 import { advanceHammerfall, planHammerfall, startHammerfall } from "./hammerfall.js";
 import type { CastPlan } from "./plan.js";
@@ -27,6 +31,10 @@ function planSignature(
       return planBigBubble(ctx, unit, signature, wantedOnly);
     case "yank":
       return planYank(ctx, unit, signature, wantedOnly);
+    case "collection-day":
+      return planCollectionDay(ctx, unit, signature, wantedOnly);
+    case "blizzard":
+      return planBlizzard(ctx, unit, signature, wantedOnly);
   }
 }
 
@@ -55,6 +63,14 @@ function startSignature(
       return;
     case "yank":
       startYank(ctx, unit, signature, plan);
+
+      return;
+    case "collection-day":
+      startCollectionDay(ctx, unit, signature, plan);
+
+      return;
+    case "blizzard":
+      startBlizzard(ctx, unit, signature, plan);
   }
 }
 
@@ -67,8 +83,49 @@ function releaseDelayTicks(signature: SignatureDefinition): number {
     case "short-fuse":
     case "big-bubble":
     case "yank":
+    case "collection-day":
+    case "blizzard":
       return signature.castTicks;
   }
+}
+
+const PRODUCED_SETUPS: Partial<Record<SignatureKind, SetupWant>> = {
+  "collection-day": "downed",
+  blizzard: "frozen",
+};
+
+function awaitedSetups(
+  ctx: StepContext,
+  unit: UnitState,
+  signature: SignatureDefinition,
+): SetupWant[] {
+  const produced = livingAllies(ctx.state, unit).flatMap((ally) => {
+    const kind = ally.signature?.kind;
+    const setup = kind === undefined ? undefined : PRODUCED_SETUPS[kind];
+
+    return setup === undefined ? [] : [setup];
+  });
+
+  return signature.wants.filter((want) => produced.includes(want));
+}
+
+function partnerStillCharging(
+  ctx: StepContext,
+  unit: UnitState,
+  signature: SignatureDefinition,
+): boolean {
+  const product = PRODUCED_SETUPS[signature.kind];
+
+  return (
+    product !== undefined &&
+    livingAllies(ctx.state, unit).some(
+      (ally) =>
+        ally.signature !== null &&
+        ally.signature.wants.includes(product) &&
+        ally.readySinceTick < 0 &&
+        !isCasting(ally),
+    )
+  );
 }
 
 function readyPlan(
@@ -76,6 +133,22 @@ function readyPlan(
   unit: UnitState,
   signature: SignatureDefinition,
 ): CastPlan | null {
+  if (ctx.state.tick - unit.readySinceTick < PATIENT_WAIT_TICKS) {
+    if (partnerStillCharging(ctx, unit, signature)) {
+      return null;
+    }
+
+    const awaited = awaitedSetups(ctx, unit, signature);
+
+    if (awaited.length > 0) {
+      const ready = livingEnemies(ctx.state, unit).some((enemy) =>
+        hasWantedState(ctx.state, enemy, awaited, ctx.state.tick),
+      );
+
+      return ready ? planSignature(ctx, unit, signature, true) : null;
+    }
+  }
+
   const wanted = planSignature(ctx, unit, signature, true);
 
   if (wanted !== null || ctx.state.tick - unit.readySinceTick < READY_WAIT_TICKS) {
@@ -143,6 +216,14 @@ export function advanceSignatureAction(ctx: StepContext, unit: UnitState): void 
       return;
     case "yank":
       advanceYank(ctx, unit, action);
+
+      return;
+    case "collection-day":
+      advanceCollectionDay(ctx, unit, action);
+
+      return;
+    case "blizzard":
+      advanceBlizzard(ctx, unit, action);
 
       return;
     case "idle":

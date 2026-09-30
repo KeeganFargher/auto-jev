@@ -63,6 +63,8 @@ const CAUSE_LABELS: Readonly<Record<SignatureCause, string>> = {
   blast: "Fuse blasts",
   burn: "Burning",
   yank: "Yank",
+  pull: "Collection Day",
+  frost: "Everybody Settle Down",
 };
 
 const HEAL_LABELS: Readonly<Record<Exclude<HealCause, "attack">, string>> = {

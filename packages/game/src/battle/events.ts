@@ -19,7 +19,9 @@ export type DamageCause =
   | "bowling"
   | "blast"
   | "burn"
-  | "yank";
+  | "yank"
+  | "pull"
+  | "frost";
 
 export type HealCause = "attack" | "safety-bubble";
 
@@ -129,6 +131,33 @@ export interface LandEvent extends EventBase {
   position: Vector2;
   hard: boolean;
   cause: LaunchCause;
+}
+
+export interface PullEvent extends EventBase {
+  kind: "pull";
+  unitId: UnitId;
+  makerUnitId: UnitId;
+  from: Vector2;
+  to: Vector2;
+  endTick: number;
+}
+
+export interface FreezeEvent extends EventBase {
+  kind: "freeze";
+  unitId: UnitId;
+  makerUnitId: UnitId;
+  untilTick: number;
+}
+
+export interface ThawEvent extends EventBase {
+  kind: "thaw";
+  unitId: UnitId;
+}
+
+export interface ShatterEvent extends EventBase {
+  kind: "shatter";
+  unitId: UnitId;
+  makerUnitId: UnitId;
 }
 
 export interface DownedEvent extends EventBase {
@@ -246,6 +275,10 @@ export type BattleEvent =
   | YankEvent
   | LaunchEvent
   | LandEvent
+  | PullEvent
+  | FreezeEvent
+  | ThawEvent
+  | ShatterEvent
   | DownedEvent
   | GetUpEvent
   | StunEvent

@@ -20,8 +20,10 @@ import {
 import {
   berserker,
   bubbleCleric,
+  burr,
   firebrand,
   harpooner,
+  mags,
   paladin,
   trainingDummy,
 } from "@jev-game/content";
@@ -85,6 +87,8 @@ const HERO_LOOKS: ReadonlyMap<HeroDefinitionId, HeroLook> = new Map([
   [firebrand.id, { hit: "strike", shot: "firecracker" }],
   [bubbleCleric.id, { hit: "strike", shot: "soap" }],
   [harpooner.id, { hit: "blade", shot: "knife" }],
+  [mags.id, { hit: "blade", shot: "knife" }],
+  [burr.id, { hit: "blunt", shot: null }],
   [trainingDummy.id, { hit: "blunt", shot: null }],
 ]);
 

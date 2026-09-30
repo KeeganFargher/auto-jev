@@ -336,6 +336,7 @@ test("each setup state counts for the hammer's aim until it ends, and a fall doe
     to: { x: 44, y: 40 },
     startTick: tick,
     endTick: tick + 5,
+    downedTicks: DOWNED_TICKS,
     makerUnitId: "A-1",
   };
   assert.equal(isSetUpAt(state, post, tick + 5 + DOWNED_TICKS - 1), true);

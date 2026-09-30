@@ -189,7 +189,7 @@ export function advanceUnitMotion(ctx: StepContext): void {
         unit.motion = {
           kind: "downed",
           startTick: motion.endTick,
-          endTick: motion.endTick + DOWNED_TICKS,
+          endTick: motion.endTick + motion.downedTicks,
           makerUnitId: motion.makerUnitId,
         };
       }

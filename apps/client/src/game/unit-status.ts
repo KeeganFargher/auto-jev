@@ -1,8 +1,7 @@
 import {
-  DOWNED_TICKS,
   isDowned,
+  isFrozen,
   isLaunched,
-  isStunned,
   type BattleSnapshot,
   type BubbleState,
   type UnitState,
@@ -14,6 +13,7 @@ export type UnitStatusKind =
   | "floating"
   | "airborne"
   | "downed"
+  | "frozen"
   | "stunned"
   | "rampage"
   | "safety-bubble";
@@ -50,6 +50,11 @@ export const UNIT_STATUS_INFO: Readonly<Record<UnitStatusKind, UnitStatusInfo>> 
     label: "Downed",
     buff: false,
     description: "Knocked flat. Can't act until it gets up.",
+  },
+  frozen: {
+    label: "Frozen",
+    buff: false,
+    description: "Frozen solid. Can't act, and a hammer or blast shatters it for double damage.",
   },
   stunned: {
     label: "Stunned",
@@ -112,7 +117,11 @@ export function unitStatuses(snapshot: BattleSnapshot, unit: UnitState): UnitSta
     statuses.push("downed");
   }
 
-  if (isStunned(unit, snapshot.tick)) {
+  if (isFrozen(unit, snapshot.tick)) {
+    statuses.push("frozen");
+  }
+
+  if (unit.stunnedUntilTick > snapshot.tick && unit.rampage === null) {
     statuses.push("stunned");
   }
 
@@ -166,7 +175,7 @@ export function statusEndTick(
 
     case "downed": {
       if (motion.kind === "skid") {
-        return motion.endTick + DOWNED_TICKS;
+        return motion.endTick + motion.downedTicks;
       }
 
       if (motion.kind !== "downed") {
@@ -174,6 +183,14 @@ export function statusEndTick(
       }
 
       return motion.endTick;
+    }
+
+    case "frozen": {
+      if (unit.frozen === null) {
+        throw missingStatus(unit, status);
+      }
+
+      return unit.frozen.untilTick;
     }
 
     case "stunned": {

@@ -2,9 +2,9 @@ import type { ArenaDefinitionId, HeroDefinitionId } from "./ids.js";
 
 export type HeroRole = "frontline" | "midline" | "backline";
 
-export type SetupState = "airborne" | "floating" | "downed" | "burning" | "primed";
+export type SetupState = "airborne" | "floating" | "downed" | "burning" | "primed" | "frozen";
 
-export type SetupWant = "airborne" | "floating" | "burning" | "grouped";
+export type SetupWant = "airborne" | "floating" | "burning" | "grouped" | "downed" | "frozen";
 
 export interface MeleeAttackDefinition {
   kind: "melee";
@@ -113,12 +113,34 @@ export interface YankDefinition extends SignatureBase {
   recoverTicks: number;
 }
 
+export interface CollectionDayDefinition extends SignatureBase {
+  kind: "collection-day";
+  rangeUnits: number;
+  castTicks: number;
+  radiusUnits: number;
+  pileRadiusUnits: number;
+  pullTicks: number;
+  pileTicks: number;
+  damage: number;
+}
+
+export interface BlizzardDefinition extends SignatureBase {
+  kind: "blizzard";
+  rangeUnits: number;
+  castTicks: number;
+  radiusUnits: number;
+  freezeTicks: number;
+  damage: number;
+}
+
 export type SignatureDefinition =
   | HammerfallDefinition
   | RampageDefinition
   | ShortFuseDefinition
   | BigBubbleDefinition
-  | YankDefinition;
+  | YankDefinition
+  | CollectionDayDefinition
+  | BlizzardDefinition;
 
 export type SignatureKind = SignatureDefinition["kind"];
 

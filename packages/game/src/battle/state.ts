@@ -52,6 +52,7 @@ export interface SkidMotion {
   to: Vector2;
   startTick: number;
   endTick: number;
+  downedTicks: number;
   makerUnitId: UnitId;
 }
 
@@ -98,6 +99,18 @@ export type UnitAction =
       startTick: number;
       throwTick: number;
       endTick: number;
+    }
+  | {
+      kind: "collection-day";
+      center: Vector2;
+      startTick: number;
+      releaseTick: number;
+    }
+  | {
+      kind: "blizzard";
+      center: Vector2;
+      startTick: number;
+      releaseTick: number;
     };
 
 export interface BurningState {
@@ -112,6 +125,11 @@ export interface PrimedState {
   fuseId: number;
   makerUnitId: UnitId;
   explodeTick: number;
+}
+
+export interface FrozenState {
+  makerUnitId: UnitId;
+  untilTick: number;
 }
 
 export interface RampageState {
@@ -150,6 +168,7 @@ export interface UnitState {
   stunnedUntilTick: number;
   burning: BurningState | null;
   primed: PrimedState | null;
+  frozen: FrozenState | null;
   rampage: RampageState | null;
   safetyBubbled: boolean;
   damageDealt: number;
@@ -327,8 +346,12 @@ export function isImmovable(unit: UnitState): boolean {
   return unit.rampage !== null;
 }
 
+export function isFrozen(unit: UnitState, tick: number): boolean {
+  return unit.frozen !== null && unit.frozen.untilTick > tick;
+}
+
 export function isStunned(unit: UnitState, tick: number): boolean {
-  return unit.stunnedUntilTick > tick && unit.rampage === null;
+  return (unit.stunnedUntilTick > tick || isFrozen(unit, tick)) && unit.rampage === null;
 }
 
 export function canAct(unit: UnitState, tick: number): boolean {
@@ -349,6 +372,10 @@ export function setupMarks(state: BattleState, unit: UnitState): SetupMark[] {
 
   if (unit.primed !== null) {
     marks.push({ state: "primed", makerUnitId: unit.primed.makerUnitId });
+  }
+
+  if (unit.frozen !== null) {
+    marks.push({ state: "frozen", makerUnitId: unit.frozen.makerUnitId });
   }
 
   if (unit.burning !== null) {

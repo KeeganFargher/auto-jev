@@ -172,6 +172,23 @@ function validateSignatureKind(owner: string, signature: SignatureDefinition): v
       requireNonNegative(owner, "bowling damage", signature.bowlingDamage);
       requireNonNegativeInteger(owner, "stun ticks", signature.stunTicks);
       requireNonNegativeInteger(owner, "recover ticks", signature.recoverTicks);
+      return;
+    case "collection-day":
+      requirePositive(owner, "range", signature.rangeUnits);
+      requirePositiveInteger(owner, "cast ticks", signature.castTicks);
+      requirePositive(owner, "radius", signature.radiusUnits);
+      requirePositive(owner, "pile radius", signature.pileRadiusUnits);
+      requireBelow(owner, "pile radius", signature.pileRadiusUnits, signature.radiusUnits);
+      requirePositiveInteger(owner, "pull ticks", signature.pullTicks);
+      requirePositiveInteger(owner, "pile ticks", signature.pileTicks);
+      requireNonNegative(owner, "damage", signature.damage);
+      return;
+    case "blizzard":
+      requirePositive(owner, "range", signature.rangeUnits);
+      requirePositiveInteger(owner, "cast ticks", signature.castTicks);
+      requirePositive(owner, "radius", signature.radiusUnits);
+      requirePositiveInteger(owner, "freeze ticks", signature.freezeTicks);
+      requireNonNegative(owner, "damage", signature.damage);
   }
 }
 

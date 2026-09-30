@@ -103,6 +103,7 @@ function killUnit(ctx: StepContext, unit: UnitState, killer: UnitState): void {
   unit.action = { kind: "idle" };
   unit.motion = { kind: "ground" };
   unit.burning = null;
+  unit.frozen = null;
   unit.readySinceTick = -1;
   emit(ctx, { kind: "death", unitId: unit.unitId, killerUnitId: killer.unitId });
 

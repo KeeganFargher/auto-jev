@@ -18,6 +18,8 @@ const WANT_LABELS: Readonly<Record<SetupWant, string>> = {
   floating: "Floating",
   burning: "Burning",
   grouped: "Grouped",
+  downed: "Downed",
+  frozen: "Frozen",
 };
 
 function trimmed(value: number): string {

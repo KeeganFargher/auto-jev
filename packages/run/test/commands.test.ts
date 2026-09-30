@@ -53,8 +53,8 @@ test("a run needs two distinct seats and a draft the pool can fill", () => {
   );
   assert.throws(
     () =>
-      createRun("greedy", 1, seats(["human", "human"]), { ...DEFAULT_RUN_RULES, draftPicks: 6 }),
-    /draft of 6 heroes/,
+      createRun("greedy", 1, seats(["human", "human"]), { ...DEFAULT_RUN_RULES, draftPicks: 8 }),
+    /draft of 8 heroes/,
   );
   assert.throws(
     () => createRun("empty", 1, seats(["human", "human"]), { ...DEFAULT_RUN_RULES, draftPicks: 0 }),

@@ -10,6 +10,7 @@ import {
   JUGGLE_DAMAGE_MULTIPLIER,
   JUGGLE_DISTANCE_MULTIPLIER,
   JUGGLE_RISE_MULTIPLIER,
+  SHATTER_DAMAGE_MULTIPLIER,
 } from "./rules.js";
 import {
   bubbleById,
@@ -290,7 +291,15 @@ export function radialStrike(ctx: StepContext, strike: RadialStrike): UnitState[
 
   for (const target of targets) {
     const juggle = juggled.has(target.unitId);
-    const bonus = juggle ? JUGGLE_DAMAGE_MULTIPLIER : 1;
+    const frozen = target.frozen;
+    let bonus = juggle ? JUGGLE_DAMAGE_MULTIPLIER : 1;
+
+    if (frozen !== null) {
+      bonus *= SHATTER_DAMAGE_MULTIPLIER;
+      target.frozen = null;
+      emit(ctx, { kind: "shatter", unitId: target.unitId, makerUnitId: frozen.makerUnitId });
+    }
+
     dealDamage(
       ctx,
       strike.source,

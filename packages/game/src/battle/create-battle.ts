@@ -91,6 +91,7 @@ function createUnit(setup: UnitSetup, hero: HeroDefinition, arena: ArenaDefiniti
     stunnedUntilTick: 0,
     burning: null,
     primed: null,
+    frozen: null,
     rampage: null,
     safetyBubbled: false,
     damageDealt: 0,

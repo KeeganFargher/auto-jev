@@ -666,3 +666,25 @@ describes. Every prompt ends with that doc's stone-arena clause.
 `rampage-roar` is the one sound with a voice: drop `no voice` from its
 clause and keep it wordless. `combo-sting` is a stinger, so encode it
 stereo.
+
+## Mags and Burr
+
+Mags reuses the KayKit mage body with the staff and a recolour, and Burr
+reuses the knight body with the staff. Neither has its own prop or sound
+yet.
+
+**Props to model:** `magnet` (a chunky horseshoe magnet, Mags's right
+hand) and `snow-broom` (a wide bristled broom, Burr's right hand). Same
+low-poly KayKit style, textured from the `weaponsBits` atlas.
+
+**Sounds** (same delivery and stone-arena clause as the table above):
+
+| Id            | Plays on (engine event)                       | Length | Prompt (before the clause)                                                            |
+| ------------- | --------------------------------------------- | ------ | ------------------------------------------------------------------------------------- |
+| `magnet-pull` | Collection Day dragging enemies in (`pull`)   | 0.8 s  | a huge magnet snapping on, scrap metal scraping across stone toward it in a rush      |
+| `freeze-over` | Everybody Settle Down freezing units (`freeze`) | 0.8 s  | a sudden gust of wind and ice crystallising over a body with a crackling glassy sheen |
+| `ice-shatter` | a frozen unit shattering (`shatter`)          | 0.6 s  | a block of ice smashed by a hammer, a sharp crack and a spray of tinkling shards      |
+
+**Effect art:** an ice-block shell drawn over frozen units (a translucent
+pale-blue chunky mesh, scaled to the body radius) and a short magnet-line
+particle streak for each `pull` event.
