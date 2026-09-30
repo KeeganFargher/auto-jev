@@ -69,6 +69,7 @@ function knockDown(
       to: skidTarget(state, unit.position, direction, travel),
       startTick: state.tick,
       endTick: state.tick + SKID_TICKS,
+      downedTicks: DOWNED_TICKS,
       makerUnitId,
     };
   } else {

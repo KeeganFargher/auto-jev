@@ -16,6 +16,7 @@ import {
   flightElevation,
   flightFraction,
   flightPosition,
+  isFrozen,
   isStunned,
   lerp,
   TICK_RATE,
@@ -82,6 +83,7 @@ import {
 import { createHeroFigure, type FigureStance, type HeroFigure } from "./hero-figures.js";
 import { emitHit, emitRelease, type HitKind } from "./hit-effects.js";
 import { GROW_STEPS, growStepsTaken, rampageSwell } from "./rampage-swell.js";
+import { pullerOf } from "./pull-beam.js";
 
 export interface BattleFrame {
   moment: BattleMoment;
@@ -190,6 +192,8 @@ const SELECTION_COLOR = "#e2bd5c";
 const FUSE_COLOR = "#ff7a2a";
 
 const REEL_COLOR = "#8d8d96";
+
+const MAGNET_COLOR = "#c58bff";
 
 const YAW_SMOOTHING = 12;
 
@@ -322,6 +326,8 @@ const GROWN_DEBRIS = 12;
 const RAGE_SECONDS = 1 / 36;
 
 const RAGE_TINT = 0.1;
+
+const FROST_GLOW = 0.35;
 
 const RAGE_PULSE = 0.06;
 
@@ -690,6 +696,7 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       motion.kind === "ground" &&
       distance(unit.position, next.position) * TICK_RATE > MOVING_UNITS_PER_SECOND;
 
+    record.figure.setFrost(unit.alive && isFrozen(unit, moment.tick) ? FROST_GLOW : 0);
     record.figure.setStance(stanceOf(unit));
     record.figure.setMoving(moving);
     record.figure.setDead(!unit.alive);
@@ -734,7 +741,8 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
     const unit = record.unit;
     record.sparkClock = unit.alive && unit.primed !== null ? record.sparkClock + deltaSeconds : 0;
     record.emberClock = unit.alive && unit.burning !== null ? record.emberClock + deltaSeconds : 0;
-    record.starClock = unit.alive && isStunned(unit, tick) ? record.starClock + deltaSeconds : 0;
+    record.starClock =
+      unit.alive && isStunned(unit, tick) && !isFrozen(unit, tick) ? record.starClock + deltaSeconds : 0;
 
     while (record.sparkClock >= SPARK_SECONDS) {
       record.sparkClock -= SPARK_SECONDS;
@@ -1103,9 +1111,15 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
   function syncReels(): void {
     for (const record of records.values()) {
       const motion = record.unit.motion;
+      const puller = pullerOf(record.unit, (unitId) => recordOf(unitId).unit);
+      const yanker =
+        motion.kind === "flight" && motion.landing.cause === "yank"
+          ? motion.landing.launcherUnitId
+          : null;
+      const sourceId = puller ?? yanker;
       let reel = reels.get(record.unitId);
 
-      if (motion.kind !== "flight" || motion.landing.cause !== "yank") {
+      if (sourceId === null) {
         if (reel !== undefined) {
           reel.dispose();
           reels.delete(record.unitId);
@@ -1115,13 +1129,13 @@ export function createBattleView(stage: BoardStage, options: BattleViewOptions):
       }
 
       if (reel === undefined) {
-        reel = createChainVisual(REEL_COLOR);
+        reel = createChainVisual(puller === null ? REEL_COLOR : MAGNET_COLOR);
         stage.scene.add(reel.root);
         reels.set(record.unitId, reel);
       }
 
       reel.stretch(
-        recordOf(motion.landing.launcherUnitId).figure.castOrigin(reelStart),
+        recordOf(sourceId).figure.castOrigin(reelStart),
         chestOf(record, reelEnd),
         0,
       );

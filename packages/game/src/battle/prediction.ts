@@ -1,7 +1,7 @@
 import type { TeamId, UnitId } from "../ids.js";
 import type { SetupWant } from "../definitions.js";
 import { distance, isWithinRange, type Vector2 } from "../math/vector.js";
-import { DOWNED_TICKS, flightFraction, flightPosition, pathPoint } from "./motion.js";
+import { flightFraction, flightPosition, pathPoint } from "./motion.js";
 import { GROUP_RADIUS_UNITS } from "./rules.js";
 import { bubbleById, isLaunched, type BattleState, type UnitState } from "./state.js";
 
@@ -59,7 +59,7 @@ export function lastsUntil(
   if (want === "downed") {
     return (
       (motion.kind === "downed" && motion.endTick > tick) ||
-      (motion.kind === "skid" && motion.endTick + DOWNED_TICKS > tick)
+      (motion.kind === "skid" && motion.endTick + motion.downedTicks > tick)
     );
   }
 
@@ -86,7 +86,7 @@ export function isSetUpAt(state: BattleState, unit: UnitState, tick: number): bo
   return (
     hasWantedState(state, unit, ["airborne", "floating", "burning", "frozen"], tick) ||
     (primed !== null && primed.explodeTick > tick) ||
-    (motion.kind === "skid" && motion.endTick + DOWNED_TICKS > tick) ||
+    (motion.kind === "skid" && motion.endTick + motion.downedTicks > tick) ||
     (motion.kind === "downed" && motion.endTick > tick)
   );
 }

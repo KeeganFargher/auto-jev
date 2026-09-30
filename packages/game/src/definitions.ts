@@ -120,6 +120,7 @@ export interface CollectionDayDefinition extends SignatureBase {
   radiusUnits: number;
   pileRadiusUnits: number;
   pullTicks: number;
+  pileTicks: number;
   damage: number;
 }
 

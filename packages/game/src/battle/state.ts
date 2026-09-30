@@ -52,6 +52,7 @@ export interface SkidMotion {
   to: Vector2;
   startTick: number;
   endTick: number;
+  downedTicks: number;
   makerUnitId: UnitId;
 }
 

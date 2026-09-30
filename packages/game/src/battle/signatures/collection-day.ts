@@ -24,7 +24,7 @@ export function collectionDayOf(unit: UnitState): CollectionDayDefinition {
 }
 
 function isPullable(target: UnitState): boolean {
-  return target.alive && isOnFloor(target) && isLaunchable(target);
+  return target.alive && target.frozen === null && isOnFloor(target) && isLaunchable(target);
 }
 
 export function planCollectionDay(
@@ -112,6 +112,7 @@ export function advanceCollectionDay(
       to,
       startTick: state.tick,
       endTick,
+      downedTicks: definition.pileTicks,
       makerUnitId: unit.unitId,
     };
     interruptAction(target);

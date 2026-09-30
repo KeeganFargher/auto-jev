@@ -1,5 +1,4 @@
 import {
-  DOWNED_TICKS,
   isDowned,
   isFrozen,
   isLaunched,
@@ -176,7 +175,7 @@ export function statusEndTick(
 
     case "downed": {
       if (motion.kind === "skid") {
-        return motion.endTick + DOWNED_TICKS;
+        return motion.endTick + motion.downedTicks;
       }
 
       if (motion.kind !== "downed") {

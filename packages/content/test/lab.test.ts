@@ -56,3 +56,27 @@ test("every lab preset plays out to a result", () => {
     assert.ok(outcome.result.endedAtTick > 0, `${preset.id} ended at once`);
   }
 });
+
+test("gather, freeze, smash lands the whole chain on nearly every seed", () => {
+  const preset = labPreset("gather-freeze-smash");
+  const seeds = Array.from({ length: 30 }, (_, index) => index + 1);
+  let shattered = 0;
+  let linked = 0;
+
+  for (const seed of seeds) {
+    const outcome = runBattle(createCustomLabSetup(seed, preset.teamA, preset.teamB), gameCatalogue);
+    shattered += outcome.events.some((event) => event.kind === "shatter") ? 1 : 0;
+    linked += outcome.events.some(
+      (event) =>
+        event.kind === "combo-link" &&
+        event.state === "downed" &&
+        event.setupUnitId === "A-1" &&
+        event.payoffUnitId === "A-2",
+    )
+      ? 1
+      : 0;
+  }
+
+  assert.ok(shattered >= 27, `the hammer shattered a freeze on only ${shattered} of 30 seeds`);
+  assert.ok(linked >= 27, `Mags set up Burr on only ${linked} of 30 seeds`);
+});

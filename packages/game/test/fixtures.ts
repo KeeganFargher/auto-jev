@@ -236,6 +236,8 @@ export const FREEZE_TICKS = 90;
 
 export const PULL_TICKS = 8;
 
+export const PILE_TICKS = 45;
+
 const puller = hero(
   "puller",
   {
@@ -249,6 +251,7 @@ const puller = hero(
     radiusUnits: 20,
     pileRadiusUnits: 3,
     pullTicks: PULL_TICKS,
+    pileTicks: PILE_TICKS,
     damage: PULL_DAMAGE,
   },
   null,
@@ -263,7 +266,7 @@ const froster = hero(
     wants: ["grouped", "downed"],
     groupSize: 3,
     rangeUnits: 60,
-    castTicks: 5,
+    castTicks: 15,
     radiusUnits: 10,
     freezeTicks: FREEZE_TICKS,
     damage: FROST_DAMAGE,

@@ -24,7 +24,7 @@ export function blizzardOf(unit: UnitState): BlizzardDefinition {
 }
 
 function isFreezable(target: UnitState): boolean {
-  return target.alive && isOnFloor(target) && !isImmovable(target);
+  return target.alive && target.frozen === null && isOnFloor(target) && !isImmovable(target);
 }
 
 export function planBlizzard(

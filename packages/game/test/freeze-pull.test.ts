@@ -7,9 +7,11 @@ import {
   FREEZE_TICKS,
   FROST_DAMAGE,
   HAMMER_DAMAGE,
+  PILE_TICKS,
   PULL_DAMAGE,
   PULL_TICKS,
   drain,
+  fill,
   eventsOf,
   fieldBattle,
   place,
@@ -202,4 +204,113 @@ test("a shattered pile takes more than the same hammer on an unfrozen pile", () 
   };
 
   assert.equal(hammerOnPile(true), hammerOnPile(false) * SHATTER_DAMAGE_MULTIPLIER);
+});
+
+test("the hammer holds for a freeze while a Burr is coming, instead of hitting the unfrozen pile", () => {
+  const state = fieldBattle([
+    place("A-1", "A", "froster", 46, 58),
+    place("A-2", "A", "shatterer", 40, 50),
+    place("B-1", "B", "post", 40, 34),
+    place("B-2", "B", "post", 46, 34),
+    place("B-3", "B", "post", 34, 34),
+  ]);
+  drain(state, "A-1");
+
+  const early = stepTicks(state, READY_WAIT_TICKS + 40);
+  assert.equal(eventsOf(early, "signature").length, 0);
+
+  fill(state, "A-1");
+  const rest = stepTicks(state, 90);
+  const casts = eventsOf(rest, "signature");
+
+  assert.deepEqual(
+    casts.map((cast) => cast.unitId),
+    ["A-1", "A-2"],
+  );
+  assert.equal(casts[1]?.wanted, true);
+  assert.equal(eventsOf(rest, "shatter").length, 3);
+});
+
+test("a hammer with no Burr on its team still casts after the normal wait", () => {
+  const state = fieldBattle([
+    place("A-1", "A", "shatterer", 40, 50),
+    place("B-1", "B", "post", 40, 42),
+  ]);
+
+  const events = stepUntil(state, "signature", READY_WAIT_TICKS + 5);
+
+  assert.equal(eventsOf(events, "signature")[0]?.tick, READY_WAIT_TICKS);
+});
+
+test("Mags holds while Burr is still charging, then Burr links to her pull", () => {
+  const state = fieldBattle([
+    place("A-1", "A", "puller", 34, 58),
+    place("A-2", "A", "froster", 46, 58),
+    ...spreadEnemies(),
+  ]);
+  drain(state, "A-2");
+
+  const early = stepTicks(state, READY_WAIT_TICKS + 40);
+  assert.equal(eventsOf(early, "pull").length, 0);
+
+  fill(state, "A-2");
+  const events = stepTicks(state, 80);
+
+  assert.equal(eventsOf(events, "pull").length, 3);
+  assert.equal(eventsOf(events, "freeze").length, 3);
+  assert.deepEqual(
+    eventsOf(events, "combo-link").map((link) => [link.setupUnitId, link.payoffUnitId, link.state]),
+    [["A-1", "A-2", "downed"]],
+  );
+});
+
+test("a pulled pile stays downed for the whole pile time", () => {
+  const state = fieldBattle([place("A-1", "A", "puller", 40, 55), ...spreadEnemies()]);
+
+  const pulled = eventsOf(stepUntil(state, "pull", 20), "pull");
+  const pullTick = pulled[0]?.tick ?? -1;
+  const events = stepTicks(state, PULL_TICKS + PILE_TICKS + 2);
+  const getUps = eventsOf(events, "get-up");
+
+  assert.equal(getUps.length, 3);
+
+  for (const getUp of getUps) {
+    assert.equal(getUp.tick, pullTick + PULL_TICKS + PILE_TICKS);
+  }
+});
+
+test("Collection Day leaves frozen enemies where they are", () => {
+  const state = fieldBattle([place("A-1", "A", "puller", 40, 55), ...spreadEnemies()]);
+  const iced = unitIn(state, "B-2");
+  const start = { ...iced.position };
+  iced.frozen = { makerUnitId: "A-1", untilTick: 500 };
+
+  const events = stepUntil(state, "pull", READY_WAIT_TICKS + 20);
+  stepTicks(state, PULL_TICKS + 2);
+
+  assert.deepEqual(
+    eventsOf(events, "pull").map((pull) => pull.unitId),
+    ["B-1", "B-3"],
+  );
+  assert.deepEqual(iced.position, start);
+});
+
+test("Blizzard does not refreeze or re-damage an enemy that is already frozen", () => {
+  const state = fieldBattle([
+    place("A-1", "A", "froster", 40, 50),
+    place("B-1", "B", "post", 40, 40),
+    place("B-2", "B", "post", 44, 40),
+    place("B-3", "B", "post", 36, 40),
+  ]);
+  const iced = unitIn(state, "B-2");
+  iced.frozen = { makerUnitId: "A-1", untilTick: 500 };
+
+  const events = stepUntil(state, "freeze", READY_WAIT_TICKS + 20);
+
+  assert.deepEqual(
+    eventsOf(events, "freeze").map((freeze) => freeze.unitId),
+    ["B-1", "B-3"],
+  );
+  assert.equal(iced.hp, iced.maxHp);
+  assert.equal(iced.frozen?.untilTick, 500);
 });

@@ -45,6 +45,7 @@ export interface HeroFigure {
   setDead(dead: boolean): void;
   setGlow(amount: number): void;
   setRage(amount: number): void;
+  setFrost(amount: number): void;
   setCelebrating(celebrating: boolean): void;
   setCastsShadow(castsShadow: boolean): void;
   perform(gesture: FigureGesture, leadSeconds: number): void;
@@ -91,6 +92,10 @@ const MAX_GESTURE_SPEED = 3;
 const FLASH_EMISSIVE = 0.55;
 
 const RAGE_TINT = new Color("#ff2a10");
+
+const FROST_TINT = new Color("#5fc8ff");
+
+const frostGlow = new Color();
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -158,6 +163,7 @@ export function createHeroFigure(heroId: HeroDefinitionId): HeroFigure {
   let celebrating = false;
   let glow = 0;
   let rage = 0;
+  let frost = 0;
   let flashTime = Number.POSITIVE_INFINITY;
   let squashStrength = 0;
   let squashAge = Number.POSITIVE_INFINITY;
@@ -291,10 +297,15 @@ export function createHeroFigure(heroId: HeroDefinitionId): HeroFigure {
     flashTime += deltaSeconds;
     const flash = flashTime < HIT_SECONDS ? Math.sin((Math.PI * flashTime) / HIT_SECONDS) : 0;
     const white = Math.max(flash * FLASH_EMISSIVE, glow);
-    const tint = rage * (1 - flash);
+    const rageTint = rage * (1 - flash);
+    const frostTint = frost * (1 - flash);
 
     for (const material of flashMaterials) {
-      material.emissive.copy(RAGE_TINT).multiplyScalar(tint).addScalar(white);
+      material.emissive
+        .copy(RAGE_TINT)
+        .multiplyScalar(rageTint)
+        .add(frostGlow.copy(FROST_TINT).multiplyScalar(frostTint))
+        .addScalar(white);
     }
   }
 
@@ -389,6 +400,14 @@ export function createHeroFigure(heroId: HeroDefinitionId): HeroFigure {
       }
 
       rage = amount;
+    },
+
+    setFrost(amount) {
+      if (!Number.isFinite(amount) || amount < 0 || amount > 1) {
+        throw new Error(`Frost must be between 0 and 1, got ${amount}`);
+      }
+
+      frost = amount;
     },
 
     setCelebrating(isCelebrating) {

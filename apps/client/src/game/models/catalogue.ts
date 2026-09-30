@@ -242,6 +242,8 @@ const ROBE_HUES: readonly [number, number] = [228, 262];
 
 const CAPE_HUES: readonly [number, number] = [315, 348];
 
+const CLOAK_HUES: readonly [number, number] = [340, 10];
+
 const ORB_HUES: readonly [number, number] = [55, 175];
 
 export const HERO_MODELS: ReadonlyMap<HeroDefinitionId, HeroModel> = new Map([
@@ -342,7 +344,7 @@ export const HERO_MODELS: ReadonlyMap<HeroDefinitionId, HeroModel> = new Map([
     {
       body: "knight",
       props: [{ prop: "staff", hand: "right", scale: 1 }],
-      tint: [],
+      tint: [{ hues: CLOAK_HUES, hue: 200, saturation: 1.1, lightness: 0.12 }],
       idle: { clip: "Idle_A", speed: 1 },
       gestures: {
         attack: { clip: "Melee_2H_Attack_Slice", from: 0.1, strike: 0.5 },

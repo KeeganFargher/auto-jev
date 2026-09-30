@@ -16,6 +16,8 @@ export const MAX_MANA_PER_HIT_TAKEN = 8;
 
 export const READY_WAIT_TICKS = 45;
 
+export const PATIENT_WAIT_TICKS = 300;
+
 export const CHAIN_WINDOW_TICKS = 120;
 
 export const CHAIN_DAMAGE_BONUS_PER_LINK = 0.1;

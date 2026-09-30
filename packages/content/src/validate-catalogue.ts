@@ -180,6 +180,7 @@ function validateSignatureKind(owner: string, signature: SignatureDefinition): v
       requirePositive(owner, "pile radius", signature.pileRadiusUnits);
       requireBelow(owner, "pile radius", signature.pileRadiusUnits, signature.radiusUnits);
       requirePositiveInteger(owner, "pull ticks", signature.pullTicks);
+      requirePositiveInteger(owner, "pile ticks", signature.pileTicks);
       requireNonNegative(owner, "damage", signature.damage);
       return;
     case "blizzard":

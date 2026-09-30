@@ -164,42 +164,42 @@ export const GOLDEN_DIGESTS: readonly GoldenDigest[] = [
   {
     presetId: "gather-freeze-smash",
     seed: 1,
-    digest: "34f1e319ce53c8af2d084d4b6674b5865b7ef926a46182011de092a4098b1e86",
+    digest: "1e3a5dd43f2c92e356b608380e33d4664e5b27b405721ae7a9e4640a6bc274cc",
   },
   {
     presetId: "gather-freeze-smash",
     seed: 2,
-    digest: "be95de4aa730890d16ea61cb576f89c6ca65efd69eec2bc480b28d7486827dca",
+    digest: "0076642e0df2e3f4912d9f1329db774b064be1f5b86b8fc7dca3949b7b12edab",
   },
   {
     presetId: "gather-freeze-smash",
     seed: 3,
-    digest: "67d83f8b39d6ed20ab50f4adbf1705044bba4608b9cc7a42ff7c901b8c294be8",
+    digest: "8193dfc6a5adafa6a57261d7cb9526b9856f1aa42cffcd3e34c85d6d7bd349f0",
   },
   {
     presetId: "gather-freeze-smash",
     seed: 4,
-    digest: "b2d4235b5dcbfe148cea3768b7a3b1c217ef74c2fefd94cde563d1806d55fcb8",
+    digest: "c7192c23f28bd359299c84b20b41bb9f3000e25b4093a8952278814d6c3b9973",
   },
   {
     presetId: "gather-freeze-smash",
     seed: 5,
-    digest: "bc8548e9e8bac4f40814755fac7773c8a17b57d605da52d213cd16f8d671fae7",
+    digest: "cd70398a92ba48b60968c9e8b61b89bd32b776b7689d71ffb0ef8b60fdecc0cb",
   },
   {
     presetId: "gather-freeze-smash",
     seed: 6,
-    digest: "5fc83ec236fe67b83c9b563460886d33037cfd985da98d5bfb8b26761d9e9135",
+    digest: "2d10dcc747aab1a7368a35cf8ee5b11f351732dfd09444d8f510498f6e67b4c1",
   },
   {
     presetId: "gather-freeze-smash",
     seed: 7,
-    digest: "68d4cb1b5eb26b3be61d4afda81d876006c9dd8361cad861f72f9ee765f65bcd",
+    digest: "02da3c9200f349f9e268e92f2af1c77dd06973d91987bec6a2dca4e9015bf479",
   },
   {
     presetId: "gather-freeze-smash",
     seed: 8,
-    digest: "a6eaf98ffa3a4140df21e25cef3ce5cd57ae9a490382c24c480e7af00a7d6d31",
+    digest: "9443ef32b5c7540d32bbf6dd22790d1549019b8d6790c0dbe9197b83c5410a9e",
   },
   {
     presetId: "full-chain",
